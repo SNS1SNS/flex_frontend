@@ -1,0 +1,87 @@
+/* Основные стили для макета админ-панели */
+.admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+}
+
+/* Стили для основного контента */
+.admin-content {
+  flex: 1;
+  padding: 20px;
+  margin-left: 250px; /* Такой же как ширина сайдбара */
+  transition: margin 0.3s ease;
+}
+
+/* Когда сайдбар свернут, увеличиваем область контента */
+.admin-sidebar.collapsed ~ .admin-content {
+  margin-left: 64px;
+}
+
+/* Стили для кнопки переключения сайдбара (гамбургер) */
+.sidebar-toggle {
+  position: fixed;
+  top: 15px;
+  left: 265px; /* 250px (ширина сайдбара) + 15px (отступ) */
+  width: 40px;
+  height: 40px;
+  background-color: #3498db;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 1001;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: left 0.3s ease;
+}
+
+.sidebar-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background-color: white;
+  margin: 3px 0;
+  transition: all 0.3s ease;
+}
+
+/* Анимация для кнопки гамбургера, когда сайдбар свернут */
+.admin-sidebar.collapsed ~ .sidebar-toggle {
+  left: 79px; /* 64px (ширина свернутого сайдбара) + 15px (отступ) */
+}
+
+.admin-sidebar.collapsed ~ .sidebar-toggle span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.admin-sidebar.collapsed ~ .sidebar-toggle span:nth-child(2) {
+  opacity: 0;
+}
+
+.admin-sidebar.collapsed ~ .sidebar-toggle span:nth-child(3) {
+  transform: rotate(-45deg) translate(5px, -5px);
+}
+
+/* Медиа-запросы для адаптивности */
+@media (max-width: 768px) {
+  .admin-content {
+    margin-left: 0;
+    padding: 15px;
+  }
+  
+  .sidebar-toggle {
+    left: 15px;
+  }
+  
+  .admin-sidebar.expanded ~ .sidebar-toggle {
+    left: 265px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-content {
+    padding: 10px;
+  }
+} 

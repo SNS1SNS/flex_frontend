@@ -1,0 +1,1207 @@
+/* Основной макет страницы */
+.vehicles-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background-color: #f5f7fa;
+  margin-left: 320px;
+  transition: margin-left 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.sidebar.compact-mode ~ .main-content {
+  margin-left: 70px;
+}
+
+.top-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  background-color: #fff;
+  border-radius: 6px;
+  padding: 10px 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.left-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.right-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.control-button {
+  padding: 8px 12px;
+  background-color: #003366;
+  border: 1px solid #003366;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.control-button::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
+  z-index: 0;
+}
+
+.control-button:hover::before {
+  width: 150%;
+  height: 150%;
+}
+
+.control-button svg {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s;
+  color: #ffffff;
+}
+
+.control-button span {
+  position: relative;
+  z-index: 1;
+  color: #ffffff;
+}
+
+.control-button:hover {
+  background-color: #004488;
+  border-color: #004488;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+
+.control-button:hover svg {
+  transform: scale(1.1);
+}
+
+.control-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.control-button.refresh {
+  color: #fff;
+  border-color: #003366;
+  background-color: #003366;
+}
+
+.control-button.refresh:hover {
+  background-color: #004488;
+}
+
+.control-button.menu-toggle {
+  color: #fff;
+  background-color: #003366;
+  border-color: #003366;
+}
+
+.control-button:disabled {
+  opacity: 0.9;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  color: #fff;
+  border-color: #99a9ba;
+  background-color: #99a9ba;
+}
+
+.control-button:disabled:hover {
+  background-color: #99a9ba;
+  border-color: #99a9ba;
+  color: #fff;
+  transform: none;
+  box-shadow: none;
+}
+
+.control-button:disabled:hover::before {
+  width: 0;
+  height: 0;
+}
+
+/* Кнопки с выбором строк */
+.control-button:disabled span {
+  color: #fff;
+}
+
+.control-button:disabled svg {
+  color: #fff;
+}
+
+/* Стили для выбранных строк в таблице */
+.vehicles-table tbody tr.selected {
+  background-color: #003366;
+  color: #ffffff;
+}
+
+/* Вторая строка с кнопками */
+.secondary-controls {
+  margin-bottom: 15px;
+}
+
+/* Поиск */
+.search-container {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.search-input {
+  padding: 8px 12px;
+  border: none;
+  outline: none;
+  width: 250px;
+  font-size: 14px;
+}
+
+.search-button {
+  background-color: transparent;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #777;
+}
+
+.search-button:hover {
+  color: #2c7be5;
+}
+
+/* Фильтры */
+.filters {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+  background-color: #fff;
+  border-radius: 6px;
+  padding: 10px 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-group label {
+  font-size: 14px;
+  color: #555;
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  outline: none;
+}
+
+/* Контейнер таблицы */
+.vehicles-table-container {
+  background-color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Таблица транспортных средств */
+.vehicles-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.vehicles-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.vehicles-table th,
+.vehicles-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.vehicles-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #555;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.vehicles-table tbody tr {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.vehicles-table tbody tr:hover {
+  background-color: #f0f7ff;
+}
+
+.vehicles-table tbody tr.selected {
+  background-color: #003366;
+  color: #ffffff;
+}
+
+.sortable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  user-select: none;
+}
+
+.sortable:hover {
+  background-color: #e9ecef;
+}
+
+.sort-asc svg, .sort-desc svg {
+  color: #2c7be5;
+}
+
+/* Кнопки действий в таблице */
+.action-button {
+  background: none;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  margin-right: 5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-button::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+}
+
+.action-button:hover::before {
+  width: 120%;
+  height: 120%;
+}
+
+.action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-button.info {
+  color: #2c7be5;
+}
+
+.action-button.info:hover {
+  background-color: rgba(44, 123, 229, 0.1);
+  color: #2361b5;
+}
+
+.action-button.edit {
+  color: #4caf50;
+}
+
+.action-button.edit:hover {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #3d8b40;
+}
+
+.action-button.delete {
+  color: #dc3545;
+}
+
+.action-button.delete:hover {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: #bd2130;
+}
+
+/* Статусы */
+.status-ready {
+  color: #3a9e3a;
+  background-color: rgba(58, 158, 58, 0.1);
+  padding: 2px 6px;
+}
+
+.status-processing {
+  color: #ff9800;
+  background-color: rgba(255, 152, 0, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.status-error {
+  color: #dc3545;
+  background-color: rgba(220, 53, 69, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.status-maintenance {
+  color: #6c757d;
+  background-color: rgba(108, 117, 125, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.status-unknown {
+  padding: 2px 6px;
+}
+
+/* Пагинация */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  border-top: 1px solid #eee;
+  background-color: #f8f9fa;
+}
+
+.page-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #555;
+}
+
+.page-size {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  outline: none;
+}
+
+.page-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.page-controls button {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.page-controls button:hover:not(:disabled) {
+  background-color: #f0f0f0;
+  border-color: #ccc;
+}
+
+.page-controls button.active {
+  background-color: #2c7be5;
+  color: #fff;
+  border-color: #2c7be5;
+}
+
+.page-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Загрузка данных */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.loading-overlay svg {
+  color: #2c7be5;
+  font-size: 32px;
+  margin-bottom: 10px;
+  animation: spin 1s linear infinite;
+}
+
+.loading-overlay span {
+  color: #333;
+  font-size: 16px;
+}
+
+/* Сообщение, когда нет данных */
+.no-data {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6c757d;
+  font-size: 16px;
+  font-style: italic;
+}
+
+/* Модальное окно */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: slideDown 0.3s ease;
+}
+
+.modal-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f8f9fa;
+  border-radius: 8px 8px 0 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  font-weight: 600;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.close {
+  font-size: 24px;
+  color: #777;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  background: none;
+  border: none;
+}
+
+.close:hover {
+  color: #333;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn {
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  min-width: 120px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.5s, height 0.5s;
+}
+
+.btn:hover::before {
+  width: 300%;
+  height: 300%;
+}
+
+.btn svg {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s;
+}
+
+.btn span {
+  position: relative;
+  z-index: 1;
+}
+
+.btn-primary {
+  background-color: #2c7be5;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(44, 123, 229, 0.3);
+}
+
+.btn-primary:hover {
+  background-color: #2361b5;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(44, 123, 229, 0.4);
+}
+
+.btn-primary:hover svg {
+  transform: translateX(3px);
+}
+
+.btn-primary:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(44, 123, 229, 0.3);
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(108, 117, 125, 0.3);
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+}
+
+.btn-secondary:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(108, 117, 125, 0.3);
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
+}
+
+.btn-danger:hover svg {
+  transform: rotate(-15deg);
+}
+
+.btn-danger:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(220, 53, 69, 0.3);
+}
+
+.btn-info {
+  background-color: #17a2b8;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(23, 162, 184, 0.3);
+}
+
+.btn-info:hover {
+  background-color: #138496;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(23, 162, 184, 0.4);
+}
+
+.btn-info:hover svg {
+  transform: translateY(-3px);
+}
+
+.btn-info:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(23, 162, 184, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:disabled:hover::before {
+  width: 0;
+  height: 0;
+}
+
+/* Улучшенные стили для дополнительных типов кнопок */
+.btn-outline-primary {
+  background-color: transparent;
+  border: 2px solid #2c7be5;
+  color: #2c7be5;
+  box-shadow: none;
+}
+
+.btn-outline-primary:hover {
+  background-color: rgba(44, 123, 229, 0.1);
+  color: #2361b5;
+  border-color: #2361b5;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(44, 123, 229, 0.2);
+}
+
+.btn-outline-secondary {
+  background-color: transparent;
+  border: 2px solid #6c757d;
+  color: #6c757d;
+  box-shadow: none;
+}
+
+.btn-outline-secondary:hover {
+  background-color: rgba(108, 117, 125, 0.1);
+  color: #5a6268;
+  border-color: #5a6268;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(108, 117, 125, 0.2);
+}
+
+.btn-small {
+  font-size: 12px;
+  padding: 6px 10px;
+  min-width: auto;
+}
+
+/* Стили для модального окна с деталями ТС */
+.vehicle-details-modal {
+  max-width: 800px;
+}
+
+.vehicle-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.vehicle-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vehicle-title h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.vehicle-icon {
+  font-size: 24px;
+  color: #2c7be5;
+}
+
+.vehicle-status {
+  font-size: 14px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.vehicle-details-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.details-section {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.details-section:hover {
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.details-section h4 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  color: #555;
+  font-weight: 600;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #333;
+}
+
+.details-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+/* Общие стили для всего приложения */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Roboto', Arial, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background-color: #f5f5f5;
+  margin: 0;
+  padding: 0;
+}
+
+/* Стили для контекстного меню ТС */
+.vehicle-context-menu {
+  position: absolute;
+  background-color: white;
+  border-radius: 5px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  min-width: 220px;
+  border: 1px solid #ddd;
+  overflow: hidden;
+  animation: slideIn 0.3s ease;
+}
+
+.context-menu-header {
+  padding: 10px 15px;
+  background-color: #0f4c81;
+  color: white;
+  font-weight: bold;
+  border-bottom: 1px solid #ddd;
+}
+
+.context-menu-options {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.context-menu-options li {
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.context-menu-options li:hover {
+  background-color: #f5f5f5;
+  padding-left: 20px;
+}
+
+.context-menu-options li svg {
+  margin-right: 10px;
+  color: #0f4c81;
+  width: 16px;
+  text-align: center;
+}
+
+/* Стили для сообщений Flash */
+.flash-messages {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  width: 350px;
+}
+
+.alert {
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  position: relative;
+  animation: slideIn 0.3s ease;
+}
+
+.alert-success {
+  background-color: #dff0d8;
+  border: 1px solid #d6e9c6;
+  color: #3c763d;
+}
+
+.alert-danger {
+  background-color: #f2dede;
+  border: 1px solid #ebccd1;
+  color: #a94442;
+}
+
+.alert-warning {
+  background-color: #fcf8e3;
+  border: 1px solid #faebcc;
+  color: #8a6d3b;
+}
+
+.alert-info {
+  background-color: #d9edf7;
+  border: 1px solid #bce8f1;
+  color: #31708f;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Улучшенные стили для кнопок */
+.btn-small {
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 5px 10px;
+}
+
+.btn-outline-primary {
+  background-color: transparent;
+  border: 1px solid #2c7be5;
+  color: #2c7be5;
+}
+
+.btn-outline-primary:hover {
+  background-color: #2c7be5;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.btn-outline-secondary {
+  background-color: transparent;
+  border: 1px solid #6c757d;
+  color: #6c757d;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #6c757d;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Стили для уведомлений */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: white;
+  padding: 15px 20px;
+  border-radius: 5px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 300px;
+  animation: slideIn 0.3s ease;
+}
+
+.notification-success {
+  border-left: 5px solid #2ecc71;
+}
+
+.notification-error {
+  border-left: 5px solid #e74c3c;
+}
+
+.notification-warning {
+  border-left: 5px solid #f39c12;
+}
+
+.notification-info {
+  border-left: 5px solid #3498db;
+}
+
+.notification svg {
+  font-size: 18px;
+}
+
+.notification-message {
+  flex: 1;
+  font-size: 14px;
+  color: #333;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  transition: color 0.2s;
+}
+
+.notification-close:hover {
+  color: #888;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+    padding: 10px;
+  }
+  
+  .filters {
+    flex-direction: column;
+    padding: 10px;
+  }
+  
+  .top-controls,
+  .secondary-controls {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .left-controls,
+  .right-controls {
+    width: 100%;
+  }
+  
+  .search-container {
+    width: 100%;
+  }
+  
+  .search-input {
+    width: 100%;
+  }
+  
+  .pagination {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .vehicle-details-modal {
+    width: 95%;
+  }
+  
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .details-actions {
+    justify-content: center;
+  }
+  
+  .flash-messages {
+    width: 300px;
+  }
+  
+  .notification {
+    width: 90%;
+    right: 5%;
+  }
+}
+
+/* Модальное окно удаления */
+.delete-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  text-align: center;
+}
+
+.warning-icon {
+  color: #dc3545;
+  font-size: 48px;
+  margin-bottom: 10px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.delete-vehicles-list {
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 10px;
+  border: 1px solid #eee;
+  text-align: left;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.delete-vehicle-item {
+  padding: 10px 15px;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.delete-vehicle-item:hover {
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+.delete-vehicle-item:last-child {
+  border-bottom: none;
+}
+
+/* Добавляем общие размеры для кнопок Обновить и Экспорт */
+.right-controls .control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 180px;
+  height: 40px;
+  font-weight: 500;
+}
+
+/* Удаляем специальные стили для кнопки refresh, чтобы она использовала общие стили */
+.control-button.refresh {
+  color: #fff;
+  border-color: #003366;
+  background-color: #003366;
+}
+
+.control-button.refresh:hover {
+  background-color: #004488;
+}
+
+/* Одинаковое расположение иконок в кнопках */
+.right-controls .control-button svg {
+  margin-right: 10px;
+  font-size: 16px;
+} 

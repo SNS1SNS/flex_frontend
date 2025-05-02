@@ -1,0 +1,573 @@
+/* Улучшенные стили для плавной анимации боковой навигации */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 320px;
+  color: white;
+  overflow-y: auto;
+  z-index: 101;
+  background: linear-gradient(135deg, #0a2747 0%, #1a3a5f 100%);
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Компактный режим бокового меню - только иконки */
+.sidebar.compact-mode {
+  width: 70px;
+  overflow: visible;
+}
+
+.with-compact-sidebar {
+  padding-left: 70px !important;
+}
+
+/* Стили для компактного режима - скрываем текст */
+.sidebar.compact-mode .nav-item span, 
+.sidebar.compact-mode .logo-text, 
+.sidebar.compact-mode .menu-toggle-icon,
+.sidebar.compact-mode .nav-group-title {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  white-space: nowrap;
+}
+
+/* При наведении на компактный сайдбар - показываем полное меню */
+.sidebar.compact-mode:hover {
+  width: 320px;
+}
+
+.sidebar.compact-mode:hover .nav-item span,
+.sidebar.compact-mode:hover .logo-text,
+.sidebar.compact-mode:hover .menu-toggle-icon,
+.sidebar.compact-mode:hover .nav-group-title {
+  opacity: 1;
+}
+
+/* Стилизация элементов в компактном режиме */
+.sidebar.compact-mode .nav-item {
+  padding: 14px 0;
+  justify-content: center;
+}
+
+.sidebar.compact-mode:hover .nav-item {
+  padding: 14px 20px;
+  justify-content: flex-start;
+}
+
+.sidebar.compact-mode .nav-item svg {
+  margin-right: 0;
+  font-size: 20px;
+}
+
+.sidebar.compact-mode:hover .nav-item svg {
+  margin-right: 12px;
+  font-size: 18px;
+}
+
+.sidebar.compact-mode .nav-item.active::after {
+  display: none;
+}
+
+.sidebar.compact-mode:hover .nav-item.active::after {
+  display: block;
+}
+
+/* Новые стили для шапки бокового меню */
+.sidebar-header {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s ease;
+  z-index: 50;
+  background-color: #0a2747;
+}
+
+.logo-image {
+  max-width: 24px;
+  height: auto;
+  z-index: 50;
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 600;
+  flex-grow: 1;
+  margin: 0;
+  background: linear-gradient(90deg, #ffffff, #3498db);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+}
+
+/* Компактный режим для шапки */
+.sidebar.compact-mode .sidebar-header {
+  justify-content: center;
+  padding: 15px 10px;
+}
+
+.sidebar.compact-mode .logo-text {
+  display: none;
+}
+
+.sidebar.compact-mode:hover .sidebar-header {
+  justify-content: flex-start;
+  padding: 20px;
+}
+
+.sidebar.compact-mode:hover .logo-text {
+  display: block;
+}
+
+.menu-toggle-icon {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+/* Стили для выпадающего меню профиля */
+.profile-menu {
+  position: absolute;
+  background-color: #0d3b66;
+  width: 280px;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 999;
+  padding: 10px 0;
+  transition: all 0.3s ease;
+}
+
+.profile-item {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.profile-menu.hidden {
+  display: none;
+}
+
+.profile-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.profile-menu li {
+  padding: 10px 15px;
+  transition: background-color 0.3s ease;
+}
+
+.profile-menu li.profile-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 20px 15px;
+}
+
+.profile-menu li:not(:first-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-menu li:last-child {
+  border-bottom: none;
+}
+
+.profile-menu li:hover {
+  background-color: #0f4c81;
+}
+
+.profile-menu a {
+  color: #ffffff;
+  text-decoration: none;
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.profile-icon {
+  padding: 5px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #001e3c;
+  border-radius: 50%;
+  color: #001e3c;
+}
+
+.menu-icon {
+  color: #001e3c;
+  width: 20px;
+  text-align: center;
+}
+
+/* Кнопки управления меню */
+.main-controls {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1050;
+  display: flex;
+  gap: 10px;
+}
+
+.sidebar-toggle, .compact-toggle {
+  background-color: var(--primary-color, #3498db);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease;
+}
+
+.sidebar-toggle:hover, .compact-toggle:hover {
+  background-color: var(--primary-dark, #2980b9);
+}
+
+.sidebar-nav {
+  margin-top: 10px;
+}
+
+/* Стили для пунктов меню */
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-size: 16px;
+  border-left: 0px solid transparent;
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  margin: 4px 10px;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
+/* Эффект свечения вокруг активного элемента */
+.nav-item.active {
+  background: rgba(52, 152, 219, 0.15);
+  border-left: 4px solid #3498db;
+  padding-left: 16px;
+  color: white;
+  box-shadow: 0 0 15px rgba(52, 152, 219, 0.1);
+  font-weight: 500;
+}
+
+/* Улучшенный эффект наведения */
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateX(5px);
+  color: white;
+}
+
+/* Плавная смена цвета иконки */
+.nav-item svg {
+  margin-right: 12px;
+  width: 20px;
+  text-align: center;
+  font-size: 18px;
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  opacity: 0.9;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.nav-item:hover svg {
+  transform: scale(1.15) rotate(3deg);
+  color: #3498db;
+  opacity: 1;
+}
+
+.nav-item.active svg {
+  transform: scale(1.2);
+  color: #3498db;
+  opacity: 1;
+  animation: bounce 3s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+/* Более плавная анимация отскока */
+@keyframes bounce {
+  0%, 100% {
+    transform: scale(1.2) translateY(0);
+  }
+  50% {
+    transform: scale(1.2) translateY(-2px);
+  }
+}
+
+/* Эффект волны при клике */
+.sidebar-nav .nav-item:active::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.3);
+  opacity: 1;
+  border-radius: 100%;
+  transform: scale(1) translate(-50%, -50%);
+  animation: wave-animation 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  z-index: 0;
+}
+
+@keyframes wave-animation {
+  0% {
+    transform: scale(1) translate(-50%, -50%);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(50) translate(-1%, -1%);
+    opacity: 0;
+  }
+}
+
+/* Фоновый эффект при наведении */
+.nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background: rgba(52, 152, 219, 0.15);
+  transition: width 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  z-index: -1;
+}
+
+.nav-item:hover::before {
+  width: 100%;
+}
+
+.nav-item.active::before {
+  width: 100%;
+}
+
+/* Индикатор активного элемента с пульсацией */
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  width: 6px;
+  height: 6px;
+  background: #3498db;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 0 8px rgba(52, 152, 219, 0.7);
+  animation: pulse 2s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(52, 152, 219, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+  }
+}
+
+/* Градиентный текст для активного элемента */
+.nav-item span {
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  position: relative;
+  z-index: 1;
+}
+
+.nav-item.active span {
+  background: linear-gradient(90deg, #ffffff, #3498db);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+  font-weight: 500;
+}
+
+.nav-item:hover span {
+  transform: translateX(2px);
+}
+
+/* Эффект пульсации при клике */
+.pulse-effect {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(52, 152, 219, 0.15);
+  border-radius: 8px;
+  z-index: -1;
+  opacity: 0;
+  transform: scale(0.98);
+  transition: opacity 1.5s cubic-bezier(0.25, 0.1, 0.25, 1), transform 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Группирование элементов в меню */
+.nav-group {
+  margin: 15px 0;
+  padding-bottom: 10px;
+  position: relative;
+}
+
+.nav-group-title {
+  padding: 5px 20px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 5px;
+}
+
+.nav-group::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
+/* Кнопка выхода */
+.sidebar-footer {
+  padding: 20px;
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to bottom, transparent, rgba(10, 39, 71, 0.8) 20%);
+}
+
+.logout-button {
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  border-left: 0px solid transparent;
+}
+
+.logout-button:hover {
+  border-left: 4px solid #e74c3c;
+  padding-left: 16px;
+}
+
+.logout-button:hover svg {
+  color: #e74c3c;
+  transform: scale(1.15) rotate(3deg);
+}
+
+/* Анимация при загрузке страницы */
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sidebar-nav .nav-item {
+  animation: fadeInLeft 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  opacity: 0;
+}
+
+/* Задержка для каждого последующего элемента */
+.sidebar-nav .nav-item:nth-child(1) { animation-delay: 0.1s; }
+.sidebar-nav .nav-item:nth-child(2) { animation-delay: 0.15s; }
+.sidebar-nav .nav-item:nth-child(3) { animation-delay: 0.2s; }
+.sidebar-nav .nav-item:nth-child(4) { animation-delay: 0.25s; }
+.sidebar-nav .nav-item:nth-child(5) { animation-delay: 0.3s; }
+.sidebar-nav .nav-item:nth-child(6) { animation-delay: 0.35s; }
+
+/* Адаптивность для маленьких экранов */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 70px;
+    overflow: visible;
+  }
+
+  .sidebar:hover {
+    width: 320px;
+  }
+
+  .sidebar .nav-item span, 
+  .sidebar .logo-text, 
+  .sidebar .menu-toggle-icon,
+  .sidebar .nav-group-title {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .sidebar:hover .nav-item span,
+  .sidebar:hover .logo-text,
+  .sidebar:hover .menu-toggle-icon,
+  .sidebar:hover .nav-group-title {
+    opacity: 1;
+  }
+
+  .nav-item {
+    padding: 14px 0;
+    justify-content: center;
+  }
+
+  .sidebar:hover .nav-item {
+    padding: 14px 20px;
+    justify-content: flex-start;
+  }
+
+  .nav-item svg {
+    margin-right: 0;
+    font-size: 20px;
+  }
+
+  .sidebar:hover .nav-item svg {
+    margin-right: 12px;
+    font-size: 18px;
+  }
+
+  .nav-item.active::after {
+    display: none;
+  }
+
+  .sidebar:hover .nav-item.active::after {
+    display: block;
+  }
+  
+  /* Смещение контента при открытом меню на мобильных */
+  .sidebar.expanded {
+    transform: translateX(0);
+  }
+  
+  .compact-toggle {
+    display: none; /* Скрываем кнопку на мобильных, так как там и так компактный режим */
+  }
+  
+  .with-sidebar-content {
+    transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  
+  .with-sidebar-content.sidebar-expanded {
+    padding-left: 70px;
+  }
+} 

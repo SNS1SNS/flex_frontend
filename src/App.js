@@ -1,24 +1,117 @@
-import logo from './logo.svg';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './components/LoginPage';
+import VehiclesPage from './components/VehiclesPage';
+import PrivateRoute from './components/PrivateRoute';
+import AdminLayout from './components/AdminLayout';
+import { isAdmin } from './utils/roleUtils';
+import { UserProvider } from './context/UserContext';
+import { SidebarProvider } from './context/SidebarContext';
 import './App.css';
 
+/**
+ * Компонент-заглушка для административных страниц
+ */
+const AdminPlaceholder = ({ title }) => (
+  <div className="admin-placeholder">
+    <h1>{title}</h1>
+    <p>Данный раздел находится в разработке</p>
+  </div>
+);
+
+/**
+ * Главный компонент приложения
+ * Определяет структуру маршрутизации всего приложения
+ */
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <UserProvider>
+      <SidebarProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Публичные маршруты */}
+            <Route path="/login" element={<LoginPage />} />
+            
+            {/* Защищенные маршруты для обычных пользователей */}
+            
+            <Route 
+              path="/vehicles" 
+              element={
+                <PrivateRoute>
+                  <VehiclesPage />
+                </PrivateRoute>
+              } 
+            />
+            
+            {/* Перенаправление со старого URL dashboard на vehicles */}
+            <Route 
+              path="/dashboard" 
+              element={<Navigate to="/vehicles" replace />} 
+            />
+            
+            <Route 
+              path="/drivers" 
+              element={
+                <PrivateRoute>
+                  <AdminPlaceholder title="Водители" />
+                </PrivateRoute>
+              } 
+            />
+            
+            <Route 
+              path="/users" 
+              element={
+                <PrivateRoute>
+                  <AdminPlaceholder title="Пользователи" />
+                </PrivateRoute>
+              } 
+            />
+            
+            {/* Административная панель */}
+            <Route 
+              path="/admin" 
+              element={<AdminLayout />}
+            >
+              <Route path="vehicles" element={<AdminPlaceholder title="Транспортные средства" />} />
+              <Route path="drivers" element={<AdminPlaceholder title="Водители" />} />
+              <Route path="users" element={<AdminPlaceholder title="Пользователи" />} />
+            </Route>
+            
+            {/* Маршрут по умолчанию */}
+            <Route 
+              path="/" 
+              element={
+                isAdmin() ? <Navigate to="/admin" replace /> : <Navigate to="/vehicles" replace />
+              } 
+            />
+            
+            {/* Страница "Доступ запрещен" */}
+            <Route 
+              path="/access-denied" 
+              element={
+                <div className="error-page">
+                  <h1>Доступ запрещен</h1>
+                  <p>У вас нет прав для просмотра этой страницы.</p>
+                  <a href="/login">Вернуться на страницу входа</a>
+                </div>
+              } 
+            />
+            
+            {/* Обработка несуществующих маршрутов */}
+            <Route 
+              path="*" 
+              element={
+                <div className="error-page">
+                  <h1>Страница не найдена</h1>
+                  <p>Страница, которую вы ищете, не существует.</p>
+                  <a href="/login">Вернуться на страницу входа</a>
+                </div>
+              } 
+            />
+          </Routes>
+        </BrowserRouter>
+      </SidebarProvider>
+    </UserProvider>
   );
 }
 
