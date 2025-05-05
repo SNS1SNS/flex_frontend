@@ -1,0 +1,183 @@
+/* Стили для компонента выбора диапазона дат */
+.date-range-picker {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  width: 100%;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+/* Шапка с выбором даты */
+.date-range-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+/* Кнопки навигации */
+.date-nav-button {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.date-nav-button:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+/* Блок отображения даты */
+.date-display {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+  margin: 0 10px;
+  justify-content: center;
+}
+
+
+.calendar-icon {
+  margin-right: 8px;
+  color: #0066cc;
+}
+
+.date-text {
+  font-size: 14px;
+  color: #333;
+}
+
+/* Кнопки периодов */
+.date-range-picker-periods {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.period-button {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  flex: 1;
+  transition: all 0.2s;
+  color: #666;
+}
+
+.period-button:hover {
+  background-color: #f0f0f0;
+  border-color: #bbb;
+  color: #333;
+}
+
+.period-button.active {
+  background-color: #e3f2fd;
+  border-color: #90caf9;
+  color: #0066cc;
+  font-weight: 500;
+}
+
+/* Выпадающий календарь */
+.date-range-picker-calendar {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  padding: 16px;
+  margin-top: 8px;
+  border: 1px solid #ddd;
+}
+
+.calendar-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-inputs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.calendar-input-group {
+  flex: 1;
+}
+
+.calendar-input-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #666;
+}
+
+.calendar-input-group input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.calendar-input-group input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.calendar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.calendar-cancel, 
+.calendar-apply {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.calendar-cancel {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  color: #666;
+}
+
+.calendar-cancel:hover {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.calendar-apply {
+  background-color: #0066cc;
+  border: none;
+  color: #fff;
+}
+
+.calendar-apply:hover {
+  background-color: #0055b3;
+} 

@@ -12,11 +12,15 @@ import './VehiclesPage.css';
 import { useUser } from '../context/UserContext';
 import { useSidebar } from '../context/SidebarContext';
 import { apiService } from '../services';
+import { useLoading } from '../context/LoadingContext';
 
 /**
  * Компонент страницы с транспортными средствами
  */
 const VehiclesPage = () => {
+  // Получаем доступ к глобальному индикатору загрузки
+  const { showLoader, hideLoader } = useLoading();
+  
   const [loading, setLoading] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [isDataFetched, setIsDataFetched] = useState(false);
@@ -54,9 +58,7 @@ const VehiclesPage = () => {
     toggleSidebar();
   };
 
-  // Загрузка данных при монтировании компонента
   useEffect(() => {
-    // Проверка токена для авторизации
     const token = localStorage.getItem('access_token');
     if (!token) {
       // Если нет токена, перенаправляем на страницу входа
@@ -78,6 +80,8 @@ const VehiclesPage = () => {
   // Функция для загрузки данных с сервера через apiService
   const handleFetchData = () => {
     setLoading(true);
+    // Показываем индикатор загрузки с глобальным контекстом
+    showLoader('Загрузка списка транспортных средств...');
     
     // Используем apiService вместо прямого fetch
     apiService.getVehicles()
@@ -115,13 +119,20 @@ const VehiclesPage = () => {
         setVehicles(processedVehicles);
         setIsDataFetched(true);
         setLoading(false);
+        // Скрываем индикатор загрузки
+        hideLoader();
       })
       .catch(error => {
         console.error('Ошибка при загрузке данных:', error);
         setLoading(false);
+        // Скрываем индикатор загрузки
+        hideLoader();
         
         // Если API недоступен, загружаем демо-данные
         setTimeout(() => {
+          // Показываем индикатор загрузки для демо-данных
+          showLoader('Загрузка демонстрационных данных...');
+          
           const demoData = [
             {
               id: 1,
@@ -172,6 +183,11 @@ const VehiclesPage = () => {
           setVehicles(demoData);
           setIsDataFetched(true);
           setLoading(false);
+          
+          // Скрываем индикатор загрузки после небольшой задержки
+          setTimeout(() => {
+            hideLoader();
+          }, 800);
         }, 1000);
       });
   };
@@ -506,12 +522,19 @@ const VehiclesPage = () => {
         </div>
         
         <div className="vehicles-table-container">
-          {loading ? (
-            <div className="loading-overlay">
-              <FontAwesomeIcon icon={faSync} spin />
-              <span>Загрузка данных...</span>
+          {!isDataFetched && vehicles.length === 0 && (
+            <div className="no-data">
+              Данные не загружены. Нажмите "Обновить", чтобы загрузить список ТС
             </div>
-          ) : (
+          )}
+          
+          {isDataFetched && vehicles.length === 0 && (
+            <div className="no-data">
+              Транспортные средства не найдены. Попробуйте изменить параметры фильтра
+            </div>
+          )}
+          
+          {vehicles.length > 0 && (
             <>
               <div className="vehicles-table">
                 <table>
@@ -678,47 +701,47 @@ const VehiclesPage = () => {
               )}
             </>
           )}
-      </div>
-      
-      {/* Модальное окно подтверждения удаления */}
-      {showDeleteConfirm && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2>Подтверждение удаления</h2>
-              <span className="close" onClick={() => setShowDeleteConfirm(false)}>&times;</span>
-            </div>
-            <div className="modal-body">
-              <div className="delete-info">
-                <FontAwesomeIcon icon={faExclamationTriangle} className="warning-icon" />
-                <p>Вы действительно хотите удалить выбранные транспортные средства ({selectedVehicles.length})?</p>
-                <div className="delete-vehicles-list">
-                  {selectedVehicles.map(id => {
-                    const vehicle = vehicles.find(v => v.id === id);
-                    return vehicle ? (
-                      <div key={id} className="delete-vehicle-item">
-                        <strong>{vehicle.name}</strong> (Гаражный номер: {vehicle.garage_number})
-                      </div>
-                    ) : null;
-                  })}
-                </div>
+        </div>
+        
+        {/* Модальное окно подтверждения удаления */}
+        {showDeleteConfirm && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h2>Подтверждение удаления</h2>
+                <span className="close" onClick={() => setShowDeleteConfirm(false)}>&times;</span>
               </div>
-              <div className="form-actions">
-                <button 
-                  className="btn btn-danger" 
-                  onClick={() => {
-                    // Здесь будет логика удаления
-                    console.log('Удаление ТС:', selectedVehicles);
-                    setShowDeleteConfirm(false);
-                    setSelectedVehicles([]);
-                  }}
-                >
+              <div className="modal-body">
+                <div className="delete-info">
+                  <FontAwesomeIcon icon={faExclamationTriangle} className="warning-icon" />
+                  <p>Вы действительно хотите удалить выбранные транспортные средства ({selectedVehicles.length})?</p>
+                  <div className="delete-vehicles-list">
+                    {selectedVehicles.map(id => {
+                      const vehicle = vehicles.find(v => v.id === id);
+                      return vehicle ? (
+                        <div key={id} className="delete-vehicle-item">
+                          <strong>{vehicle.name}</strong> (Гаражный номер: {vehicle.garage_number})
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button 
+                    className="btn btn-danger" 
+                    onClick={() => {
+                      // Здесь будет логика удаления
+                      console.log('Удаление ТС:', selectedVehicles);
+                      setShowDeleteConfirm(false);
+                      setSelectedVehicles([]);
+                    }}
+                  >
                     <FontAwesomeIcon icon={faTrash} /> <span>Удалить</span>
-                </button>
-                <button 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowDeleteConfirm(false)}
-                >
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => setShowDeleteConfirm(false)}
+                  >
                     <span>Отмена</span>
                   </button>
                 </div>
@@ -834,7 +857,7 @@ const VehiclesPage = () => {
                   </button>
                   <button className="btn btn-secondary" onClick={() => setShowVehicleDetails(false)}>
                     <span>Закрыть</span>
-                </button>
+                  </button>
                 </div>
               </div>
             </div>

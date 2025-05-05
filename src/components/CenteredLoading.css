@@ -1,0 +1,89 @@
+.centered-loading-container {
+  /* Гарантированное центрирование в окне браузера */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: all;
+  z-index: 10000; /* Максимальный z-index для отображения поверх всего */
+}
+
+.centered-loading-overlay {
+  /* Затемнение заднего фона */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.centered-loading-content {
+  /* Центрированное содержимое с индикатором */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #ffffff;
+  padding: 30px 40px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: fadeInScale 0.3s ease, float 2s ease-in-out infinite;
+}
+
+.centered-loading-icon {
+  font-size: 48px;
+  color: #003366;
+  margin-bottom: 16px;
+  animation: spin 1s linear infinite;
+}
+
+.centered-loading-message {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin-top: 5px;
+}
+
+/* Анимации */
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translate(-50%, -50%);
+  }
+  50% {
+    transform: translate(-50%, -53%);
+  }
+  100% {
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+} 

@@ -2,18 +2,15 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-    faTruck, faUser, faUsers, faSignOutAlt,
-    faCog, faDesktop, faExchangeAlt, faFileAlt,
-    faEnvelope, faVideo, faBell, faFolder,
-    faExclamationTriangle, faCreditCard, faLanguage,
-    faPlusCircle, faWrench, faTachometerAlt, faCar, faUserTie, faClipboardList,
-    faEllipsisVertical, faRightFromBracket, faInfo, faQuestion, faArrowLeft
+    faTruck, faUser, faUsers, 
+    faFileAlt,
+    faRightFromBracket, faInfo, faQuestion, 
+    faUserTie
 } from '@fortawesome/free-solid-svg-icons';
 import './Sidebar.css';
 import './ProfileMenu.css';
 import { authService } from '../services';
 import { useUser } from '../context/UserContext';
-import { useSidebar } from '../context/SidebarContext';
 import { 
     createPulseEffect,
     animateOnHover,
@@ -29,7 +26,6 @@ import logo from '../images/logo.svg';  // Импортируйте изобра
 const Sidebar = () => {
     const location = useLocation();
     const { clearUserData } = useUser();
-    const { sidebarOpen, toggleSidebar } = useSidebar();
     const [isCompactMode, setIsCompactMode] = useState(false);
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const profileMenuRef = useRef(null);
@@ -62,13 +58,6 @@ const Sidebar = () => {
         }
     };
     
-    // Функция для закрытия профильного меню
-    const closeProfileMenu = (e) => {
-        if (e) e.stopPropagation();
-        setProfileMenuOpen(false);
-        document.body.classList.remove('profile-menu-open');
-    };
-
     // Обработчик для закрытия профильного меню при клике вне его
     const handleClickOutside = (event) => {
         if (
@@ -233,6 +222,8 @@ const Sidebar = () => {
                         <FontAwesomeIcon icon={faUserTie} />
                         <span>Водители</span>
                     </Link>
+                    
+                    
                 </div>
                 
                 <div className="nav-group">

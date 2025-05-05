@@ -1,0 +1,141 @@
+/* Стили для разделения экрана */
+.split-mode-controls {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 10px;
+}
+
+.split-mode-button {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 1rem;
+  padding: 5px 8px;
+  margin: 0 2px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.split-mode-button:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.split-mode-button.active {
+  background-color: #e3f2fd;
+  color: #0066cc;
+}
+
+/* Стили для различных режимов разделения экрана */
+.main-content.split-mode-single .tabs-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  gap: 0px;
+}
+
+.main-content.split-mode-split-2 .tabs-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+  gap: 10px;
+}
+
+.main-content.split-mode-split-4 .tabs-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Стили для контейнеров отчетов в режиме разделения */
+.report-container {
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.report-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid #eee;
+  background-color: #f9f9f9;
+}
+
+.report-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+  display: flex;
+  align-items: center;
+}
+
+.report-title-icon {
+  margin-right: 8px;
+  color: #0066cc;
+}
+
+.report-content {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+}
+
+/* Выделение выбранного транспортного средства в списке */
+.selected-vehicle {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background-color: #f5f9ff;
+  border-left: 3px solid #0066cc;
+  border-radius: 4px;
+}
+
+.selected-vehicle-icon {
+  color: #0066cc;
+  margin-right: 10px;
+}
+
+.selected-vehicle-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.selected-vehicle-imei {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* Настройки размера контейнеров в разделенном режиме */
+.main-content.split-mode-split-2 .track-chart-container,
+.main-content.split-mode-split-4 .track-chart-container {
+  height: 100%;
+}
+
+.main-content.split-mode-split-2 .track-map,
+.main-content.split-mode-split-4 .track-map {
+  height: 300px !important;
+}
+
+.main-content.split-mode-split-2 .track-statistics,
+.main-content.split-mode-split-4 .track-statistics {
+  flex-direction: column;
+}
+
+.main-content.split-mode-split-4 .stat-card {
+  padding: 8px;
+  margin: 4px;
+}
+
+.main-content.split-mode-split-4 .stat-value {
+  font-size: 1.2rem;
+} 

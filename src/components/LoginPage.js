@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './LoginPage.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faSignInAlt, faGlobe, faUser, faLock, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faSignInAlt, faGlobe, faUser, faLock, faSpinner, faCheckCircle, faExclamationCircle, faInfoCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import authService from '../services/authService';
 
 function LoginPage() {
@@ -15,6 +15,10 @@ function LoginPage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [message, setMessage] = useState({ text: '', category: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({
+    username: '',
+    password: ''
+  });
   const dropdownRef = useRef(null);
   
   // Объект с переводами
@@ -33,7 +37,10 @@ function LoginPage() {
       login_success: 'Вход выполнен успешно',
       login_error: 'Ошибка входа: ',
       connection_error: 'Ошибка соединения с сервером',
-      processing: 'Обработка...'
+      processing: 'Обработка...',
+      username_required: 'Введите имя пользователя',
+      password_required: 'Введите пароль',
+      form_error: 'Пожалуйста, заполните все поля'
     },
     en: {
       name_website: 'Equipment Control',
@@ -49,7 +56,10 @@ function LoginPage() {
       login_success: 'Login successful',
       login_error: 'Login error: ',
       connection_error: 'Server connection error',
-      processing: 'Processing...'
+      processing: 'Processing...',
+      username_required: 'Enter username',
+      password_required: 'Enter password',
+      form_error: 'Please fill in all fields'
     },
     kz: {
       name_website: 'Техника Бақылауы',
@@ -65,12 +75,42 @@ function LoginPage() {
       login_success: 'Кіру сәтті болды',
       login_error: 'Кіру қатесі: ',
       connection_error: 'Сервермен байланыс қатесі',
-      processing: 'Өңдеу...'
+      processing: 'Өңдеу...',
+      username_required: 'Пайдаланушы атын енгізіңіз',
+      password_required: 'Құпия сөзді енгізіңіз',
+      form_error: 'Барлық өрістерді толтырыңыз'
     }
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    
+    // Проверка формы и сброс ошибок
+    let isValid = true;
+    const errors = {
+      username: '',
+      password: ''
+    };
+    
+    if (!username.trim()) {
+      errors.username = currentTranslations.username_required || 'Введите имя пользователя';
+      isValid = false;
+    }
+    
+    if (!password.trim()) {
+      errors.password = currentTranslations.password_required || 'Введите пароль';
+      isValid = false;
+    }
+    
+    // Устанавливаем ошибки полей и останавливаем отправку, если форма невалидна
+    setFieldErrors(errors);
+    if (!isValid) {
+      setMessage({ 
+        text: currentTranslations.form_error || 'Пожалуйста, заполните все поля', 
+        category: 'danger' 
+      });
+      return;
+    }
     
     // Сбрасываем предыдущие сообщения и устанавливаем состояние загрузки
     setMessage({ text: '', category: '' });
@@ -81,10 +121,10 @@ function LoginPage() {
       console.log('Начинаем авторизацию для пользователя:', username);
       
       // Используем authService для входа
-      const data = await authService.login(username, password, loginType);
+      const result = await authService.login(username, password, loginType);
       
-      // Проверяем, что данные получены (не логируем их повторно, это делает authService)
-      if (data) {
+      // Проверяем, что данные получены
+      if (result) {
         console.log('Авторизация успешна');
       }
       
@@ -120,6 +160,14 @@ function LoginPage() {
         text: `${currentTranslations.login_error} ${error}`, 
         category: 'danger' 
       });
+      
+      // Если это ошибка "неверные учетные данные", выделяем поля
+      if (error.toString().includes('credentials') || error.toString().includes('user') || error.toString().toLowerCase().includes('пароль')) {
+        setFieldErrors({
+          username: ' ',
+          password: ' '
+        });
+      }
     } finally {
       // В любом случае выключаем индикатор загрузки
       setIsLoading(false);
@@ -220,8 +268,14 @@ function LoginPage() {
         <h1 className="login-title">{loginTitle}</h1>
 
         {message.text && (
-          <div id="login-message">
-            <div className={`alert alert-${message.category}`}>{message.text}</div>
+          <div id="login-message" className={`message-container ${message.category}`}>
+            <div className="message-icon">
+              {message.category === 'success' && <FontAwesomeIcon icon={faCheckCircle} />}
+              {message.category === 'danger' && <FontAwesomeIcon icon={faExclamationCircle} />}
+              {message.category === 'warning' && <FontAwesomeIcon icon={faExclamationTriangle} />}
+              {message.category === 'info' && <FontAwesomeIcon icon={faInfoCircle} />}
+            </div>
+            <div className="message-text">{message.text}</div>
           </div>
         )}
         
@@ -234,12 +288,23 @@ function LoginPage() {
                 name="username"
                 placeholder={currentTranslations.username}
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (e.target.value.trim()) {
+                    setFieldErrors(prev => ({...prev, username: ''}));
+                  }
+                }}
                 required
                 disabled={isLoading}
+                className={fieldErrors.username ? 'input-error' : ''}
               />
               <i><FontAwesomeIcon icon={faUser} /></i>
-              <div className="error-message" id="username-error"></div>
+              {fieldErrors.username && (
+                <div className="error-message visible" id="username-error">
+                  <FontAwesomeIcon icon={faExclamationCircle} />
+                  {fieldErrors.username !== ' ' && fieldErrors.username}
+                </div>
+              )}
             </div>
           </div>
           
@@ -251,12 +316,23 @@ function LoginPage() {
                 name="password"
                 placeholder={currentTranslations.password}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (e.target.value.trim()) {
+                    setFieldErrors(prev => ({...prev, password: ''}));
+                  }
+                }}
                 required
                 disabled={isLoading}
+                className={fieldErrors.password ? 'input-error' : ''}
               />
               <i><FontAwesomeIcon icon={faLock} /></i>
-              <div className="error-message" id="password-error"></div>
+              {fieldErrors.password && (
+                <div className="error-message visible" id="password-error">
+                  <FontAwesomeIcon icon={faExclamationCircle} />
+                  {fieldErrors.password !== ' ' && fieldErrors.password}
+                </div>
+              )}
             </div>
           </div>
           
@@ -297,15 +373,15 @@ function LoginPage() {
                 className={`dropdown-content ${showDropdown ? 'show' : ''}`} 
                 id="languageDropdown"
               >
-                {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+                { }
                 <a href="#" onClick={(e) => changeLanguage('ru', e)}>
                   Русский
                 </a>
-                {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+                {}
                 <a href="#" onClick={(e) => changeLanguage('en', e)}>
                   English
                 </a>
-                {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+                {}
                 <a href="#" onClick={(e) => changeLanguage('kz', e)}>
                   Қазақша
                 </a>

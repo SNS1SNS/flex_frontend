@@ -1,0 +1,225 @@
+/* Стили для панели управления анимацией маршрута */
+.route-animation-progress {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  padding: 15px;
+  width: 320px;
+  margin: 10px;
+  position: absolute;
+  left: 10px;
+  bottom: 30px;
+  z-index: 1000;
+}
+
+/* Контейнер прогресс-бара */
+.progress-container {
+  width: 100%;
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Сам прогресс-бар */
+.progress-bar {
+  height: 100%;
+  background: #2c7be5;
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+/* Информация о времени */
+.progress-info {
+  display: flex;
+  justify-content: center;
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 10px;
+}
+
+.separator {
+  margin: 0 6px;
+}
+
+/* Статистика маршрута */
+.route-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  padding: 10px 0;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #344050;
+}
+
+.stat-item svg {
+  margin-right: 5px;
+  color: #2c7be5;
+}
+
+/* Элементы управления анимацией */
+.animation-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.animation-pause, .animation-stop {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.animation-pause:hover, .animation-stop:hover {
+  background-color: #e9ecef;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+
+.speed-control label {
+  margin-right: 8px;
+  color: #555;
+}
+
+.speed-control select {
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  background-color: white;
+  cursor: pointer;
+}
+
+/* Стили для маркера транспортного средства */
+.animated-vehicle-marker {
+  z-index: 1000;
+}
+
+.vehicle-animation-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.vehicle-icon-animated {
+  background: #2c7be5;
+  color: white;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 2;
+}
+
+.direction-indicator-animated {
+  position: absolute;
+  top: 2px;
+  left: 18px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 12px solid #2c7be5;
+  transform-origin: center bottom;
+  z-index: 1;
+}
+
+.pulse-circle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(44, 123, 229, 0.3);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+
+/* Стили для линии трека */
+.vehicle-track-progress {
+  stroke-dasharray: 5, 5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* Стили для всплывающей подсказки */
+.custom-tooltip {
+  background-color: rgba(0, 0, 0, 0.75);
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 576px) {
+  .route-animation-progress {
+    width: calc(100% - 40px);
+    left: 10px;
+    right: 10px;
+    padding: 10px;
+  }
+  
+  .stat-item {
+    font-size: 12px;
+  }
+  
+  .speed-control label {
+    display: none;
+  }
+  
+  .animation-controls {
+    gap: 5px;
+  }
+  
+  .animation-pause, .animation-stop {
+    width: 32px;
+    height: 32px;
+  }
+} 

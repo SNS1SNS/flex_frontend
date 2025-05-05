@@ -1,0 +1,208 @@
+.report-tabs-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: #f1f4f8;
+  border-bottom: 1px solid #e3ebf6;
+  padding: 0 5px;
+  position: relative;
+}
+
+.report-tabs {
+  display: flex;
+  overflow-x: auto;
+  flex: 1;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  position: relative;
+}
+
+.report-tabs::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.report-tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 160px;
+  max-width: 240px;
+  height: 40px;
+  padding: 0 10px 0 15px;
+  background-color: #f8fafc;
+  border: 1px solid #e3ebf6;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  margin-right: 2px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  position: relative;
+  user-select: none;
+}
+
+.report-tab:hover {
+  background-color: #fff;
+}
+
+.report-tab.active {
+  background-color: #fff;
+  border-bottom: 2px solid #2c7be5;
+  padding-bottom: 1px;
+  z-index: 1;
+}
+
+.tab-content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  margin-right: 5px;
+}
+
+.tab-icon {
+  margin-right: 8px;
+  color: #5e6e82;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.tab-title {
+  font-size: 14px;
+  color: #344050;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-subtitle {
+  font-size: 11px;
+  color: #748194;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close-btn {
+  background: none;
+  border: none;
+  color: #748194;
+  cursor: pointer;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.tab-close-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #344050;
+  opacity: 1;
+}
+
+.tab-scroll-button {
+  width: 24px;
+  height: 24px;
+  background-color: #fff;
+  border: 1px solid #e3ebf6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5e6e82;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+  margin: 0 5px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.tab-scroll-button:hover {
+  background-color: #f8fafc;
+  color: #344050;
+}
+
+.tab-scroll-button.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tab-scroll-button.left {
+  margin-right: 0;
+}
+
+.tab-scroll-button.right {
+  margin-left: 0;
+}
+
+/* Стили для активной вкладки */
+.report-tab.active .tab-icon {
+  color: #2c7be5;
+}
+
+.report-tab.active .tab-title {
+  font-weight: 500;
+}
+
+/* Эффект тени для прокрутки */
+.report-tabs::before,
+.report-tabs::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 15px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.report-tabs::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(241, 244, 248, 0.9), rgba(241, 244, 248, 0));
+}
+
+.report-tabs::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(241, 244, 248, 0.9), rgba(241, 244, 248, 0));
+}
+
+.report-tabs.can-scroll-left::before {
+  opacity: 1;
+}
+
+.report-tabs.can-scroll-right::after {
+  opacity: 1;
+}
+
+/* Медиа-запросы для адаптивности */
+@media (max-width: 768px) {
+  .report-tab {
+    min-width: 120px;
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 576px) {
+  .report-tab {
+    min-width: 100px;
+    padding: 0 5px 0 10px;
+  }
+  
+  .tab-icon {
+    margin-right: 5px;
+  }
+  
+  .tab-close-btn {
+    width: 18px;
+    height: 18px;
+  }
+} 

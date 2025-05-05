@@ -23,7 +23,7 @@ const AdminLayout = () => {
   
   // Если пользователь не администратор, перенаправляем на дашборд
   if (!checkAdminRole()) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/vehicles" replace />;
   }
   
   return (

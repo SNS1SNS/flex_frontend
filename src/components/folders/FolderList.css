@@ -1,0 +1,639 @@
+/* Основные стили для списка папок */
+.folder-list-container {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.folder-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+.folders-container {
+    margin-bottom: 10px;
+}
+
+/* Стили для элементов папки */
+.folder-item {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.folder-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 5px;
+    transition: background-color 0.2s;
+}
+
+.folder-header:hover {
+    background-color: rgba(0, 0, 255, 0.05);
+}
+
+.folder-toggle {
+    width: 20px;
+    text-align: center;
+    margin-right: 5px;
+}
+
+.folder-toggle-icon {
+    transition: transform 0.2s ease;
+}
+
+.folder-expanded .folder-toggle-icon {
+    transform: rotate(0deg);
+}
+
+.folder-toggle-placeholder {
+    width: 20px;
+    display: inline-block;
+}
+
+.folder-icon {
+    margin-right: 8px;
+    width: 20px;
+    text-align: center;
+}
+
+.folder-name {
+    flex-grow: 1;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.folder-count {
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 11px;
+    color: #666;
+    margin-right: 8px;
+}
+
+/* Стили для разных типов папок */
+.folder-type-tariff .folder-header {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.folder-type-group .folder-header {
+    background-color: rgba(0, 150, 0, 0.05);
+}
+
+.folder-type-group .folder-icon {
+    color: #28a745;
+}
+
+.folder-group-title {
+    font-weight: 500;
+}
+
+.folder-group-title.with-vehicles {
+    color: #28a745;
+}
+
+.folder-type-tariff:hover .folder-header,
+.folder-type-group:hover .folder-header {
+    background-color: rgba(0, 100, 255, 0.1);
+}
+
+/* Стили для содержимого папки */
+.folder-contents {
+    overflow: visible;
+    max-height: none;
+    transition: none;
+}
+
+.folder-expanded .folder-contents {
+    max-height: none;
+    transition: none;
+}
+
+/* Стили для транспортных средств */
+.vehicle-compact-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+}
+
+.vehicle-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 15px;
+    margin: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s, transform 0.1s;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    min-height: 32px;
+}
+
+.vehicle-item:hover {
+    background-color: rgba(255, 100, 0, 0.1);
+    transform: translateX(2px);
+}
+
+.vehicle-item.selected {
+    background-color: rgba(0, 123, 255, 0.1);
+    border-left: 3px solid #007bff;
+}
+
+.vehicle-item.has-user-group {
+    border-left: 3px solid #28a745;
+}
+
+.vehicle-icon {
+    margin-right: 8px;
+    color: #fd7e14;
+    font-size: 12px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vehicle-name {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vehicle-item.selected .vehicle-name {
+    font-weight: 500;
+    color: #007bff;
+}
+
+/* Стили для кнопки добавления новой папки */
+.add-folder-button {
+    display: flex;
+    align-items: center;
+    margin: 15px;
+    padding: 10px 15px;
+    background: linear-gradient(45deg, rgba(26, 54, 88, 0.9), rgba(41, 77, 125, 0.9));
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(26, 54, 88, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.add-folder-button:hover {
+    background: linear-gradient(45deg, rgba(41, 77, 125, 0.9), rgba(56, 103, 165, 0.9));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(26, 54, 88, 0.4);
+}
+
+.add-folder-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 5px rgba(26, 54, 88, 0.3);
+}
+
+.add-folder-button svg {
+    margin-right: 10px;
+    font-size: 16px;
+    transition: transform 0.3s ease;
+}
+
+.add-folder-button:hover svg {
+    transform: rotate(90deg);
+}
+
+.add-folder-button span {
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* Эффект сияния при наведении */
+.add-folder-button::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        to right, 
+        rgba(255, 255, 255, 0) 0%, 
+        rgba(255, 255, 255, 0.2) 50%, 
+        rgba(255, 255, 255, 0) 100%
+    );
+    transform: rotate(30deg);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.add-folder-button:hover::after {
+    opacity: 1;
+    animation: shine 1.5s infinite;
+}
+
+@keyframes shine {
+    0% {
+        left: -50%;
+    }
+    100% {
+        left: 150%;
+    }
+}
+
+/* Стили для модального окна создания папки */
+.create-folder-modal {
+    position: fixed;
+    z-index: 1050;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+}
+
+.create-folder-content {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 25px;
+    width: 420px;
+    max-width: 90%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.create-folder-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #1a3658;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+/* Улучшенные стили для формы создания папки */
+.folder-form-group {
+    margin-bottom: 18px;
+}
+
+.folder-form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #495057;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.folder-form-group input,
+.folder-form-group select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    background-color: #f8f9fa;
+}
+
+.folder-form-group input:focus,
+.folder-form-group select:focus {
+    outline: none;
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+    background-color: #fff;
+}
+
+.folder-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.folder-form-actions button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.folder-cancel-btn {
+    background-color: #f0f2f5;
+    color: #333;
+}
+
+.folder-cancel-btn:hover {
+    background-color: #e0e2e5;
+}
+
+.folder-create-btn {
+    background-color: #1a3658;
+    color: white;
+}
+
+.folder-create-btn:hover {
+    background-color: #2a4b72;
+}
+
+.folder-create-btn:active {
+    transform: translateY(1px);
+}
+
+/* Стили для индикатора загрузки */
+.folder-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    color: #666;
+}
+
+.folder-loading svg {
+    font-size: 30px;
+    margin-bottom: 10px;
+    color: #1a3658;
+}
+
+.folder-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    color: #dc3545;
+}
+
+.folder-error svg {
+    font-size: 30px;
+    margin-bottom: 10px;
+}
+
+/* Стили для контекстного меню */
+.context-menu {
+    position: fixed;
+    z-index: 9999;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18), 0 3px 8px rgba(0, 0, 0, 0.12);
+    width: 280px;
+    max-width: 90vw;
+    animation: contextMenuFadeIn 0.25s ease-out;
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+    transform-origin: top left;
+    user-select: none;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@supports not (backdrop-filter: blur(8px)) {
+    .context-menu {
+        background-color: rgba(255, 255, 255, 0.95);
+    }
+}
+
+@keyframes contextMenuFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.context-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.context-menu-title {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    color: #343a40;
+    font-size: 14px;
+}
+
+.context-menu-title svg {
+    margin-right: 10px;
+    width: 16px;
+    height: 16px;
+    color: inherit;
+}
+
+.context-menu-title span {
+    max-width: 210px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.close-context-menu {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6c757d;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.close-context-menu:hover {
+    background-color: #dee2e6;
+    color: #343a40;
+    transform: scale(1.05);
+}
+
+.context-menu-content {
+    padding: 8px 0;
+    max-height: calc(90vh - 50px);
+    overflow-y: auto;
+}
+
+.context-menu-group {
+    padding: 4px 0;
+}
+
+.context-menu-item {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    position: relative;
+}
+
+.context-menu-item:hover {
+    background-color: #f2f4f7;
+    color: #0d6efd;
+}
+
+.context-menu-item svg {
+    margin-right: 12px;
+    width: 16px;
+    height: 16px;
+    color: #6c757d;
+    transition: all 0.2s;
+}
+
+.context-menu-item:hover svg {
+    color: #0d6efd;
+    transform: scale(1.1);
+}
+
+.context-menu-item-danger {
+    color: #dc3545;
+}
+
+.context-menu-item-danger svg {
+    color: #dc3545;
+}
+
+.context-menu-item-danger:hover {
+    background-color: #ffe9e9;
+    color: #c82333;
+}
+
+.context-menu-item-danger:hover svg {
+    color: #c82333;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background-color: #dee2e6;
+    margin: 6px 10px;
+}
+
+/* Стили для добавления интерактивности папок */
+.folder-header {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.folder-header:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.folder-header.active {
+    background-color: rgba(13, 110, 253, 0.1);
+    font-weight: bold;
+    border-left: 3px solid #0d6efd;
+    color: #0d6efd;
+}
+
+.folder-header.active .folder-icon i,
+.folder-header.active .folder-name {
+    color: #0d6efd;
+    font-weight: bold;
+}
+
+.vehicle-item {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vehicle-item:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.vehicle-item.selected {
+    background-color: rgba(13, 110, 253, 0.15);
+    border-left: 3px solid #0d6efd;
+}
+
+/* Улучшение кнопки добавления папки */
+.add-folder-button {
+    margin-top: 15px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.3);
+    transition: all 0.3s ease;
+}
+
+.add-folder-button:hover {
+    background-color: #0069d9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+
+.add-folder-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+
+
+/* Scrollbar styles */
+.folder-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.folder-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+}
+
+.folder-list::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.folder-list::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Стили для контейнера меню, чтобы превентить вложенные меню */
+.menu-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9000;
+}
+
+.menu-container .context-menu {
+    pointer-events: auto;
+}
+

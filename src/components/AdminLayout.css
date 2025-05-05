@@ -9,7 +9,6 @@
 .admin-content {
   flex: 1;
   padding: 20px;
-  margin-left: 250px; /* Такой же как ширина сайдбара */
   transition: margin 0.3s ease;
 }
 

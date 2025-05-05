@@ -2,11 +2,16 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
 import VehiclesPage from './components/VehiclesPage';
+import DriversPage from './components/DriversPage';
+import UsersPage from './components/UsersPage';
+import ReportsPage from './components/reports/ReportsPage';
 import PrivateRoute from './components/PrivateRoute';
 import AdminLayout from './components/AdminLayout';
+import Notifications from './components/common/Notifications';
 import { isAdmin } from './utils/roleUtils';
 import { UserProvider } from './context/UserContext';
 import { SidebarProvider } from './context/SidebarContext';
+import { LoadingProvider } from './context/LoadingContext';
 import './App.css';
 
 /**
@@ -27,89 +32,101 @@ function App() {
   return (
     <UserProvider>
       <SidebarProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Публичные маршруты */}
-            <Route path="/login" element={<LoginPage />} />
-            
-            {/* Защищенные маршруты для обычных пользователей */}
-            
-            <Route 
-              path="/vehicles" 
-              element={
-                <PrivateRoute>
-                  <VehiclesPage />
-                </PrivateRoute>
-              } 
-            />
-            
-            {/* Перенаправление со старого URL dashboard на vehicles */}
-            <Route 
-              path="/dashboard" 
-              element={<Navigate to="/vehicles" replace />} 
-            />
-            
-            <Route 
-              path="/drivers" 
-              element={
-                <PrivateRoute>
-                  <AdminPlaceholder title="Водители" />
-                </PrivateRoute>
-              } 
-            />
-            
-            <Route 
-              path="/users" 
-              element={
-                <PrivateRoute>
-                  <AdminPlaceholder title="Пользователи" />
-                </PrivateRoute>
-              } 
-            />
-            
-            {/* Административная панель */}
-            <Route 
-              path="/admin" 
-              element={<AdminLayout />}
-            >
-              <Route path="vehicles" element={<AdminPlaceholder title="Транспортные средства" />} />
-              <Route path="drivers" element={<AdminPlaceholder title="Водители" />} />
-              <Route path="users" element={<AdminPlaceholder title="Пользователи" />} />
-            </Route>
-            
-            {/* Маршрут по умолчанию */}
-            <Route 
-              path="/" 
-              element={
-                isAdmin() ? <Navigate to="/admin" replace /> : <Navigate to="/vehicles" replace />
-              } 
-            />
-            
-            {/* Страница "Доступ запрещен" */}
-            <Route 
-              path="/access-denied" 
-              element={
-                <div className="error-page">
-                  <h1>Доступ запрещен</h1>
-                  <p>У вас нет прав для просмотра этой страницы.</p>
-                  <a href="/login">Вернуться на страницу входа</a>
-                </div>
-              } 
-            />
-            
-            {/* Обработка несуществующих маршрутов */}
-            <Route 
-              path="*" 
-              element={
-                <div className="error-page">
-                  <h1>Страница не найдена</h1>
-                  <p>Страница, которую вы ищете, не существует.</p>
-                  <a href="/login">Вернуться на страницу входа</a>
-                </div>
-              } 
-            />
-          </Routes>
-        </BrowserRouter>
+        <LoadingProvider>
+          <BrowserRouter>
+            <Notifications />
+            <Routes>
+              {/* Публичные маршруты */}
+              <Route path="/login" element={<LoginPage />} />
+              
+              {/* Защищенные маршруты для обычных пользователей */}
+              
+              <Route 
+                path="/vehicles" 
+                element={
+                  <PrivateRoute>
+                    <VehiclesPage />
+                  </PrivateRoute>
+                } 
+              />
+              
+              {/* Перенаправление со старого URL dashboard на vehicles */}
+              <Route 
+                path="/dashboard" 
+                element={<Navigate to="/vehicles" replace />} 
+              />
+              
+              <Route 
+                path="/drivers" 
+                element={
+                  <PrivateRoute>
+                    <DriversPage />
+                  </PrivateRoute>
+                } 
+              />
+              
+              <Route 
+                path="/users" 
+                element={
+                  <PrivateRoute>
+                    <UsersPage />
+                  </PrivateRoute>
+                } 
+              />
+              
+              <Route 
+                path="/reports" 
+                element={
+                  <PrivateRoute>
+                    <ReportsPage />
+                  </PrivateRoute>
+                } 
+              />
+              
+              {/* Административная панель */}
+              <Route 
+                path="/admin" 
+                element={<AdminLayout />}
+              >
+                <Route path="vehicles" element={<AdminPlaceholder title="Транспортные средства" />} />
+                <Route path="drivers" element={<AdminPlaceholder title="Водители" />} />
+                <Route path="users" element={<AdminPlaceholder title="Пользователи" />} />
+              </Route>
+              
+              {/* Маршрут по умолчанию */}
+              <Route 
+                path="/" 
+                element={
+                  isAdmin() ? <Navigate to="/admin" replace /> : <Navigate to="/vehicles" replace />
+                } 
+              />
+              
+              {/* Страница "Доступ запрещен" */}
+              <Route 
+                path="/access-denied" 
+                element={
+                  <div className="error-page">
+                    <h1>Доступ запрещен</h1>
+                    <p>У вас нет прав для просмотра этой страницы.</p>
+                    <a href="/login">Вернуться на страницу входа</a>
+                  </div>
+                } 
+              />
+              
+              {/* Обработка несуществующих маршрутов */}
+              <Route 
+                path="*" 
+                element={
+                  <div className="error-page">
+                    <h1>Страница не найдена</h1>
+                    <p>Страница, которую вы ищете, не существует.</p>
+                    <a href="/login">Вернуться на страницу входа</a>
+                  </div>
+                } 
+              />
+            </Routes>
+          </BrowserRouter>
+        </LoadingProvider>
       </SidebarProvider>
     </UserProvider>
   );

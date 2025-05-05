@@ -4,13 +4,9 @@ import { authService } from '../services';
 // Создаем контекст
 const UserContext = createContext(null);
 
-// Переменная для отслеживания статуса загрузки
 let isLoadingUserData = false;
-// Переменная для кэширования данных
 let cachedUserData = null;
-// Время последнего обновления кэша
 let cacheTime = null;
-// Время жизни кэша в миллисекундах (10 минут)
 const CACHE_TTL = 10 * 60 * 1000;
 
 /**

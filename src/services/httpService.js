@@ -256,10 +256,105 @@ const getDemoData = (endpoint) => {
     ];
   }
   
-  // Для других эндпоинтов можно добавить соответствующие демо-данные
+  // Демо-данные для водителей
+  if (endpoint === '/api/drivers') {
+    return [
+      {
+        id: 1,
+        name: "Nursultan",
+        surname: "Sarymov",
+        patronymic: "Sarymovich",
+        phone: "+77079621630",
+        employmentDate: "А",
+        group: "",
+        status: "Активный",
+        startDate: "31.03.2025"
+      },
+      {
+        id: 2,
+        name: "Иван",
+        surname: "Петров",
+        patronymic: "Сергеевич",
+        phone: "+7 (999) 123-45-67",
+        employmentDate: "В",
+        group: "Логистика",
+        status: "Активный",
+        startDate: "15.03.2022"
+      },
+      {
+        id: 3,
+        name: "Алексей",
+        surname: "Иванов",
+        patronymic: "Дмитриевич",
+        phone: "+77079621629",
+        employmentDate: "А",
+        group: "Дальнобойщики",
+        status: "Активный",
+        startDate: "17.04.2025"
+      }
+    ];
+  }
   
-  // По умолчанию возвращаем пустой объект
-  return {};
+  // Демо-данные для пользователей
+  if (endpoint === '/api/users') {
+    return [
+      {
+        id: 1,
+        username: "admin",
+        email: "admin@example.com",
+        firstName: "Администратор",
+        lastName: "Системы",
+        role: "ADMIN",
+        userGroup: "Администраторы",
+        status: "Активный",
+        blocked: false,
+        registrationDate: "2024-01-15",
+        lastLogin: "2025-05-02 14:30:15"
+      },
+      {
+        id: 2,
+        username: "manager",
+        email: "manager@example.com",
+        firstName: "Иван",
+        lastName: "Петров",
+        role: "MANAGER",
+        userGroup: "Менеджеры",
+        status: "Активный",
+        blocked: false,
+        registrationDate: "2024-02-20",
+        lastLogin: "2025-05-01 09:15:22"
+      },
+      {
+        id: 3,
+        username: "operator",
+        email: "operator@example.com",
+        firstName: "Алексей",
+        lastName: "Сидоров",
+        role: "OPERATOR",
+        userGroup: "Операторы",
+        status: "Заблокирован",
+        blocked: true,
+        registrationDate: "2024-03-10",
+        lastLogin: "2025-04-15 11:40:33"
+      },
+      {
+        id: 4,
+        username: "user",
+        email: "user@example.com",
+        firstName: "Елена",
+        lastName: "Смирнова",
+        role: "USER",
+        userGroup: "Пользователи",
+        status: "Активный",
+        blocked: false,
+        registrationDate: "2024-04-05",
+        lastLogin: "2025-05-02 10:22:45"
+      }
+    ];
+  }
+  
+  // Для других эндпоинтов - пустой массив
+  return [];
 };
 
 // Специальная функция для запросов смены языка (с обходом CORS)
