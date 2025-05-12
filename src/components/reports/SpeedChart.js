@@ -918,6 +918,7 @@ const SpeedChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate 
         isLoading={isLoading}
         error={error}
         options={getChartOptions()}
+        reportType="speed"
       />
     </>
   );

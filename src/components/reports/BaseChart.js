@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSyncAlt, faDownload, faExpand, faCompress, faTruck, faColumns, faWindowRestore, faRedo, faSearchMinus, faKeyboard } from '@fortawesome/free-solid-svg-icons';
 import SplitScreenContainer from '../common/SplitScreenContainer';
 import splitScreenManager, { SPLIT_MODES } from '../../utils/SplitScreenManager';
+import ReportChooser from './ReportChooser';
 import './ChartStyles.css';
 
 // Регистрируем необходимые компоненты ChartJS
@@ -35,16 +36,47 @@ const BaseChart = ({
   formatTooltipLabel = (value) => `${value}`,
   formatYAxisLabel = (value) => `${value}`,
   formatXAxisLabel = (value) => value,
-  emptyDataMessage = 'Нет данных для отображения'
+  emptyDataMessage = 'Нет данных для отображения',
+  reportType // Добавляем тип отчета для идентификации
 }) => {
   const [expandedMode, setExpandedMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [chartData, setChartData] = useState(null);
   const [error, setError] = useState(null);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showReportChooser, setShowReportChooser] = useState(false);
+  const [splitDirection, setSplitDirection] = useState(null);
   const chartRef = useRef(null);
   const chartContainerRef = useRef(null);
   const containerId = useRef(`chart-container-${Math.random().toString(36).substring(2, 11)}`).current;
+
+  // Эффект для проверки существования контейнера в DOM и установки ID на DOM-элемент
+  useEffect(() => {
+    console.log(`BaseChart: Инициализация контейнера с ID ${containerId}`);
+    
+    // Ищем элемент контейнера через ref
+    if (chartContainerRef.current) {
+      // Гарантируем, что ID будет установлен и в DOM-элементе
+      const container = chartContainerRef.current.closest('.chart-split-container');
+      if (container) {
+        // Если ID не установлен или отличается, устанавливаем его
+        if (!container.id || container.id !== containerId) {
+          console.log(`BaseChart: Устанавливаем ID ${containerId} на DOM-элемент`);
+          container.id = containerId;
+        }
+      }
+    }
+    
+    // Дополнительная проверка, что DOM-элемент существует
+    setTimeout(() => {
+      const containerExists = document.getElementById(containerId);
+      if (!containerExists) {
+        console.warn(`BaseChart: DOM-элемент с ID ${containerId} не найден после таймаута`);
+      } else {
+        console.log(`BaseChart: DOM-элемент с ID ${containerId} успешно найден после таймаута`);
+      }
+    }, 100);
+  }, [containerId]);
 
   // Создание и настройка данных для графика
   useEffect(() => {
@@ -165,6 +197,44 @@ const BaseChart = ({
     };
   }, []);
 
+  // Эффект для проверки, что DOM был обновлен после разделения экрана
+  useEffect(() => {
+    // Если есть выбранное направление для разделения, 
+    // это значит что произошло недавнее действие по разделению
+    if (splitDirection) {
+      // Проверяем наличие контейнера в DOM
+      const checkContainerExistence = () => {
+        const containerElement = document.getElementById(containerId);
+        
+        if (containerElement) {
+          console.log(`BaseChart: Контейнер ${containerId} существует после действия разделения`);
+          // Также проверяем наличие нового контейнера для второго отчета
+          const secondContainerSelector = `#${containerId}-2, [data-container-id="${containerId}-2"]`;
+          const secondContainer = document.querySelector(secondContainerSelector);
+          
+          if (secondContainer) {
+            console.log(`BaseChart: Новый контейнер ${containerId}-2 существует после разделения`);
+          } else {
+            console.warn(`BaseChart: Новый контейнер ${containerId}-2 НЕ найден после разделения`);
+          }
+        } else {
+          console.warn(`BaseChart: Контейнер ${containerId} НЕ найден после действия разделения`);
+        }
+      };
+      
+      // Проверяем с небольшой задержкой, чтобы DOM успел обновиться
+      setTimeout(checkContainerExistence, 100);
+    }
+  }, [splitDirection, containerId]);
+  
+  // Эффект для сброса состояния при размонтировании
+  useEffect(() => {
+    return () => {
+      // Очистка при размонтировании компонента
+      console.log(`BaseChart: Компонент с ID ${containerId} размонтирован`);
+    };
+  }, [containerId]);
+
   // Функция загрузки данных
   const loadData = async () => {
     if (!vehicle || !startDate || !endDate) {
@@ -246,6 +316,179 @@ const BaseChart = ({
   // Переключение отображения подсказок по клавиатурным сокращениям
   const toggleKeyboardShortcuts = () => {
     setShowKeyboardShortcuts(!showKeyboardShortcuts);
+  };
+
+  // Функция для разделения экрана по горизонтали
+  const handleHorizontalSplit = () => {
+    setSplitDirection('horizontal');
+    setShowReportChooser(true);
+  };
+
+  // Функция для разделения экрана по вертикали
+  const handleVerticalSplit = () => {
+    setSplitDirection('vertical');
+    setShowReportChooser(true);
+  };
+
+  // Обработчик выбора отчета для разделенного экрана
+  const handleReportSelect = (selectedReportType) => {
+    // Закрываем выбор отчета
+    setShowReportChooser(false);
+    
+    // Проверяем, что направление разделения было установлено
+    if (!splitDirection) {
+      console.warn('BaseChart: Попытка разделения экрана без указания направления');
+      return;
+    }
+    
+    // Ищем контейнер с более надежной стратегией
+    let containerElement = null;
+    
+    // Стратегия 1: Поиск по ID напрямую
+    containerElement = document.getElementById(containerId);
+    
+    // Стратегия 2: Поиск через ref и его родителя
+    if (!containerElement && chartContainerRef.current) {
+      const parentContainer = chartContainerRef.current.closest('.chart-split-container');
+      if (parentContainer) {
+        console.log(`BaseChart: Найден родительский контейнер через ref: ${parentContainer.id || 'без ID'}`);
+        
+        // Устанавливаем ID, чтобы гарантировать, что он доступен
+        if (!parentContainer.id) {
+          parentContainer.id = containerId;
+          console.log(`BaseChart: Установлен ID ${containerId} на родительский контейнер`);
+        }
+        
+        containerElement = parentContainer;
+      }
+    }
+    
+    // Стратегия 3: Поиск по атрибуту data-container-id
+    if (!containerElement) {
+      const containers = document.querySelectorAll(`[data-container-id="${containerId}"]`);
+      if (containers.length > 0) {
+        console.log(`BaseChart: Найден контейнер по data-container-id: ${containerId}`);
+        containerElement = containers[0];
+      }
+    }
+    
+    // Если все стратегии не помогли найти контейнер
+    if (!containerElement) {
+      console.error(`BaseChart: Критическая ошибка - не удалось найти подходящий контейнер для разделения`);
+      setError('Не удалось разделить экран. Пожалуйста, попробуйте ещё раз или обновите страницу.');
+      return;
+    }
+    
+    // Используем ID найденного контейнера, который может отличаться от исходного containerId
+    const actualContainerId = containerElement.id;
+    console.log(`BaseChart: Разделение контейнера ${actualContainerId} по направлению ${splitDirection}`);
+    
+    try {
+      // Добавляем обработчик события завершения разделения контейнера
+      const handleSplitComplete = (event) => {
+        const { containerId, container2Id } = event.detail;
+        
+        // Проверяем, что событие относится к нашему контейнеру
+        if (containerId === actualContainerId) {
+          console.log(`BaseChart: Получено событие завершения разделения для контейнера ${containerId}, второй контейнер: ${container2Id}`);
+          
+          // Ждем, чтобы DOM обновился и React отрендерил компоненты
+          // Используем функцию для ожидания второго контейнера
+          waitForSecondContainer(container2Id, selectedReportType);
+        }
+        
+        // Удаляем обработчик после использования
+        document.removeEventListener('splitContainerComplete', handleSplitComplete);
+      };
+      
+      // Добавляем обработчик события завершения разделения
+      document.addEventListener('splitContainerComplete', handleSplitComplete);
+      
+      // Разделяем экран через менеджер разделения
+      const success = splitScreenManager.addDynamicSplit(actualContainerId, splitDirection);
+      
+      if (!success) {
+        console.error(`BaseChart: Не удалось разделить контейнер ${actualContainerId}`);
+        setError('Не удалось разделить экран. Пожалуйста, попробуйте ещё раз.');
+        
+        // Удаляем обработчик, если разделение не удалось
+        document.removeEventListener('splitContainerComplete', handleSplitComplete);
+      }
+      
+      // Сброс направления разделения
+      setSplitDirection(null);
+    } catch (error) {
+      console.error(`BaseChart: Ошибка при разделении экрана:`, error);
+      setError(`Ошибка при разделении экрана: ${error.message}`);
+    }
+  };
+
+  // Функция для ожидания создания второго контейнера
+  const waitForSecondContainer = (container2Id, selectedReportType, attempt = 0) => {
+    const maxAttempts = 10;
+    const secondContainer = document.getElementById(container2Id);
+    
+    if (secondContainer) {
+      console.log(`BaseChart: Контейнер ${container2Id} найден, создаём отчет типа ${selectedReportType}`);
+      
+      // Создаем отчет через систему событий
+      const createEvent = new CustomEvent('createReport', {
+        detail: {
+          reportType: selectedReportType,
+          container: container2Id,
+          vehicle: vehicle,
+          startDate: startDate,
+          endDate: endDate,
+          timestamp: Date.now() // Добавляем временную метку для уникальности событий
+        }
+      });
+      
+      document.dispatchEvent(createEvent);
+      
+      // Вызываем обновление графиков через некоторое время
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 500);
+      
+      return true;
+    } else if (attempt < maxAttempts) {
+      // Повторяем попытку с задержкой
+      console.log(`BaseChart: Попытка ${attempt + 1}/${maxAttempts} найти контейнер ${container2Id}`);
+      setTimeout(() => {
+        waitForSecondContainer(container2Id, selectedReportType, attempt + 1);
+      }, 100);
+    } else {
+      console.error(`BaseChart: Не удалось найти контейнер ${container2Id} после ${maxAttempts} попыток`);
+      setError(`Не удалось создать второй контейнер для отчета. Пожалуйста, попробуйте ещё раз.`);
+    }
+  };
+
+  // Эффект для обновления графика после его создания или изменения размера
+  useEffect(() => {
+    const handleResize = () => {
+      if (chartRef.current && chartRef.current.chart) {
+        console.log(`BaseChart: Изменение размера графика ${containerId}`);
+        chartRef.current.resize();
+        chartRef.current.update();
+      }
+    };
+    
+    // Обрабатываем изменение размера окна
+    window.addEventListener('resize', handleResize);
+    
+    // Также вызываем обновление через некоторое время после рендеринга
+    const resizeTimeout = setTimeout(handleResize, 200);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    };
+  }, [containerId, chartData]);
+
+  // Закрытие окна выбора отчета
+  const handleReportChooserClose = () => {
+    setShowReportChooser(false);
+    setSplitDirection(null);
   };
 
   // Определение опций для графика
@@ -477,14 +720,14 @@ const BaseChart = ({
             <div className="tm-control-group">
               <button
                 className="tm-control-button"
-                onClick={() => splitScreenManager.addDynamicSplit(containerId, 'horizontal')}
+                onClick={handleHorizontalSplit}
                 title="Разделить по горизонтали"
               >
                 <FontAwesomeIcon icon={faColumns} style={{ transform: 'rotate(90deg)' }} />
               </button>
               <button
                 className="tm-control-button"
-                onClick={() => splitScreenManager.addDynamicSplit(containerId, 'vertical')}
+                onClick={handleVerticalSplit}
                 title="Разделить по вертикали"
               >
                 <FontAwesomeIcon icon={faColumns} />
@@ -593,6 +836,16 @@ const BaseChart = ({
             </div>
           )}
         </div>
+        
+        {/* Модальное окно выбора отчета */}
+        {showReportChooser && (
+          <ReportChooser 
+            onSelectReport={handleReportSelect}
+            onClose={handleReportChooserClose}
+            selectedVehicle={vehicle}
+            originalReport={reportType}
+          />
+        )}
       </>
     );
   };
@@ -611,6 +864,7 @@ const BaseChart = ({
     >
       <SplitScreenContainer 
         id={containerId}
+        data-container-id={containerId}
         className="chart-split-container"
         showControls={false}
         onSplitModeChange={handleSplitModeChange}

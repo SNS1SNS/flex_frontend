@@ -1,8 +1,172 @@
+/* Стили для контейнера разделенного экрана */
 .split-screen-container {
-  position: relative;
   width: 100%;
   height: 100%;
+  position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Стили для контейнера в разделенном режиме */
+.split-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  box-sizing: border-box;
+}
+
+/* Стили для горизонтально разделенного контейнера */
+.split-horizontal {
+  flex-direction: column;
+}
+
+/* Стили для вертикально разделенного контейнера */
+.split-vertical {
+  flex-direction: row;
+}
+
+/* Стили для панелей в разделенном контейнере */
+.split-pane {
+  flex: 1;
+  position: relative;
+  min-height: 100px;
+  min-width: 100px;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Стили для содержимого разделенной панели */
+.split-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+/* Стили для разделителя */
+.resizer {
+  background: #e0e0e0;
+  position: relative;
+  z-index: 10;
+  box-sizing: border-box;
+  border: 1px solid #d0d0d0;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+  transition: background 0.2s;
+}
+
+/* Вертикальный разделитель (для вертикального разделения) */
+.resizer.vertical {
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+/* Горизонтальный разделитель (для горизонтального разделения) */
+.resizer.horizontal {
+  height: 8px;
+  width: 100%;
+  cursor: row-resize;
+}
+
+/* Стили при наведении на разделитель */
+.resizer:hover {
+  background: #ccc;
+}
+
+/* Стили при перетаскивании разделителя */
+.resizer:active {
+  background: #aaa;
+}
+
+/* Стили для элемента-заполнителя */
+.split-placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  color: #999;
+  font-style: italic;
+  font-size: 14px;
+  background: #f9f9f9;
+}
+
+/* Стили для панели управления разделением */
+.split-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  display: flex;
+  gap: 5px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  padding: 5px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Показываем панель управления при наведении на контейнер */
+.split-screen-container:hover .split-controls {
+  opacity: 1;
+}
+
+/* Стили для кнопок управления разделением */
+.split-control-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+}
+
+.split-control-btn:hover {
+  background: #f0f0f0;
+}
+
+/* Специальные стили для поддержки графиков */
+.split-pane .chart-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Настройка canvas для графиков, чтобы они растягивались */
+.split-pane canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Стили для графиков в разделенном режиме */
+.split-pane .chart-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Адаптация графиков для правильного масштабирования */
+.split-pane .chart {
+  flex: 1;
+  width: 100%;
+  position: relative;
+}
+
+/* Убираем лишние отступы в графиках */
+.split-pane .chart-title,
+.split-pane .chart-controls {
+  margin: 5px;
 }
 
 /* Стили для элементов управления разделением */
@@ -42,47 +206,6 @@
 
 .split-control-btn:active {
   background-color: #ccc;
-}
-
-/* Стили для разделенных контейнеров */
-.split-container {
-  display: flex;
-  width: 100%;
-  height: 100%;
-}
-
-.horizontal-split {
-  flex-direction: column;
-}
-
-.vertical-split {
-  flex-direction: row;
-}
-
-.split-pane {
-  flex: 1;
-  overflow: auto;
-  position: relative;
-}
-
-/* Разделитель (resizer) */
-.split-divider {
-  background-color: #ccc;
-  position: relative;
-}
-
-.split-divider:hover {
-  background-color: #999;
-}
-
-.split-divider.horizontal {
-  height: 4px;
-  cursor: row-resize;
-}
-
-.split-divider.vertical {
-  width: 4px;
-  cursor: col-resize;
 }
 
 /* Стили для различных режимов разделения */

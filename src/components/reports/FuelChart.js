@@ -6,8 +6,8 @@ import KalmanFilter from '../../utils/KalmanFilter';
 import './FuelChart.css';
 
 // Статические параметры фильтра Калмана
-const KALMAN_PROCESS_NOISE = 0.0175;  // Q - шум процесса
-const KALMAN_MEASUREMENT_NOISE = 1.90; // R - шум измерения
+const KALMAN_PROCESS_NOISE = 0.0275;  // Q - шум процесса
+const KALMAN_MEASUREMENT_NOISE = 2.10; // R - шум измерения
 
 const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }) => {
   const [chartData, setChartData] = useState([]);
@@ -674,6 +674,7 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
             formatYAxisLabel={formatFuelLabel}
             formatXAxisLabel={formatTimeLabel}
             emptyDataMessage="Нет данных о топливе за выбранный период"
+            reportType="fuel"
             options={{
               tooltips: {
                 mode: 'index',

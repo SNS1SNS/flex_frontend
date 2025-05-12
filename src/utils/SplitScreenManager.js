@@ -11,6 +11,11 @@ export const SPLIT_MODES = {
   CUSTOM: 'custom' // Режим для пользовательских разделений
 };
 
+// Максимальное количество разделений по направлениям
+const MAX_SPLITS = {
+  VERTICAL: 2,    // Максимум 2 колонки
+  HORIZONTAL: 4   // Максимум 4 строки
+};
 
 /**
  * Менеджер разделения экрана для отчетов
@@ -34,6 +39,10 @@ class SplitScreenManager {
     };
     this.history = []; // История режимов разделения для функции "назад"
     this.renderComponentCallback = null; // Функция для рендеринга React компонентов
+    this.verticalSplitCount = 0; // Счетчик вертикальных разделений
+    this.horizontalSplitCount = 0; // Счетчик горизонтальных разделений
+    this.observers = null; // Хранит наблюдателей для контейнеров
+    this._pendingSplitWrappers = null; // Хранит ожидающие разделения
   }
 
   /**
@@ -366,11 +375,22 @@ class SplitScreenManager {
     // Добавляем разделитель, который можно перетаскивать
     this.addResizer(splitWrapper, direction);
     
-    // Вызываем событие разделения контейнера
-    this.triggerEvent('containerSplit', { 
-      parentId: containerId, 
-      children: [container1Id, container2Id], 
-      direction 
+    // Увеличиваем счетчик соответствующего типа разделений
+    if (direction === 'vertical') {
+      this.verticalSplitCount++;
+    } else {
+      this.horizontalSplitCount++;
+    }
+    
+    // Показываем селектор отчетов для второго контейнера
+    // Используем событие вместо метода, которого нет
+    this.triggerEvent('reportSelectionNeeded', { containerId: container2Id });
+    
+    // Вызываем событие разделения
+    this.triggerEvent('containerSplit', {
+      containerId,
+      direction,
+      childContainers: [container1Id, container2Id]
     });
     
     console.log(`Контейнер ${containerId} успешно разделен на ${container1Id} и ${container2Id}`);
@@ -658,39 +678,6 @@ class SplitScreenManager {
   }
 
   /**
-   * Устанавливает содержимое контейнера
-   * @param {string} containerId - ID контейнера
-   * @param {HTMLElement|Object} content - Содержимое (DOM-элемент или объект с информацией)
-   */
-  setContainerContent(containerId, content) {
-    const containerInfo = this.containers.get(containerId);
-    if (!containerInfo) return;
-    
-    const contentArea = containerInfo.element.querySelector('.container-content');
-    
-    // Очищаем текущее содержимое
-    contentArea.innerHTML = '';
-    
-    // Добавляем новое содержимое
-    if (content instanceof HTMLElement) {
-      contentArea.appendChild(content);
-    } else if (typeof content === 'object') {
-      // Если content - это объект с данными, создаем элемент-заглушку
-      const placeholder = document.createElement('div');
-      placeholder.className = 'report-placeholder';
-      placeholder.innerHTML = `
-        <h3>${content.title || 'Отчет'}</h3>
-        <div>${content.description || 'Нет описания'}</div>
-      `;
-      contentArea.appendChild(placeholder);
-    }
-    
-    // Сохраняем ссылку на содержимое
-    containerInfo.content = content;
-    containerInfo.type = 'leaf';
-  }
-
-  /**
    * Инициализирует панель управления разделением экрана
    */
   initSplitControls() {
@@ -726,34 +713,35 @@ class SplitScreenManager {
   }
 
   /**
-   * Сбрасывает разделение экрана до исходного состояния
+   * Сбрасывает разделение экрана до одного контейнера
    */
   resetSplitScreen() {
-    // Очищаем корневой контейнер
-    this.rootContainer.innerHTML = '';
+    // Сбрасываем счетчики разделений
+    this.verticalSplitCount = 0;
+    this.horizontalSplitCount = 0;
     
-    // Очищаем коллекцию контейнеров
-    this.containers.clear();
-    
-    // Создаем новый начальный контейнер
-    const initialContainer = this.createContainer('initial-container');
-    this.rootContainer.appendChild(initialContainer);
-    
-    this.containers.set('initial-container', {
-      element: initialContainer,
-      type: 'main',
-      content: null,
-      parent: null,
-      children: []
-    });
-    
-    this.activeContainer = 'initial-container';
-    
-    // Обновляем состояние макета
-    this.currentState.layout = null;
-    
-    // Вызываем событие сброса
-    this.triggerEvent('splitScreenReset');
+    // Существующий код сброса...
+    if (this.rootContainer) {
+      this.rootContainer.innerHTML = '';
+      
+      const initialContainer = this.createContainer('initial-container');
+      this.rootContainer.appendChild(initialContainer);
+      
+      this.containers = new Map();
+      this.containers.set('initial-container', {
+        element: initialContainer,
+        type: 'main',
+        content: null,
+        parent: null,
+        children: []
+      });
+      
+      this.activeContainer = 'initial-container';
+      this.currentState.mode = SPLIT_MODES.SINGLE;
+      
+      // Вызываем событие сброса разделения
+      this.triggerEvent('splitScreenReset');
+    }
   }
 
   /**
@@ -821,32 +809,277 @@ class SplitScreenManager {
   }
 
   /**
+   * Добавляет обработчики событий при создании разделенных контейнеров
+   * чтобы избежать проблем с узлами DOM
+   * @param {HTMLElement} container1 - Первый контейнер
+   * @param {HTMLElement} container2 - Второй контейнер
+   */
+  addContainerEventHandlers(container1, container2) {
+    // Эти обработчики помогут отследить изменения в DOM
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          console.log('Изменение дочерних элементов контейнера:', 
+            mutation.target.id, 
+            'Добавлено:', mutation.addedNodes.length, 
+            'Удалено:', mutation.removedNodes.length);
+        }
+      });
+    });
+    
+    // Наблюдаем за обоими контейнерами
+    if (container1) {
+      observer.observe(container1, { childList: true, subtree: true });
+      console.log(`SplitScreenManager: Наблюдение за контейнером ${container1.id} установлено`);
+    }
+    
+    if (container2) {
+      observer.observe(container2, { childList: true, subtree: true });
+      console.log(`SplitScreenManager: Наблюдение за контейнером ${container2.id} установлено`);
+    }
+    
+    // Сохраняем ссылку на observer для возможной очистки
+    if (container1?.id) {
+      this.observers = this.observers || new Map();
+      this.observers.set(container1.id, observer);
+    }
+  }
+  
+  /**
+   * Безопасно очищает контейнер, учитывая возможное наличие React-компонентов
+   * @param {HTMLElement} container - Контейнер для очистки
+   * @returns {HTMLElement|null} - Очищенный контейнер или null в случае ошибки
+   */
+  safelyEmptyContainer(container) {
+    if (!container) {
+      console.warn('SplitScreenManager: Попытка очистить несуществующий контейнер');
+      return null;
+    }
+    
+    // Проверяем, управляется ли контейнер React
+    const isReactManaged = container.hasAttribute('data-react-managed') || 
+                          container.hasAttribute('data-reactroot') || 
+                          container.querySelector('[data-reactroot]');
+    
+    console.log(`SplitScreenManager: Очистка контейнера ${container.id || 'без ID'}, React-управляемый: ${isReactManaged}`);
+    
+    if (isReactManaged) {
+      // Если контейнер управляется React, мы не удаляем его содержимое напрямую
+      // Вместо этого, добавляем специальный атрибут, который React-код может обработать
+      container.setAttribute('data-split-requested', 'true');
+      container.setAttribute('data-split-timestamp', Date.now().toString());
+      
+      // Не изменяем содержимое React-контейнера напрямую
+      return container;
+    } else {
+      try {
+        // Для обычных контейнеров можем безопасно очистить содержимое
+        // Но делаем это осторожно, избегая innerHTML
+        while (container.firstChild) {
+          try {
+            container.removeChild(container.firstChild);
+          } catch (e) {
+            console.error(`Ошибка при очистке контейнера: ${e.message}`);
+            break;
+          }
+        }
+        return container;
+      } catch (e) {
+        console.error(`Глобальная ошибка при очистке контейнера: ${e.message}`);
+        return null;
+      }
+    }
+  }
+  
+  /**
    * Добавляет динамическое разделение контейнера
    * @param {string} containerId - ID контейнера для разделения
    * @param {string} direction - Направление разделения ('horizontal' или 'vertical')
+   * @returns {boolean} - Успешно ли выполнено разделение
    */
   addDynamicSplit(containerId, direction) {
+    console.log(`SplitScreenManager: Начало разделения контейнера ${containerId} по направлению ${direction}`);
+    
+    // Проверяем, не превышено ли максимальное количество разделений
+    if (direction === 'vertical' && this.verticalSplitCount >= MAX_SPLITS.VERTICAL) {
+      // Показываем уведомление о максимальном количестве колонок
+      if (window.showNotification) {
+        window.showNotification('warning', `Достигнуто максимальное количество вертикальных разделений (${MAX_SPLITS.VERTICAL})`);
+      } else {
+        console.warn(`Достигнуто максимальное количество вертикальных разделений (${MAX_SPLITS.VERTICAL})`);
+      }
+      return false;
+    }
+    
+    if (direction === 'horizontal' && this.horizontalSplitCount >= MAX_SPLITS.HORIZONTAL) {
+      // Показываем уведомление о максимальном количестве строк
+      if (window.showNotification) {
+        window.showNotification('warning', `Достигнуто максимальное количество горизонтальных разделений (${MAX_SPLITS.HORIZONTAL})`);
+      } else {
+        console.warn(`Достигнуто максимальное количество горизонтальных разделений (${MAX_SPLITS.HORIZONTAL})`);
+      }
+      return false;
+    }
+    
     // Сохраняем текущее состояние в историю перед разделением
     this.history.push({
       mode: this.currentState.mode,
       layout: this.currentState.layout
     });
     
-    // Устанавливаем режим кастомного разделения
-    this.currentState.mode = SPLIT_MODES.CUSTOM;
+    // Улучшенный поиск контейнера с несколькими стратегиями
+    let containerElement = null;
     
-    // Разделяем контейнер
-    this.splitContainer(containerId, direction);
+    // Стратегия 1: Поиск контейнера по ID напрямую
+    containerElement = document.getElementById(containerId);
     
-    // Вызываем событие динамического разделения
-    this.triggerEvent('dynamicSplit', {
+    // Стратегия 2: Поиск по атрибуту data-container-id
+    if (!containerElement) {
+      const containers = document.querySelectorAll(`[data-container-id="${containerId}"]`);
+      if (containers.length > 0) {
+        console.log(`SplitScreenManager: Найден контейнер по data-container-id: ${containerId}`);
+        containerElement = containers[0];
+      }
+    }
+    
+    // Стратегия 3: Пытаемся найти контейнер из this.containers
+    if (!containerElement) {
+      const containerInfo = this.containers.get(containerId);
+      if (containerInfo && containerInfo.element) {
+        console.log(`SplitScreenManager: Найден контейнер из кэша: ${containerId}`);
+        containerElement = containerInfo.element;
+      }
+    }
+    
+    // Если контейнер не найден, сообщаем об ошибке
+    if (!containerElement) {
+      console.error(`Контейнер с ID ${containerId} не найден`);
+      
+      // Выводим список всех доступных контейнеров для отладки
+      const allContainers = document.querySelectorAll('.report-container, .chart-split-container, [id*="container"]');
+      console.log('Доступные контейнеры:', Array.from(allContainers).map(c => c.id || 'без ID'));
+      
+      return false;
+    }
+    
+    // Получаем информацию о контейнере из кэша или создаем новую
+    let container = this.containers.get(containerId);
+    if (!container) {
+      console.log(`SplitScreenManager: Создаем новую информацию о контейнере ${containerId}`);
+      container = {
+        element: containerElement,
+        type: 'main',
+        content: null,
+        parent: null,
+        children: []
+      };
+      this.containers.set(containerId, container);
+    }
+    
+    // Создаем ID для новых контейнеров
+    const container1Id = `${containerId}-1`;
+    const container2Id = `${containerId}-2`;
+    
+    // Проверяем, управляется ли контейнер React
+    const isReactManaged = containerElement.hasAttribute('data-react-managed') || 
+                         containerElement.hasAttribute('data-reactroot') || 
+                         containerElement.querySelector('[data-reactroot]');
+    
+    console.log(`SplitScreenManager: Создание нового разделения: ${containerId} -> ${container1Id}, ${container2Id}, React-управляемый: ${isReactManaged}`);
+    
+    // Сохраняем тип контента первого контейнера для передачи его в первый дочерний контейнер
+    const originalContent = container.content;
+    
+    // Регистрируем новые контейнеры в кэше
+    this.containers.set(container1Id, {
+      element: null, // Заполним позже
+      type: 'child',
+      content: originalContent, // Сохраняем исходный контент для первого контейнера
+      parent: containerId,
+      children: []
+    });
+    
+    this.containers.set(container2Id, {
+      element: null, // Заполним позже
+      type: 'child',
+      content: null, // Второй контейнер пока пустой
+      parent: containerId,
+      children: []
+    });
+    
+    // Обновляем информацию о родительском контейнере
+    container.children = [container1Id, container2Id];
+    container.type = 'parent';
+    
+    // Увеличиваем счетчик соответствующего типа разделений
+    if (direction === 'vertical') {
+      this.verticalSplitCount++;
+    } else {
+      this.horizontalSplitCount++;
+    }
+    
+    // Для React-контейнеров используем событийный подход
+    // Создаем событие для координации с React-компонентами
+    const event = new CustomEvent('splitContainerRequested', {
+      detail: {
+        containerId: containerId,
+        container1Id: container1Id,
+        container2Id: container2Id,
+        direction: direction,
+        originalContent: originalContent ? true : false
+      }
+    });
+    document.dispatchEvent(event);
+    
+    // Вызываем событие разделения контейнера
+    this.triggerEvent('containerSplit', {
       containerId,
       direction,
-      mode: this.currentState.mode
+      childContainers: [container1Id, container2Id],
+      isReactManaged
     });
+    
+    // Запускаем таймер для перерисовки графиков после разделения
+    setTimeout(() => {
+      // Отправляем событие изменения размера, чтобы графики обновились
+      window.dispatchEvent(new Event('resize'));
+      
+      // Отправляем событие завершения разделения контейнера
+      const completeEvent = new CustomEvent('splitContainerComplete', {
+        detail: {
+          containerId: containerId,
+          container1Id: container1Id,
+          container2Id: container2Id,
+          direction: direction
+        }
+      });
+      document.dispatchEvent(completeEvent);
+      
+      console.log(`SplitScreenManager: Контейнер ${containerId} успешно разделен на ${container1Id} и ${container2Id}`);
+    }, 100);
+    
+    return true;
+  }
+  
+  /**
+   * Метод для обновления графиков после изменения размера контейнеров
+   * @param {string} containerId - ID контейнера, в котором находится график
+   */
+  updateChartInContainer(containerId) {
+    // Создаем событие для обновления графика
+    const updateEvent = new CustomEvent('updateChart', {
+      detail: {
+        containerId: containerId,
+        timestamp: Date.now()
+      }
+    });
+    document.dispatchEvent(updateEvent);
+    
+    // Также вызываем общее событие изменения размера
+    window.dispatchEvent(new Event('resize'));
   }
 }
 
-// Экспортируем единственный экземпляр менеджера разделения
+// Создаем экземпляр класса SplitScreenManager и экспортируем его как экспорт по умолчанию
 const splitScreenManager = new SplitScreenManager();
-export default splitScreenManager; 
+export default splitScreenManager;

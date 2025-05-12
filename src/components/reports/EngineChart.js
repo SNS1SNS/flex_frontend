@@ -508,6 +508,7 @@ const EngineChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate
         isLoading={isLoading}
         error={error}
         options={getChartOptions()}
+        reportType="engine" // Добавляем тип отчета для идентификации
       />
     </>
   );

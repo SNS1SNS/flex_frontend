@@ -1,0 +1,213 @@
+.split-report-selector {
+  position: absolute;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
+  z-index: 1000;
+  width: 350px;
+  max-width: calc(100vw - 40px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+/* Анимация появления */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Позиционирование селектора в зависимости от placement */
+.split-report-selector.right {
+  top: 50px;
+  right: 10px;
+}
+
+.split-report-selector.left {
+  top: 50px;
+  left: 10px;
+}
+
+.split-report-selector.top {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.split-report-selector.bottom {
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Заголовок селектора */
+.selector-header {
+  padding: 12px 15px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #f8f9fa;
+}
+
+.selector-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #343a40;
+  flex: 1;
+}
+
+.selector-vehicle {
+  font-size: 13px;
+  color: #495057;
+  margin-right: 10px;
+  background: #e9ecef;
+  padding: 3px 8px;
+  border-radius: 4px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selector-close-btn {
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 14px;
+  padding: 0;
+}
+
+.selector-close-btn:hover {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+/* Контент селектора */
+.selector-content {
+  padding: 10px;
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+.selector-section {
+  margin-bottom: 15px;
+}
+
+.selector-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #6c757d;
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 5px;
+}
+
+.report-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.report-item:hover {
+  background-color: #e9ecef;
+  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+.report-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #6c757d;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+/* Цвета иконок для разных категорий отчетов */
+.report-item[key="track"] .report-item-icon,
+.report-item[key="live-track"] .report-item-icon {
+  background-color: #28a745;
+}
+
+.report-item[key="speed"] .report-item-icon,
+.report-item[key="rpm"] .report-item-icon {
+  background-color: #fd7e14;
+}
+
+.report-item[key="fuel"] .report-item-icon {
+  background-color: #ffc107;
+}
+
+.report-item[key="voltage"] .report-item-icon,
+.report-item[key="engine"] .report-item-icon {
+  background-color: #17a2b8;
+}
+
+.report-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-item-title {
+  font-weight: 500;
+  color: #212529;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.report-item-description {
+  font-size: 12px;
+  color: #6c757d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Подвал селектора */
+.selector-footer {
+  padding: 10px;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.selector-footer button {
+  padding: 6px 12px;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancel-btn {
+  background-color: #f8f9fa;
+  color: #212529;
+  border: 1px solid #ced4da;
+}
+
+.cancel-btn:hover {
+  background-color: #e9ecef;
+} 

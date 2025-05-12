@@ -890,6 +890,7 @@ const VoltageChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDat
       isLoading={isLoading}
       error={error}
       options={getChartOptions()}
+      reportType="voltage"
     />
     </>
   );

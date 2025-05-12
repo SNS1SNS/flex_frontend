@@ -8,7 +8,7 @@ import {
   faCalendarDay, faClipboardCheck, faExclamationTriangle,
   faShieldAlt, faFileAlt, faCarAlt, faRoute, faMapMarked,
   faSearch, faAngleLeft, faAngleRight, faRightFromBracket,
-  faQuestion, faInfo, faColumns, faThLarge
+  faQuestion, faInfo
 } from '@fortawesome/free-solid-svg-icons';
 import TrackMap from './TrackMap';
 import FolderList from '../folders/FolderList';
@@ -105,6 +105,25 @@ const ReportsPage = () => {
   
   // Добавляем ref для контейнера отчетов
   const reportsContainerRef = useRef(null);
+
+  // Эффект для обработки события создания отчета при разделении экрана
+  useEffect(() => {
+    // Обработчик события создания отчета
+    const handleCreateReport = (event) => {
+      const { reportType, container, vehicle, startDate, endDate } = event.detail;
+      
+      // Создаем отчет в указанном контейнере
+      createReportForContainer(reportType, container, vehicle, startDate, endDate);
+    };
+    
+    // Добавляем слушателя события
+    document.addEventListener('createReport', handleCreateReport);
+    
+    // Очистка при размонтировании
+    return () => {
+      document.removeEventListener('createReport', handleCreateReport);
+    };
+  }, []);
 
   // Форматирование даты в строку ДД.ММ.ГГГГ
   const formatDate = (date) => {
@@ -980,66 +999,284 @@ const ReportsPage = () => {
     };
   }, [splitScreenActive, dateRange, openTabs, activeTabId, selectedVehicle, splitMode]);
   
-  // Функция для создания отчета для контейнера
-  const createReportForContainer = (reportType, containerId) => { // eslint-disable-line no-unused-vars
-    if (!selectedVehicle) {
-      alert('Пожалуйста, выберите транспортное средство для создания отчета');
-      return null;
+  // Создание отчета для контейнера при разделении экрана
+  const createReportForContainer = (reportType, containerId, vehicleObj, startDateObj, endDateObj) => {
+    // Используем переданные параметры или значения из состояния
+    const vehicle = vehicleObj || selectedVehicle;
+    const startDate = startDateObj || dateRange.startDate;
+    const endDate = endDateObj || dateRange.endDate;
+    
+    if (!vehicle) {
+      console.warn('Не выбрано транспортное средство для создания отчета');
+      // Показываем уведомление, если доступно
+      if (window.showNotification) {
+        window.showNotification('warning', 'Пожалуйста, выберите транспортное средство для создания отчета');
+      }
+      return;
     }
     
-    // Создаем элемент контейнера для отчета
-    const reportContainer = document.createElement('div');
-    reportContainer.className = 'split-report-content';
-    reportContainer.style.width = '100%';
-    reportContainer.style.height = '100%';
+    console.log(`ReportsPage: Создание отчета типа ${reportType} в контейнере ${containerId}`);
     
-    // Создаем React компонент в зависимости от типа отчета
-    const reportElement = getReportElement(reportType, selectedVehicle, dateRange.startDate, dateRange.endDate);
-    
-    // Отрисовываем React компонент в контейнере
-    if (reportElement) {
-      setTimeout(() => {
-        try {
-          const root = ReactDOM.createRoot(reportContainer);
-          root.render(reportElement);
-        } catch (error) {
-          console.error('Ошибка при отрисовке отчета в контейнере:', error);
-          reportContainer.innerHTML = `<div class="error-message">Ошибка при создании отчета: ${error.message}</div>`;
+    // Улучшенное нахождение DOM-элемента контейнера с несколькими стратегиями
+    const findContainer = () => {
+      // Стратегия 1: прямой поиск по ID
+      let container = document.getElementById(containerId);
+      if (container) {
+        console.log(`ReportsPage: Контейнер ${containerId} найден напрямую по ID`);
+        return container;
+      }
+      
+      // Стратегия 2: поиск по data-container-id
+      const containersByData = document.querySelectorAll(`[data-container-id="${containerId}"]`);
+      if (containersByData.length > 0) {
+        console.log(`ReportsPage: Контейнер ${containerId} найден по data-container-id`);
+        return containersByData[0];
+      }
+      
+      // Стратегия 3: поиск внутри split-container
+      const parts = containerId.split('-');
+      if (parts.length > 1) {
+        const parentId = parts.slice(0, -1).join('-');
+        const parentContainer = document.getElementById(parentId);
+        if (parentContainer) {
+          const childContainers = parentContainer.querySelectorAll('.report-container');
+          for (const child of childContainers) {
+            if (child.id === containerId || !child.id) {
+              console.log(`ReportsPage: Контейнер найден внутри родителя ${parentId}`);
+              // Если у контейнера нет ID, устанавливаем правильный ID
+              if (!child.id) {
+                child.id = containerId;
+                console.log(`ReportsPage: Установлен ID ${containerId} на дочерний контейнер`);
+              }
+              return child;
+            }
+          }
         }
-      }, 0);
-    } else {
-      reportContainer.innerHTML = '<div class="error-message">Неизвестный тип отчета</div>';
-    }
-    
-    return reportContainer;
-  };
-  
-  // Функция для получения React-элемента отчета по его типу
-  const getReportElement = (reportType, vehicle, startDate, endDate) => {
-    const reportProps = {
-      key: `split-${reportType}-${vehicle?.id || 'no-vehicle'}-${Date.now()}`,
-      vehicle: vehicle,
-      startDate: startDate,
-      endDate: endDate,
-      hidePeriodSelector: true
+      }
+      
+      // Стратегия 4: поиск контейнеров с шаблоном ID
+      const idPattern = new RegExp(`${containerId.replace(/[-]/g, '[-]')}$`);
+      const containersByPattern = Array.from(document.querySelectorAll('[id]')).filter(el => idPattern.test(el.id));
+      if (containersByPattern.length > 0) {
+        console.log(`ReportsPage: Контейнер найден по шаблону ID: ${containersByPattern[0].id}`);
+        return containersByPattern[0];
+      }
+      
+      return null;
     };
     
-    switch (reportType) {
-      case 'track':
-        return <TrackMap {...reportProps} />;
-      case 'live-track':
-        return <LiveTrack {...reportProps} />;
-      case 'speed':
-        return <SpeedChart {...reportProps} />;
-      case 'fuel':
-        return <FuelChart {...reportProps} />;
-      case 'voltage':
-        return <VoltageChart {...reportProps} />;
-      case 'rpm':
-        return <EngineChart {...reportProps} />;
-      default:
-        return null;
+    // Пытаемся найти контейнер с помощью нашей улучшенной функции
+    let container = findContainer();
+    
+    if (!container) {
+      console.error(`Контейнер ${containerId} не найден. Пробуем с задержкой...`);
+      
+      // Получаем список всех доступных контейнеров для отладки
+      const allContainers = document.querySelectorAll('[id^="chart-container-"], [id^="initial-container"], .report-container, .chart-split-container');
+      if (allContainers.length > 0) {
+        console.log('Доступные контейнеры:', Array.from(allContainers).map(c => c.id || 'без ID'));
+      } else {
+        console.warn('Не найдено контейнеров для отчетов в DOM');
+      }
+      
+      // Увеличенная задержка для гарантии, что DOM будет обновлен после разделения
+      setTimeout(() => {
+        container = findContainer();
+        
+        if (container) {
+          console.log(`ReportsPage: Контейнер ${containerId} найден после задержки`);
+          renderReportToContainer(container, reportType, vehicle, startDate, endDate);
+        } else {
+          console.error(`Не удалось найти контейнер ${containerId} даже после задержки`);
+          
+          // Проверяем наличие похожих контейнеров
+          const similarContainers = document.querySelectorAll(`.split-container > div`);
+          console.log('Доступные разделенные контейнеры:', Array.from(similarContainers).map(c => c.id || 'без ID'));
+          
+          // Если можем найти хоть какой-то контейнер для отчета, используем его
+          if (similarContainers.length > 0) {
+            const fallbackContainer = similarContainers[similarContainers.length - 1]; // последний контейнер в списке
+            console.log(`ReportsPage: Используем запасной контейнер ${fallbackContainer.id || 'без ID'}`);
+            
+            // Устанавливаем ID контейнеру, если он отсутствует
+            if (!fallbackContainer.id) {
+              fallbackContainer.id = containerId;
+            }
+            
+            renderReportToContainer(fallbackContainer, reportType, vehicle, startDate, endDate);
+    } else {
+            // Создаем уведомление об ошибке
+            if (window.showNotification) {
+              window.showNotification('error', 'Не удалось создать отчет в разделенном экране');
+            }
+          }
+        }
+      }, 600); // Увеличенная задержка
+      
+      return;
     }
+    
+    renderReportToContainer(container, reportType, vehicle, startDate, endDate);
+  };
+  
+  // Хранилище для React-корней
+  const reactRoots = useRef(new Map()).current;
+  
+  // Эффект для очистки React-корней при размонтировании
+  useEffect(() => {
+    return () => {
+      // Очищаем все React-корни перед размонтированием компонента
+      console.log('ReportsPage: Очистка всех React-корней при размонтировании');
+      
+      reactRoots.forEach((root, id) => {
+        try {
+          console.log(`ReportsPage: Размонтирование React-корня для контейнера ${id}`);
+          // Рендерим null в контейнер, чтобы размонтировать React-дерево
+          root.render(null);
+        } catch (e) {
+          console.error(`Ошибка при очистке React-корня для контейнера ${id}:`, e);
+        }
+      });
+      
+      // Очищаем Map с корнями
+      reactRoots.clear();
+    };
+  }, [reactRoots]);
+  
+  // Функция для определения, можно ли создавать React-корень для контейнера
+  const canCreateReactRoot = (container) => {
+    if (!container) return false;
+    
+    // Помечаем контейнер специальным атрибутом
+    if (!container.hasAttribute('data-react-managed')) {
+      container.setAttribute('data-react-managed', 'true');
+      return true;
+    }
+    
+    // Проверяем, что у контейнера нет другого React-рендера
+    return !container.querySelector('[data-reactroot]');
+  };
+  
+  // Функция для безопасного удаления React-корня
+  const safelyRemoveReactRoot = (containerId) => {
+    const root = reactRoots.get(containerId);
+    if (root) {
+      try {
+        console.log(`ReportsPage: Безопасное удаление React-корня для контейнера ${containerId}`);
+        // Рендерим null вместо компонента для размонтирования
+        root.render(null);
+        // Удаляем корень из Map
+        reactRoots.delete(containerId);
+        return true;
+      } catch (e) {
+        console.error(`Ошибка при удалении React-корня для контейнера ${containerId}:`, e);
+        return false;
+      }
+    }
+    return false;
+  };
+  
+  // Вспомогательная функция для рендеринга отчета в контейнер
+  const renderReportToContainer = (container, reportType, vehicle, startDate, endDate) => {
+    if (!container) {
+      console.error('ReportsPage: Невозможно отрендерить отчет - контейнер не найден');
+      return;
+    }
+    
+    console.log(`ReportsPage: Начинаем рендеринг отчета типа ${reportType} в контейнер ${container.id || 'без ID'}`);
+    
+    // Создаем уникальный ключ для этого контейнера, если у него нет ID
+    if (!container.id) {
+      container.id = `chart-container-${Math.random().toString(36).substring(2, 11)}`;
+      console.log(`ReportsPage: Присвоен новый ID контейнеру: ${container.id}`);
+    }
+    
+    // Проверяем, не является ли контейнер частью другого React-дерева
+    const isPartOfAnotherReactTree = container.closest('[data-reactroot]') !== null;
+    
+    // Если контейнер уже имеет React-корень, удаляем его безопасно
+    if (reactRoots.has(container.id)) {
+      const existingRoot = reactRoots.get(container.id);
+      try {
+        console.log(`ReportsPage: Удаление существующего React-корня для ${container.id}`);
+        existingRoot.render(null); // Размонтируем компоненты
+        
+        // Добавляем небольшую задержку перед удалением из Map
+        setTimeout(() => {
+          reactRoots.delete(container.id); // Удаляем корень из Map
+          console.log(`ReportsPage: React-корень для ${container.id} удален из Map`);
+        }, 50);
+      } catch (e) {
+        console.error(`Ошибка при удалении существующего React-корня:`, e);
+      }
+    }
+    
+    // Ожидаем небольшую задержку для завершения операций удаления
+    setTimeout(() => {
+      try {
+        // Проверяем, является ли контейнер частью DOM
+        if (!document.body.contains(container)) {
+          console.error(`ReportsPage: Контейнер ${container.id} больше не присутствует в DOM`);
+          return;
+        }
+        
+        // Маркируем контейнер как управляемый React
+        container.setAttribute('data-react-managed', 'true');
+        
+        // Получаем элемент отчета соответствующего типа
+        const reportElement = getReportElement(reportType, vehicle, startDate, endDate);
+        
+        if (!reportElement) {
+          console.error(`ReportsPage: Не удалось создать элемент отчета типа ${reportType}`);
+          container.innerHTML = `
+            <div style="padding: 20px; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
+              <h3>Ошибка при создании отчета</h3>
+              <p>Не удалось создать элемент отчета типа ${reportType}</p>
+            </div>
+          `;
+          return;
+        }
+        
+        // Создаем новый корневой элемент для React
+        console.log(`ReportsPage: Создание нового React-корня для контейнера ${container.id}`);
+        try {
+          const root = ReactDOM.createRoot(container);
+          
+          // Сохраняем корень в Map
+          reactRoots.set(container.id, root);
+          
+          // Рендерим компонент в контейнер
+          root.render(reportElement);
+          
+          console.log(`Отчет типа ${reportType} успешно создан в контейнере ${container.id}`);
+        } catch (error) {
+          console.error(`Ошибка при рендеринге отчета в контейнер ${container.id}:`, error);
+          
+          // Если произошла ошибка с React, пробуем очистить контейнер и показать сообщение об ошибке
+          try {
+            // Безопасная очистка контейнера
+            while (container.firstChild) {
+              container.removeChild(container.firstChild);
+            }
+            
+            // Показываем сообщение об ошибке
+            const errorDiv = document.createElement('div');
+            errorDiv.innerHTML = `
+              <div style="padding: 20px; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
+                <h3>Ошибка при создании отчета</h3>
+                <p>${error.message}</p>
+                <p>Пожалуйста, попробуйте создать отчет заново или обновите страницу.</p>
+              </div>
+            `;
+            container.appendChild(errorDiv);
+          } catch (renderError) {
+            console.error(`Не удалось отрендерить сообщение об ошибке:`, renderError);
+          }
+        }
+      } catch (error) {
+        console.error(`Неожиданная ошибка при обработке контейнера ${container.id}:`, error);
+      }
+    }, 100); // Небольшая задержка для завершения предыдущих операций React
   };
   
   // Обновленная функция для изменения режима разделения экрана
@@ -1089,34 +1326,14 @@ const ReportsPage = () => {
     }
   };
   
-  // Отображение кнопок переключения режима разделения экрана
-  const renderSplitModeControls = () => {
-    return (
-      <div className="split-mode-controls">
-        <button 
-          className={`split-mode-button ${splitMode === 'single' ? 'active' : ''}`}
-          onClick={() => handleSplitModeChange('single')}
-          title="Один отчет"
-        >
-          <FontAwesomeIcon icon={faTh} />
-        </button>
-        <button 
-          className={`split-mode-button ${splitMode === 'split-2' ? 'active' : ''}`}
-          onClick={() => handleSplitModeChange('split-2')}
-          title="Разделить экран на 2"
-        >
-          <FontAwesomeIcon icon={faColumns} />
-        </button>
-        <button 
-          className={`split-mode-button ${splitMode === 'split-4' ? 'active' : ''}`}
-          onClick={() => handleSplitModeChange('split-4')}
-          title="Разделить экран на 4"
-        >
-          <FontAwesomeIcon icon={faThLarge} />
-        </button>
-      </div>
-    );
-  };
+  // eslint-disable-next-line
+  useEffect(() => {
+    // При инициализации, если есть необходимость, устанавливаем начальный режим разделения
+    if (splitMode !== 'single' && !splitScreenActive) {
+      // Применим настройки разделения при загрузке компонента
+      handleSplitModeChange(splitMode);
+    }
+  }, []);
   
   // Эти функции могут использоваться в будущем, поэтому добавляем eslint-disable-next-line
   // eslint-disable-next-line
@@ -1163,6 +1380,53 @@ const ReportsPage = () => {
       });
     }
   };
+  
+  // Функция для получения React-элемента отчета по его типу
+  const getReportElement = (reportType, vehicle, startDate, endDate) => {
+    const reportProps = {
+      key: `split-${reportType}-${vehicle?.id || 'no-vehicle'}-${Date.now()}`,
+      vehicle: vehicle,
+      startDate: startDate,
+      endDate: endDate,
+      hidePeriodSelector: true
+    };
+    
+    switch (reportType) {
+      case 'track':
+        return <TrackMap {...reportProps} />;
+      case 'live-track':
+        return <LiveTrack {...reportProps} />;
+      case 'speed':
+        return <SpeedChart {...reportProps} />;
+      case 'fuel':
+        return <FuelChart {...reportProps} />;
+      case 'voltage':
+        return <VoltageChart {...reportProps} />;
+      case 'rpm':
+        return <EngineChart {...reportProps} />;
+      default:
+        return null;
+    }
+  };
+  
+  // Эффект для очистки React-корней при изменении ключевых параметров
+  useEffect(() => {
+    // Если изменяется транспортное средство или даты, нужно обновить все корни React
+    if (selectedVehicle || dateRange.startDate || dateRange.endDate) {
+      console.log('ReportsPage: Ключевые параметры изменились, обновляем React-корни');
+      
+      // Для всех открытых вкладок обновляем соответствующие React-корни
+      openTabs.forEach(tab => {
+        // Если у вкладки есть контейнер с React-корнем, безопасно удаляем его
+        const containerId = tab.id;
+        if (containerId) {
+          if (safelyRemoveReactRoot(containerId)) {
+            console.log(`ReportsPage: Удален React-корень для вкладки ${tab.title} (${containerId})`);
+          }
+        }
+      });
+    }
+  }, [selectedVehicle, dateRange, openTabs, safelyRemoveReactRoot]);
   
   return (
     <div className="dashboard">
