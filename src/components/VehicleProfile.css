@@ -1,0 +1,1075 @@
+/* Основная структура страницы профиля */
+.vehicle-profile-layout {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.vehicle-profile-layout .main-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* Верхняя панель с кнопками */
+.profile-top-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  background-color: #fff;
+  padding: 12px 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.3s ease;
+}
+
+.profile-top-controls:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-top-controls .right-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.control-button.edit {
+  background-color: #4a6dff;
+  color: white;
+}
+
+.control-button.edit:hover {
+  background-color: #3d5ce0;
+}
+
+.control-button.delete {
+  background-color: #ff4a4a;
+  color: white;
+}
+
+.control-button.delete:hover {
+  background-color: #e03d3d;
+}
+
+.control-button svg {
+  margin-right: 8px;
+}
+
+/* Стили контейнеров состояний */
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 50px auto;
+  padding: 30px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+}
+
+.error-message {
+  color: #ff4a4a;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+/* Профиль ТС */
+.vehicle-profile {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.vehicle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.vehicle-title {
+  display: flex;
+  align-items: center;
+}
+
+.vehicle-icon {
+  font-size: 24px;
+  margin-right: 15px;
+  color: #4a6dff;
+}
+
+.vehicle-title h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.vehicle-status {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.status-processing {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-maintenance {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-unknown {
+  background-color: #e2e3e5;
+  color: #383d41;
+}
+
+/* Вкладки для навигации */
+.tabs {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+.tab {
+  padding: 10px 20px;
+  color: #666;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-right: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab.active {
+  color: #4a6dff;
+  border-bottom-color: #4a6dff;
+}
+
+/* Общие стили для всех секций */
+.section {
+  margin-bottom: 25px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.section:hover {
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+/* Стили для заголовков секций */
+.section-header {
+  background: linear-gradient(135deg, #003366 0%, #004080 100%);
+  padding: 20px 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.section-header:hover {
+  background: linear-gradient(135deg, #004080 0%, #0050a0 100%);
+}
+
+/* Стили для заголовков h2 */
+.section-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #ffffff;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Стили для контента секций */
+.section-content {
+  padding: 25px;
+  background: #ffffff;
+  max-height: 2000px;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out;
+}
+
+/* Стили для свернутого состояния */
+.section-content.collapsed {
+  max-height: 0;
+  padding: 0 25px;
+  opacity: 0;
+  margin: 0;
+  border: none;
+}
+
+/* Стили для иконки сворачивания */
+.toggle-section {
+  transition: transform 0.3s ease;
+  color: white;
+}
+
+/* Стили для свернутой иконки */
+.toggle-section.rotated {
+  transform: rotate(180deg);
+}
+
+/* Информационные строки */
+.info-row {
+  display: flex;
+  margin-bottom: 15px;
+  align-items: center;
+}
+
+.info-row .label {
+  width: 180px;
+  flex-shrink: 0;
+  font-weight: 500;
+  color: #495057;
+}
+
+.info-row input,
+.info-row select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+  max-width: 400px;
+}
+
+.info-row input:focus,
+.info-row select:focus {
+  border-color: #4a6dff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 109, 255, 0.1);
+}
+
+.value-with-button {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  max-width: 400px;
+}
+
+.mt-4 {
+  margin-top: 1.5rem;
+}
+
+.text-center {
+  text-align: center;
+}
+
+/* Кнопки и стили действий */
+.btn-profile {
+  padding: 10px 20px;
+  background-color: #4a6dff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-profile:hover {
+  background-color: #3857d6;
+  transform: translateY(-2px);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+}
+
+/* Стили для тарировочных таблиц */
+.calibration-tables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 20px;
+}
+
+.calibration-table {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  min-width: 300px;
+  margin-bottom: 30px;
+  transition: all 0.3s ease;
+}
+
+.calibration-table:hover {
+  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.calibration-table h3 {
+  color: #2c3e50;
+  font-size: 1.3em;
+  margin: 0 0 15px 0;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #4a90e2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Обновленные стили для сетки калибровки */
+.calibration-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 50px;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Стили для скроллбара */
+.calibration-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calibration-grid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.calibration-grid::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.calibration-grid::-webkit-scrollbar-thumb:hover {
+  background: #4a90e2;
+}
+
+/* Обновленные стили для заголовков и ячеек сетки */
+.calibration-grid .header {
+  background: #4a90e2;
+  color: white;
+  padding: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.calibration-grid .header.delete-header {
+  background: transparent;
+  padding: 0;
+}
+
+.calibration-grid > div:not(.header) {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.calibration-grid > div:not(.header):hover {
+  background-color: #f0f0f0;
+}
+
+.calibration-grid .editable {
+  padding: 10px 15px;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  background: white;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  text-align: center;
+  font-size: 14px;
+}
+
+.calibration-grid .editable:hover {
+  border-color: #4a90e2;
+  background: #f8f9fa;
+}
+
+.calibration-grid .editable:focus {
+  border-color: #4a90e2;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+  outline: none;
+}
+
+/* Информационный блок о формате данных */
+.calibration-info {
+  background-color: #f8f9fa;
+  border-left: 4px solid #4a90e2;
+  padding: 12px 15px;
+  margin-bottom: 20px;
+  border-radius: 0 6px 6px 0;
+}
+
+.calibration-format-info {
+  margin: 0;
+  color: #495057;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calibration-format-info svg {
+  color: #4a90e2;
+}
+
+.delete-row-btn {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  padding: 8px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.delete-row-btn:hover {
+  color: #c82333;
+  background: rgba(220, 53, 69, 0.1);
+  transform: scale(1.1);
+}
+
+.calibration-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.calibration-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.add-row-btn {
+  background-color: #28a745;
+  color: white;
+}
+
+.add-row-btn:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+.save-table-btn {
+  background-color: #4a90e2;
+  color: white;
+}
+
+.save-table-btn:hover {
+  background-color: #357abd;
+  transform: translateY(-1px);
+}
+
+.import-excel-btn {
+  background-color: #ffc107;
+  color: #000;
+}
+
+.import-excel-btn:hover {
+  background-color: #e0a800;
+  transform: translateY(-1px);
+}
+
+.export-excel-btn {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.export-excel-btn:hover {
+  background-color: #138496;
+  transform: translateY(-1px);
+}
+
+/* Стили для модального окна подтверждения */
+.confirm-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.confirm-modal-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  text-align: center;
+  min-width: 300px;
+}
+
+.confirm-modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.confirm-modal-buttons button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  min-width: 100px;
+}
+
+/* Кнопки профиля */
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.action-button svg {
+  margin-right: 8px;
+}
+
+/* Сетка для профиля */
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+  padding: 0;
+}
+
+.profile-item {
+  display: flex;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.profile-item:hover {
+  background-color: #e9ecef;
+}
+
+.profile-label {
+  width: 150px;
+  font-weight: bold;
+  color: #6c757d;
+}
+
+.profile-value {
+  flex: 1;
+  color: #212529;
+}
+
+/* Стили для фиксированной кнопки сохранения */
+.fixed-save-btn-container {
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.fixed-save-btn {
+  min-width: 100%;
+  border-radius: 0;
+  margin: 0;
+  padding: 10px 0;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  font-weight: 500;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.fixed-save-btn:hover {
+  background-color: #218838;
+}
+
+/* Стили для раздела выбора количества датчиков */
+.sensor-count-select {
+  width: 200px;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  background-color: #fff;
+}
+
+.sensor-count-select:focus {
+  border-color: #4a6dff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 109, 255, 0.1);
+}
+
+.no-sensors-message {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  text-align: center;
+  color: #6c757d;
+  border: 1px dashed #ced4da;
+}
+
+.no-sensors-message p {
+  margin-bottom: 10px;
+}
+
+.no-sensors-message p:last-child {
+  margin-bottom: 0;
+}
+
+/* Стиль для индикатора загрузки калибровочных данных */
+.calibration-loading {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  text-align: center;
+  color: #6c757d;
+  border: 1px solid #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calibration-loading p {
+  margin-bottom: 0;
+  font-weight: 500;
+}
+
+/* Адаптивные стили */
+@media (max-width: 768px) {
+  .profile-top-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .profile-top-controls .right-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .vehicle-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .vehicle-status {
+    margin-top: 10px;
+  }
+  
+  .profile-actions {
+    justify-content: center;
+  }
+  
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .info-row .label {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+  
+  .calibration-actions {
+    flex-direction: column;
+  }
+}
+
+/* Стили для индикатора статуса API */
+.api-status {
+  margin-bottom: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px 15px;
+  border: 1px solid #e9ecef;
+}
+
+.api-status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #495057;
+}
+
+.api-status-indicator.loading {
+  color: #007bff;
+}
+
+.status-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  padding-left: 20px;
+}
+
+.status-loading:before {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 123, 255, 0.3);
+  border-top-color: #007bff;
+  border-radius: 50%;
+  animation: spinner 1s linear infinite;
+}
+
+.status-synced {
+  color: #28a745;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-not-synced {
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Стили для истории синхронизации */
+.sync-history {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.sync-history h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 18px;
+  color: #495057;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.sync-history-table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.sync-history-header {
+  display: table-row;
+  font-weight: bold;
+  background-color: #e9ecef;
+}
+
+.sync-history-header > div {
+  display: table-cell;
+  padding: 8px 12px;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.sync-history-row {
+  display: table-row;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.sync-history-row > div {
+  display: table-cell;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.sync-history-row.success {
+  background-color: rgba(40, 167, 69, 0.05);
+}
+
+.sync-history-row.error {
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+.sync-success {
+  color: #28a745;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sync-error {
+  color: #dc3545;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.no-history-message {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Кнопка обновления данных */
+.refresh-data-btn {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 15px;
+  margin-left: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.3s ease;
+}
+
+.refresh-data-btn:hover {
+  background-color: #5a6268;
+}
+
+.refresh-data-btn:disabled {
+  background-color: #ced4da;
+  cursor: not-allowed;
+}
+
+/* Стили для информационного блока по импорту/экспорту Excel */
+.excel-format-info {
+  background-color: #f3f8ff;
+  border-left: 4px solid #17a2b8;
+  padding: 12px 15px;
+  margin: 15px 0;
+  border-radius: 0 6px 6px 0;
+  font-size: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.excel-format-info svg {
+  color: #17a2b8;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.excel-format-info p {
+  margin: 0 0 8px 0;
+  color: #495057;
+}
+
+.excel-format-info p:last-child {
+  margin-bottom: 0;
+}
+
+.excel-format-info ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.excel-format-info li {
+  margin-bottom: 5px;
+}
+
+/* Улучшения стилей для кнопок импорта/экспорта */
+.import-excel-btn, .export-excel-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.import-excel-btn:hover, .export-excel-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.import-excel-btn:active, .export-excel-btn:active {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Стили для модального окна с информацией о формате */
+.excel-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.excel-modal.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.excel-modal-content {
+  background: white;
+  border-radius: 8px;
+  padding: 25px;
+  max-width: 600px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+}
+
+.excel-modal.show .excel-modal-content {
+  transform: translateY(0);
+}
+
+.excel-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.excel-modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.excel-modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #6c757d;
+  transition: color 0.3s;
+}
+
+.excel-modal-close:hover {
+  color: #dc3545;
+}
+
+/* Стили для эффекта обновления таблицы */
+.table-updated {
+  animation: tableUpdate 1s ease-in-out;
+}
+
+@keyframes tableUpdate {
+  0% {
+    background-color: rgba(0, 123, 255, 0.1);
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.6);
+  }
+  50% {
+    background-color: rgba(0, 123, 255, 0.15);
+    box-shadow: 0 0 12px rgba(0, 123, 255, 0.8);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+/* Стили для сообщения об ошибке в таблице */
+.calibration-error {
+  background-color: #fff3f3;
+  border: 1px solid #ffcccb;
+  border-radius: 5px;
+  padding: 15px;
+  margin-bottom: 15px;
+  color: #d63031;
+}
+
+/* Контейнер для таблиц калибровки */
+.calibration-tables-container {
+  width: 100%;
+  margin-bottom: 30px;
+}
+
+.calibration-tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+  gap: 25px;
+  width: 100%;
+}
+
+.calibration-table-cell {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Адаптивные стили для таблиц калибровки */
+@media (max-width: 1200px) {
+  .calibration-tables-grid {
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .calibration-tables-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .calibration-table {
+    padding: 12px;
+  }
+  
+  .calibration-grid {
+    max-height: 300px;
+  }
+}

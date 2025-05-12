@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCalendarAlt, faTruck, faUser, faMapMarkerAlt, faPlus, 
@@ -9,16 +10,34 @@ import {
   faSearch, faAngleLeft, faAngleRight, faRightFromBracket,
   faQuestion, faInfo, faColumns, faThLarge
 } from '@fortawesome/free-solid-svg-icons';
-import LiveTrack from './LiveTrack';
 import TrackMap from './TrackMap';
-import SpeedChart from './SpeedChart';
-import FuelChart from './FuelChart';
 import FolderList from '../folders/FolderList';
 import './ReportStyles.css';
 import logo from '../../images/logo.svg';
 import fuel from '../../images/fuel.png';
 import track from '../../images/road.png';
 import track2 from '../../images/tracks.png';
+
+// Временные заглушки для компонентов, которые еще не созданы
+const LiveTrack = ({ vehicle, startDate, endDate }) => (
+  <div className="component-placeholder">
+    <h3>Компонент LiveTrack находится в разработке</h3>
+    <p>Выбрано ТС: {vehicle?.name || 'Не выбрано'}</p>
+    <p>Период: {startDate?.toLocaleDateString()} - {endDate?.toLocaleDateString()}</p>
+  </div>
+);
+
+// Импортируем компоненты графиков
+import SpeedChart from './SpeedChart';
+import FuelChart from './FuelChart';
+import VoltageChart from './VoltageChart';
+import EngineChart from './EngineChart';
+
+// Импортируем менеджер разделения экрана и компонент выбора отчетов
+import SplitScreenManager, { SPLIT_MODES } from '../../utils/SplitScreenManager';
+import '../../utils/SplitScreen.css';
+import ReportSelector from './ReportSelector';
+
 const ReportsPage = () => {
   const [dateRange, setDateRange] = useState(() => {
     // Пытаемся восстановить дату из localStorage
@@ -42,7 +61,6 @@ const ReportsPage = () => {
     start.setDate(start.getDate() - 1);
     return { startDate: start, endDate: end };
   });
-  const [showCalendar, setShowCalendar] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('today');
   const [stats, setStats] = useState({ vehicles: 0, drivers: 0, trips: 0 });
   const [openTabs, setOpenTabs] = useState([]);
@@ -58,6 +76,7 @@ const ReportsPage = () => {
   });
 
   // Refs
+  // eslint-disable-next-line no-unused-vars
   const datePickerRef = useRef(null);
   const reportMenuRef = useRef(null);
 
@@ -76,12 +95,33 @@ const ReportsPage = () => {
     return savedMode || 'single';  // 'single', 'split-2', 'split-4'
   });
 
+  // Добавляем состояния для модального окна
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [tempStartDate, setTempStartDate] = useState('');
+  const [tempEndDate, setTempEndDate] = useState('');
+
+  // Добавляем состояние для активации режима разделения экрана
+  const [splitScreenActive, setSplitScreenActive] = useState(false);
+  
+  // Добавляем ref для контейнера отчетов
+  const reportsContainerRef = useRef(null);
+
   // Форматирование даты в строку ДД.ММ.ГГГГ
   const formatDate = (date) => {
     if (!date) return '';
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
+    
+    // Проверяем, является ли date строкой, и если да - преобразуем в объект Date
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Проверяем, является ли dateObj валидным объектом Date
+    if (!(dateObj instanceof Date) || isNaN(dateObj)) {
+      console.warn('Невалидная дата для форматирования:', date);
+      return '';
+    }
+    
+    const day = dateObj.getDate().toString().padStart(2, '0');
+    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const year = dateObj.getFullYear();
     return `${day}.${month}.${year}`;
   };
 
@@ -92,14 +132,17 @@ const ReportsPage = () => {
     const endDate = new Date(currentDate);
 
     if (periodType === 'day') {
+      startDate.setDate(startDate.getDate() -1);
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
     } else if (periodType === 'week') {
       endDate.setDate(startDate.getDate());
       startDate.setDate(startDate.getDate() - 7);
+      startDate.setHours(0, 0, 0, 0);
     } else if (periodType === 'month') {
       endDate.setDate(startDate.getDate());
       startDate.setDate(startDate.getDate() - 31);
+      startDate.setHours(0, 0, 0, 0);
     }
 
     return { startDate, endDate };
@@ -116,39 +159,107 @@ const ReportsPage = () => {
     fetchStatistics();
   }, []);
 
-  // Обработчик клика по иконке календаря
+  // Обновляем обработчик клика по календарю
   const handleCalendarClick = () => {
-    setShowCalendar(true);
+    // Инициализируем временные даты текущими значениями
+    const startDate = dateRange.startDate instanceof Date 
+      ? dateRange.startDate.toISOString().split('T')[0] 
+      : (typeof dateRange.startDate === 'string' ? dateRange.startDate : '');
+      
+    const endDate = dateRange.endDate instanceof Date 
+      ? dateRange.endDate.toISOString().split('T')[0] 
+      : (typeof dateRange.endDate === 'string' ? dateRange.endDate : '');
+    
+    setTempStartDate(startDate);
+    setTempEndDate(endDate);
+    // Открываем модальное окно
+    setShowDateModal(true);
   };
 
-  // Применение выбранного диапазона дат
-  const handleApplyDateRange = (start, end) => {
-    setDateRange({ startDate: start, endDate: end });
-    setShowCalendar(false);
+  // Функция закрытия модального окна
+  const closeDateModal = () => {
+    setShowDateModal(false);
+  };
+
+  // Обработчик изменения начальной даты
+  const handleStartDateChange = (e) => {
+    setTempStartDate(e.target.value);
+  };
+
+  // Обработчик изменения конечной даты
+  const handleEndDateChange = (e) => {
+    setTempEndDate(e.target.value);
+  };
+
+  // Функция для применения выбранного диапазона дат
+  const applyDateRange = () => {
+    // Преобразуем строки в объекты Date
+    const startDate = new Date(tempStartDate);
+    const endDate = new Date(tempEndDate);
     
-    // Определение типа периода на основе выбранных дат
-    let periodType = 'custom';
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay());
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Устанавливаем время начальной даты на 00:00:00.000
+    startDate.setHours(0, 0, 0, 0);
     
-    if (start.getTime() === today.getTime() && 
-        end.getTime() === new Date(today.getTime() + 86399999).getTime()) {
-      periodType = 'today';
-    } else if (start.getTime() === startOfWeek.getTime() && 
-              end.getTime() === new Date(startOfWeek.getTime() + 6 * 86400000 + 86399999).getTime()) {
-      periodType = 'week';
-    } else if (start.getTime() === startOfMonth.getTime() && 
-              end.getTime() === new Date(new Date(today.getFullYear(), today.getMonth() + 1, 0).getTime() + 86399999).getTime()) {
-      periodType = 'month';
+    // Обновляем основное состояние dateRange
+    setDateRange({
+      startDate,
+      endDate
+    });
+    
+    // Сохраняем дату последнего обновления для отслеживания
+    window.lastDateUpdateTime = new Date().getTime();
+    
+    // Сохраняем в localStorage
+    try {
+      localStorage.setItem('lastDateRange', JSON.stringify({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        updateTimestamp: window.lastDateUpdateTime
+      }));
+      
+      console.log('Сохранены даты в localStorage (ручной выбор):', {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      });
+    } catch (error) {
+      console.warn('Ошибка при сохранении дат в localStorage:', error);
     }
     
-    setSelectedPeriod(periodType);
-    localStorage.setItem('currentPeriodType', periodType);
+    // Закрываем модальное окно
+    setShowDateModal(false);
     
-    // Обновляем статистику
+    // Отправляем событие обновления дат
+    const dateEvent = new CustomEvent('dateRangeChanged', {
+      detail: {
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+        forceUpdate: true,
+        timestamp: window.lastDateUpdateTime
+      }
+    });
+    document.dispatchEvent(dateEvent);
+    
+    // Отправляем событие принудительного обновления для всех компонентов
+    const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
+      detail: { 
+        vehicle: selectedVehicle,
+        startDate: startDate,
+        endDate: endDate,
+        timestamp: window.lastDateUpdateTime
+      }
+    });
+    document.dispatchEvent(forceUpdateEvent);
+    
+    // Обновляем даты в открытых вкладках
+    if (openTabs.length > 0) {
+      setOpenTabs(prevTabs => prevTabs.map(tab => ({
+        ...tab,
+        startDate: startDate,
+        endDate: endDate
+      })));
+    }
+    
+    // Обновляем статистику с новым диапазоном дат
     fetchStatistics();
   };
 
@@ -158,7 +269,32 @@ const ReportsPage = () => {
     localStorage.setItem('currentPeriodType', period);
     
     const { startDate, endDate } = calculateDateRange(new Date(), period);
+    
+    // Дополнительная гарантия, что startDate установлен на 00:00:00.000
+    startDate.setHours(0, 0, 0, 0);
+    
     setDateRange({ startDate, endDate });
+    
+    // Сохраняем дату последнего обновления для отслеживания
+    window.lastDateUpdateTime = new Date().getTime();
+    
+    // Сохраняем в localStorage с форматированием для правильного чтения в других компонентах
+    try {
+      localStorage.setItem('lastDateRange', JSON.stringify({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        periodType: period,
+        updateTimestamp: window.lastDateUpdateTime
+      }));
+      
+      console.log('Сохранены даты в localStorage:', {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        periodType: period
+      });
+    } catch (error) {
+      console.warn('Ошибка при сохранении дат в localStorage:', error);
+    }
     
     // Отправка события об изменении дат
     const event = new CustomEvent('dateRangeChanged', {
@@ -166,10 +302,31 @@ const ReportsPage = () => {
         startDate: formatDate(startDate),
         endDate: formatDate(endDate),
         periodType: period,
-        forceUpdate: true
+        forceUpdate: true,
+        timestamp: window.lastDateUpdateTime
       }
     });
     document.dispatchEvent(event);
+    
+    // Дополнительно отправляем событие forceUpdate для обеспечения синхронизации
+    const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
+      detail: { 
+        vehicle: selectedVehicle,
+        startDate: startDate,
+        endDate: endDate,
+        timestamp: window.lastDateUpdateTime
+      }
+    });
+    document.dispatchEvent(forceUpdateEvent);
+    
+    // Обновляем даты в открытых вкладках
+    if (openTabs.length > 0) {
+      setOpenTabs(prevTabs => prevTabs.map(tab => ({
+        ...tab,
+        startDate: startDate,
+        endDate: endDate
+      })));
+    }
   };
 
   // Загрузка статистики
@@ -273,6 +430,8 @@ const ReportsPage = () => {
       case 'live-track': return 'Местоположение';
       case 'speed': return 'Скорость';
       case 'fuel': return 'Объем топлива';
+      case 'voltage': return 'Напряжение';
+      case 'rpm': return 'Обороты двигателя';
       default: return 'Отчет';
     }
   };
@@ -304,6 +463,7 @@ const ReportsPage = () => {
       case 'track-movement': return faRoad;
       case 'track-violations': return faExclamationTriangle;
       case 'track-fuel': return faGasPump;
+      case 'rpm': return faChartArea;
       default: return faFileAlt;
     }
   };
@@ -329,6 +489,44 @@ const ReportsPage = () => {
   // Переключение между вкладками
   const handleTabChange = (tabId) => {
     setActiveTabId(tabId);
+  };
+
+  // Обработчик выбора транспортного средства
+  const handleVehicleSelect = (vehicle) => {
+    // Если выбрано то же самое ТС, не делаем ничего
+    if (selectedVehicle && vehicle && selectedVehicle.id === vehicle.id) {
+      console.log('Выбрано то же самое ТС, игнорируем:', vehicle?.name);
+      return;
+    }
+
+    setSelectedVehicle(vehicle);
+    console.log('Выбрано транспортное средство:', vehicle);
+
+    // Сохраняем выбор в глобальной переменной для отслеживания последнего выбора
+    window.lastSelectedVehicleId = vehicle?.id;
+    window.lastVehicleUpdateTime = new Date().getTime();
+
+    // Создаем пользовательское событие для обновления всех компонентов
+    // Добавляем текущие даты к событию для полной синхронизации
+    const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
+      detail: { 
+        vehicle: vehicle,
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        timestamp: window.lastVehicleUpdateTime
+      }
+    });
+
+    // Отправляем событие для синхронизации выбора машины между компонентами
+    document.dispatchEvent(forceUpdateEvent);
+
+    // Обновляем все открытые вкладки с данными нового ТС
+    if (vehicle && openTabs.length > 0) {
+      setOpenTabs(prevTabs => prevTabs.map(tab => ({
+        ...tab,
+        vehicle: vehicle
+      })));
+    }
   };
 
   // Отображение контента активной вкладки
@@ -407,19 +605,33 @@ const ReportsPage = () => {
     const tabStartDate = activeTab.startDate || dateRange.startDate;
     const tabEndDate = activeTab.endDate || dateRange.endDate;
     
-    console.log('Отображение отчета:', {
+    // Устраняем дубликаты рендера и гарантируем актуальные данные
+    console.log('Отображение отчета (одно сообщение):', {
       type: activeTab.type,
       vehicle: activeTab.vehicle,
       startDate: tabStartDate ? tabStartDate.toISOString() : 'не указана',
       endDate: tabEndDate ? tabEndDate.toISOString() : 'не указана'
     });
     
+    // Создаем событие для принудительного обновления данных
+    const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
+      detail: { 
+        vehicle: activeTab.vehicle,
+        startDate: tabStartDate,
+        endDate: tabEndDate,
+        timestamp: new Date().getTime() // Добавим временную метку для гарантированного обновления
+      }
+    });
+    
+    // Отправляем событие через setTimeout, чтобы компонент успел обновиться
+    setTimeout(() => document.dispatchEvent(forceUpdateEvent), 50);
+    
     // Рендер компонента в зависимости от типа отчета
-
     switch (activeTab.type) {
       case 'track':
         return (
           <TrackMap 
+            key={`track-${activeTab.id}-${activeTab.vehicle?.id || 'no-vehicle'}-${Date.now()}`}
             tabId={activeTab.id} 
             vehicle={activeTab.vehicle} 
             startDate={tabStartDate} 
@@ -430,7 +642,6 @@ const ReportsPage = () => {
       case 'live-track':
         return (
           <LiveTrack
-            tabId={activeTab.id}
             vehicle={activeTab.vehicle}
             startDate={tabStartDate}
             endDate={tabEndDate}
@@ -439,7 +650,6 @@ const ReportsPage = () => {
       case 'speed':
         return (
           <SpeedChart 
-            tabId={activeTab.id} 
             vehicle={activeTab.vehicle} 
             startDate={tabStartDate} 
             endDate={tabEndDate}
@@ -448,9 +658,24 @@ const ReportsPage = () => {
       case 'fuel':
         return (
           <FuelChart 
-            tabId={activeTab.id} 
             vehicle={activeTab.vehicle} 
             startDate={tabStartDate} 
+            endDate={tabEndDate}
+          />
+        );
+      case 'voltage':
+        return (
+          <VoltageChart 
+            vehicle={activeTab.vehicle} 
+            startDate={tabStartDate} 
+            endDate={tabEndDate}
+          />
+        );
+      case 'rpm':
+        return (
+          <EngineChart
+            vehicle={activeTab.vehicle}
+            startDate={tabStartDate}
             endDate={tabEndDate}
           />
         );
@@ -518,6 +743,10 @@ const ReportsPage = () => {
         return 'График изменения уровня топлива с отметками заправок, сливов и расхода.';
       case 'speed': 
         return 'График скорости движения транспорта с выделением нарушений скоростного режима.';
+      case 'voltage': 
+        return 'График изменения напряжения бортовой сети транспортного средства.';
+      case 'rpm': 
+        return 'График оборотов двигателя транспортного средства с анализом нагрузки.';
       default: 
         return 'Выберите отчет для просмотра подробной информации и начала работы.';
     }
@@ -532,6 +761,8 @@ const ReportsPage = () => {
       case 'fuel': return 'linear-gradient(135deg, #1cc88a 0%, #13855c 100%)';
       case 'speed': return 'linear-gradient(135deg, #f6c23e 0%, #dda20a 100%)';
       case 'safedrive-details': return 'linear-gradient(135deg, #e74a3b 0%, #be2617 100%)';
+      case 'voltage': return 'linear-gradient(135deg, #54b4d3 0%, #2696b8 100%)';
+      case 'rpm': return 'linear-gradient(135deg, #9d4edd 0%, #7b2cbf 100%)';
       default: return 'linear-gradient(135deg, #858796 0%, #60616f 100%)';
     }
   };
@@ -643,39 +874,221 @@ const ReportsPage = () => {
     localStorage.setItem('splitScreenMode', splitMode);
   }, [splitMode]);
 
-  // Обработчик изменения диапазона дат
-  const handleDateChange = (start, end) => {
-    setDateRange({
-      startDate: start,
-      endDate: end
-    });
+  // Функция для рендеринга React компонентов в контейнере
+  const renderReactComponent = (componentType, container, props) => {
+    if (!container) return;
     
-    // Обновляем даты в открытых вкладках
-    if (openTabs.length > 0) {
-      setOpenTabs(prevTabs => prevTabs.map(tab => ({
-        ...tab,
-        startDate: start,
-        endDate: end
-      })));
+    try {
+      const root = ReactDOM.createRoot(container);
       
-      console.log('Обновлен диапазон дат для всех отчетов:', {
-        startDate: start ? start.toISOString() : 'не указана',
-        endDate: end ? end.toISOString() : 'не указана'
-      });
+      // Выбираем компонент в зависимости от типа
+      switch (componentType) {
+        case 'ReportSelector':
+          root.render(<ReportSelector 
+            selectedVehicle={selectedVehicle} 
+            onSelectReport={props.onSelectReport}
+            onCancel={props.onCancel}
+          />);
+          break;
+        // Добавьте другие компоненты по мере необходимости
+        default:
+          console.warn('Неизвестный тип компонента:', componentType);
+      }
+    } catch (error) {
+      console.error('Ошибка при рендеринге React компонента:', error);
+      container.innerHTML = `<div class="error-message">Ошибка при рендеринге: ${error.message}</div>`;
     }
   };
-
-  // Обработчик выбора транспортного средства
-  const handleVehicleSelect = (vehicle) => {
-    setSelectedVehicle(vehicle);
-    console.log('Выбрано транспортное средство:', vehicle);
+  
+  // Инициализация менеджера разделения экрана
+  useEffect(() => {
+    // Проверяем, активен ли режим разделения экрана
+    if (splitScreenActive && reportsContainerRef.current) {
+      console.log('Активация режима разделения экрана с режимом:', splitMode);
+      
+      // Определяем доступные типы отчетов
+      const availableReportTypes = [
+        'track', 'live-track', 'speed', 'fuel', 'voltage', 'rpm'
+      ];
+      
+      try {
+        // Инициализируем менеджер разделения экрана с четырьмя параметрами
+        SplitScreenManager.init(
+          reportsContainerRef.current,
+          availableReportTypes,
+          (reportType, containerId) => createReportForContainer(reportType, containerId),
+          renderReactComponent
+        );
+        
+        // Устанавливаем текущий режим разделения
+        if (splitMode === 'split-2') {
+          // Если режим разделения на 2 части, устанавливаем вертикальное разделение
+          SplitScreenManager.changeSplitMode(SPLIT_MODES.VERTICAL);
+        } else if (splitMode === 'split-4') {
+          // Если режим разделения на 4 части, устанавливаем квадратное разделение
+          SplitScreenManager.changeSplitMode(SPLIT_MODES.QUAD);
+        }
+        
+        // Добавляем обработчики событий
+        SplitScreenManager.on('splitScreenHidden', () => {
+          console.log('Событие скрытия режима разделения экрана');
+          setSplitScreenActive(false);
+          setSplitMode('single');
+          
+          // Перерисовываем отчеты в нормальном режиме
+          const activeTab = openTabs.find(tab => tab.id === activeTabId);
+          if (activeTab) {
+            const event = new CustomEvent('forceVehicleUpdate', {
+              detail: { 
+                vehicle: activeTab.vehicle,
+                startDate: activeTab.startDate || dateRange.startDate,
+                endDate: activeTab.endDate || dateRange.endDate,
+                timestamp: new Date().getTime()
+              }
+            });
+            document.dispatchEvent(event);
+          }
+        });
+        
+        // Показываем кнопку выхода из режима разделения экрана
+        const exitSplitBtn = document.getElementById('exit-split-screen');
+        if (exitSplitBtn) {
+          exitSplitBtn.style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Ошибка при инициализации менеджера разделения экрана:', error);
+        setSplitScreenActive(false);
+      }
+    } else {
+      // Скрываем кнопку выхода из режима разделения экрана
+      const exitSplitBtn = document.getElementById('exit-split-screen');
+      if (exitSplitBtn) {
+        exitSplitBtn.style.display = 'none';
+      }
+    }
+    
+    return () => {
+      // Очистка при размонтировании
+      if (splitScreenActive) {
+        console.log('Очистка менеджера разделения экрана при размонтировании');
+        try {
+          SplitScreenManager.hideSplitScreen();
+        } catch (error) {
+          console.error('Ошибка при скрытии режима разделения экрана:', error);
+        }
+      }
+    };
+  }, [splitScreenActive, dateRange, openTabs, activeTabId, selectedVehicle, splitMode]);
+  
+  // Функция для создания отчета для контейнера
+  const createReportForContainer = (reportType, containerId) => { // eslint-disable-line no-unused-vars
+    if (!selectedVehicle) {
+      alert('Пожалуйста, выберите транспортное средство для создания отчета');
+      return null;
+    }
+    
+    // Создаем элемент контейнера для отчета
+    const reportContainer = document.createElement('div');
+    reportContainer.className = 'split-report-content';
+    reportContainer.style.width = '100%';
+    reportContainer.style.height = '100%';
+    
+    // Создаем React компонент в зависимости от типа отчета
+    const reportElement = getReportElement(reportType, selectedVehicle, dateRange.startDate, dateRange.endDate);
+    
+    // Отрисовываем React компонент в контейнере
+    if (reportElement) {
+      setTimeout(() => {
+        try {
+          const root = ReactDOM.createRoot(reportContainer);
+          root.render(reportElement);
+        } catch (error) {
+          console.error('Ошибка при отрисовке отчета в контейнере:', error);
+          reportContainer.innerHTML = `<div class="error-message">Ошибка при создании отчета: ${error.message}</div>`;
+        }
+      }, 0);
+    } else {
+      reportContainer.innerHTML = '<div class="error-message">Неизвестный тип отчета</div>';
+    }
+    
+    return reportContainer;
   };
-
-  // Изменение режима разделения экрана
+  
+  // Функция для получения React-элемента отчета по его типу
+  const getReportElement = (reportType, vehicle, startDate, endDate) => {
+    const reportProps = {
+      key: `split-${reportType}-${vehicle?.id || 'no-vehicle'}-${Date.now()}`,
+      vehicle: vehicle,
+      startDate: startDate,
+      endDate: endDate,
+      hidePeriodSelector: true
+    };
+    
+    switch (reportType) {
+      case 'track':
+        return <TrackMap {...reportProps} />;
+      case 'live-track':
+        return <LiveTrack {...reportProps} />;
+      case 'speed':
+        return <SpeedChart {...reportProps} />;
+      case 'fuel':
+        return <FuelChart {...reportProps} />;
+      case 'voltage':
+        return <VoltageChart {...reportProps} />;
+      case 'rpm':
+        return <EngineChart {...reportProps} />;
+      default:
+        return null;
+    }
+  };
+  
+  // Обновленная функция для изменения режима разделения экрана
   const handleSplitModeChange = (mode) => {
+    console.log('Изменение режима разделения экрана на:', mode);
+    
+    // Устанавливаем режим разделения в состоянии компонента
     setSplitMode(mode);
+    
+    // Если выбран любой режим разделения, активируем менеджер разделения экрана
+    if (mode !== 'single') {
+      setSplitScreenActive(true);
+      
+      // Если SplitScreenManager уже инициализирован, меняем режим
+      if (SplitScreenManager.rootContainer) {
+        try {
+          // Определяем режим в терминах SPLIT_MODES
+          let splitScreenMode;
+          switch (mode) {
+            case 'split-2':
+              splitScreenMode = SPLIT_MODES.VERTICAL;
+              break;
+            case 'split-4':
+              splitScreenMode = SPLIT_MODES.QUAD;
+              break;
+            default:
+              splitScreenMode = SPLIT_MODES.SINGLE;
+          }
+          
+          // Применяем выбранный режим
+          SplitScreenManager.changeSplitMode(splitScreenMode);
+        } catch (error) {
+          console.error('Ошибка при изменении режима разделения экрана:', error);
+        }
+      }
+    } else {
+      // Деактивируем режим разделения экрана
+      if (SplitScreenManager.rootContainer) {
+        try {
+          SplitScreenManager.changeSplitMode(SPLIT_MODES.SINGLE);
+          SplitScreenManager.hideSplitScreen();
+        } catch (error) {
+          console.error('Ошибка при отключении режима разделения экрана:', error);
+        }
+      }
+      setSplitScreenActive(false);
+    }
   };
-
+  
   // Отображение кнопок переключения режима разделения экрана
   const renderSplitModeControls = () => {
     return (
@@ -704,7 +1117,53 @@ const ReportsPage = () => {
       </div>
     );
   };
-
+  
+  // Эти функции могут использоваться в будущем, поэтому добавляем eslint-disable-next-line
+  // eslint-disable-next-line
+  const handleDateChange = (start, end) => {
+    // Устанавливаем время начальной даты на 00:00:00.000
+    if (start instanceof Date) {
+      start.setHours(0, 0, 0, 0);
+    }
+    
+    setDateRange({
+      startDate: start,
+      endDate: end
+    });
+    
+    // Сохраняем в localStorage
+    try {
+      if (start instanceof Date && end instanceof Date) {
+        localStorage.setItem('lastDateRange', JSON.stringify({
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          updateTimestamp: new Date().getTime()
+        }));
+        
+        console.log('Сохранены даты в localStorage (handleDateChange):', {
+          startDate: start.toISOString(),
+          endDate: end.toISOString()
+        });
+      }
+    } catch (error) {
+      console.warn('Ошибка при сохранении дат в localStorage:', error);
+    }
+    
+    // Обновляем даты в открытых вкладках
+    if (openTabs.length > 0) {
+      setOpenTabs(prevTabs => prevTabs.map(tab => ({
+        ...tab,
+        startDate: start,
+        endDate: end
+      })));
+      
+      console.log('Обновлен диапазон дат для всех отчетов:', {
+        startDate: start ? start.toISOString() : 'не указана',
+        endDate: end ? end.toISOString() : 'не указана'
+      });
+    }
+  };
+  
   return (
     <div className="dashboard">
       {/* Боковая панель */}
@@ -807,44 +1266,39 @@ const ReportsPage = () => {
         </div>
 
         {/* Модальное окно выбора даты */}
-        {showCalendar && (
-          <div className="date-picker-modal" ref={datePickerRef}>
+        {showDateModal && (
+          <div className="date-picker-modal">
             <div className="date-picker-content">
-              <h3>Выберите диапазон дат</h3>
+              <h3>Выбор периода</h3>
               <div className="date-inputs">
                 <div className="form-group">
-                  <label htmlFor="start-date">Начальная дата:</label>
-                  <input 
-                    type="date" 
-                    id="start-date" 
-                    className="form-control" 
-                    defaultValue={dateRange.startDate ? dateRange.startDate.toISOString().split('T')[0] : ''}
+                  <label htmlFor="start-date">Начальная дата</label>
+                  <input
+                    id="start-date"
+                    type="date"
+                    className="form-control"
+                    value={tempStartDate}
+                    onChange={handleStartDateChange}
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="end-date">Конечная дата:</label>
-                  <input 
-                    type="date" 
-                    id="end-date" 
-                    className="form-control" 
-                    defaultValue={dateRange.endDate ? dateRange.endDate.toISOString().split('T')[0] : ''}
+                  <label htmlFor="end-date">Конечная дата</label>
+                  <input
+                    id="end-date"
+                    type="date"
+                    className="form-control"
+                    value={tempEndDate}
+                    onChange={handleEndDateChange}
                   />
                 </div>
               </div>
               <div className="date-picker-actions">
-                <button 
-                  className="btn btn-primary" 
-                  onClick={() => {
-                    const startInput = document.getElementById('start-date');
-                    const endInput = document.getElementById('end-date');
-                    if (startInput.value && endInput.value) {
-                      handleApplyDateRange(new Date(startInput.value), new Date(endInput.value));
-                    }
-                  }}
-                >
+                <button className="btn btn-secondary" onClick={closeDateModal}>
+                  Отмена
+                </button>
+                <button className="btn btn-primary" onClick={applyDateRange}>
                   Применить
                 </button>
-                <button onClick={() => setShowCalendar(false)}>Отмена</button>
               </div>
             </div>
           </div>
@@ -905,7 +1359,7 @@ const ReportsPage = () => {
           <div className="nav-group">
             <div className="nav-group-title">Транспортные средства</div>
             <FolderList 
-              onVehicleSelect={setSelectedVehicle}
+              onVehicleSelect={handleVehicleSelect}
             />
           </div>
         </div>
@@ -962,7 +1416,7 @@ const ReportsPage = () => {
                       {renderReportItem('fuel', faGasPump, 'Объем топлива')}
                       {renderReportItem('speed', faTachometerAlt, 'Скорость')}
                       {renderReportItem('voltage', faChartLine, 'Напряжение бортовой сети')}
-                      {renderReportItem('engine', faChartArea, 'Обороты двигателя')}
+                      {renderReportItem('rpm', faChartArea, 'Обороты двигателя')}
                     </ul>
                   </div>
 
@@ -1000,12 +1454,11 @@ const ReportsPage = () => {
                 onClick={() => handleTabChange(tab.id)}
                 data-tab-id={tab.id}
                 data-vehicle-id={tab.vehicle?.id}
-                data-vehicle={tab.vehicle?.name}
                 data-vehicle-imei={tab.vehicle?.imei}
                 data-report-type={tab.type}
               >
                 <FontAwesomeIcon icon={getReportIcon(tab.type)} />
-                <span>{tab.vehicle?.name} - {tab.title}</span>
+                <span>{tab.title}</span>
                 <button 
                   className="close-tab"
                   onClick={(e) => handleCloseTab(tab.id, e)}
@@ -1031,11 +1484,15 @@ const ReportsPage = () => {
               <button id="logout-button">Выход</button>
             </div>
           </div>
+          
         </div>
         
         {/* Контейнер для отчетов */}
-        <div className="reports-container">
-          {renderActiveTabContent()}
+        <div 
+          className={`reports-container ${splitScreenActive ? 'split-screen-mode' : ''}`} 
+          ref={reportsContainerRef}
+        >
+          {!splitScreenActive && renderActiveTabContent()}
         </div>
         
         {/* Аварийная кнопка выхода из полноэкранного режима */}
@@ -1056,28 +1513,6 @@ const ReportsPage = () => {
           onClick={() => window.exitFullscreen && window.exitFullscreen()}
         >
           Выйти из полного экрана
-        </div>
-        
-        {/* Кнопка выхода из режима разделения экрана */}
-        <div 
-          id="exit-split-screen" 
-          style={{ 
-            position: 'fixed', 
-            bottom: 10, 
-            left: 10, 
-            zIndex: 10000, 
-            background: 'rgba(0,123,255,0.8)', 
-            color: 'white', 
-            padding: '8px 15px', 
-            borderRadius: 5, 
-            cursor: 'pointer', 
-            display: 'none', 
-            fontSize: 14, 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-          }}
-          onClick={() => window.splitScreenManager && window.splitScreenManager.hideSplitScreen()}
-        >
-          <FontAwesomeIcon icon={faPlus} style={{ transform: 'rotate(45deg)' }} /> Выйти из режима разделения экрана
         </div>
       </div>
     </div>

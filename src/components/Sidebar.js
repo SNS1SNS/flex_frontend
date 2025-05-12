@@ -5,7 +5,10 @@ import {
     faTruck, faUser, faUsers, 
     faFileAlt,
     faRightFromBracket, faInfo, faQuestion, 
-    faUserTie
+    faUserTie,
+    faCalendarAlt,
+    faTimes,
+    faCheck
 } from '@fortawesome/free-solid-svg-icons';
 import './Sidebar.css';
 import './ProfileMenu.css';
@@ -30,6 +33,17 @@ const Sidebar = () => {
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const profileMenuRef = useRef(null);
     const headerRef = useRef(null);
+    
+    // Состояния для календаря
+    const [showDateModal, setShowDateModal] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(() => {
+        // Проверяем, сохранена ли дата в localStorage
+        const savedDate = localStorage.getItem('selectedDate');
+        return savedDate || new Date().toISOString().split('T')[0]; // формат YYYY-MM-DD
+    });
+    const [tempDate, setTempDate] = useState(''); // Временное хранение выбранной даты
+    const [showNotification, setShowNotification] = useState(false);
+    const [notificationMessage, setNotificationMessage] = useState('');
     
     // Функция для выхода из аккаунта
     const handleLogout = () => {
@@ -58,6 +72,61 @@ const Sidebar = () => {
         }
     };
     
+    // Функция открытия модального окна выбора даты
+    const openDateModal = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setTempDate(selectedDate); // Инициализируем временную дату текущим выбором
+        setShowDateModal(true);
+    };
+    
+    // Функция закрытия модального окна
+    const closeDateModal = () => {
+        setShowDateModal(false);
+    };
+    
+    // Обработчик временного изменения даты
+    const handleTempDateChange = (e) => {
+        setTempDate(e.target.value);
+    };
+    
+    // Обработчик применения выбранной даты
+    const applyDateChange = () => {
+        setSelectedDate(tempDate);
+        
+        // Сохраняем выбранную дату в localStorage
+        localStorage.setItem('selectedDate', tempDate);
+        
+        // Показываем уведомление об успешном изменении
+        showDateChangeNotification(tempDate);
+        
+        // Закрываем модальное окно
+        setShowDateModal(false);
+    };
+    
+    // Функция для показа уведомления об изменении даты
+    const showDateChangeNotification = (date) => {
+        setNotificationMessage(`Дата изменена на: ${formatDate(date)}`);
+        setShowNotification(true);
+        
+        // Автоматическое скрытие уведомления через 3 секунды
+        setTimeout(() => {
+            setShowNotification(false);
+        }, 3000);
+    };
+    
+    // Отображение даты в удобном формате
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        
+        const date = new Date(dateString);
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        
+        return `${day}.${month}.${year}`;
+    };
+    
     // Обработчик для закрытия профильного меню при клике вне его
     const handleClickOutside = (event) => {
         if (
@@ -67,6 +136,14 @@ const Sidebar = () => {
             !headerRef.current.contains(event.target)
         ) {
             setProfileMenuOpen(false);
+        }
+        
+        // Закрываем модальное окно при клике вне его
+        if (showDateModal) {
+            const dateModal = document.querySelector('.date-modal-content');
+            if (dateModal && !dateModal.contains(event.target)) {
+                setShowDateModal(false);
+            }
         }
     };
 
@@ -235,6 +312,47 @@ const Sidebar = () => {
                 </div>
             </div>
             
+            {/* Модальное окно выбора даты */}
+            {showDateModal && (
+                <div className="date-modal-overlay">
+                    <div className="date-modal-content">
+                        <div className="date-modal-header">
+                            <h3>Выберите дату</h3>
+                            <button className="close-button" onClick={closeDateModal}>
+                                <FontAwesomeIcon icon={faTimes} />
+                            </button>
+                        </div>
+                        <div className="date-modal-body">
+                            <input 
+                                type="date" 
+                                value={tempDate} 
+                                onChange={handleTempDateChange} 
+                                className="date-picker"
+                            />
+                        </div>
+                        <div className="date-modal-footer">
+                            <button className="cancel-date" onClick={closeDateModal}>
+                                Отмена
+                            </button>
+                            <button className="apply-date" onClick={applyDateChange}>
+                                Применить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Всплывающее уведомление */}
+            {showNotification && (
+                <div className="date-notification">
+                    <div className="date-notification-icon">
+                        <FontAwesomeIcon icon={faCheck} />
+                    </div>
+                    <div className="date-notification-message">
+                        {notificationMessage}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

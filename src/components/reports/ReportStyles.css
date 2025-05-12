@@ -482,73 +482,123 @@ body {
     transform: scale(1.05);
 }
 
+/* Модальное окно выбора даты - улучшенная версия с высоким z-index */
 .date-picker-modal {
-    position: absolute;
-    top: 150px;
-    left: 320px;
-    background-color: white;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    z-index: 1000;
-    padding: 20px;
-    width: 400px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000; /* Очень высокий z-index, чтобы всегда быть поверх других элементов */
+    backdrop-filter: blur(3px); /* Эффект размытия фона для улучшения видимости */
 }
 
 .date-picker-content {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 25px;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    position: relative;
+    animation: fadeInScale 0.3s ease-out forwards;
+}
+
+@keyframes fadeInScale {
+    0% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.date-picker-content h3 {
+    margin-bottom: 20px;
+    color: #0a2747;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
 }
 
 .date-inputs {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 25px;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    flex: 1;
+    gap: 6px;
 }
 
 .form-group label {
     font-size: 14px;
+    font-weight: 500;
     color: #555;
 }
 
 .form-control {
-    padding: 8px 10px;
+    padding: 12px 15px;
     border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
+    border-radius: 6px;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #4C91CD;
+    box-shadow: 0 0 0 2px rgba(76, 145, 205, 0.2);
 }
 
 .date-picker-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 10px;
+    justify-content: space-between;
+    gap: 15px;
 }
 
 .btn {
-    padding: 8px 16px;
-    border-radius: 4px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
     cursor: pointer;
-    border: 1px solid transparent;
-    font-size: 14px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+    flex: 1;
+}
+
+.btn-secondary {
+    background-color: #e9e9e9;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background-color: #d9d9d9;
 }
 
 .btn-primary {
-    background-color: #0d3b66;
-    border-color: #0d3b66;
+    background-color: #4C91CD;
     color: white;
 }
 
 .btn-primary:hover {
-    background-color: #0a2d4d;
-    border-color: #0a2d4d;
+    background-color: #3a7cb2;
+}
+
+/* Добавляем анимации для улучшения пользовательского опыта */
+@keyframes datepickerFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .date-tabs {
@@ -584,28 +634,6 @@ body {
     padding: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     background-color: rgba(0, 0, 0, 0.05);
-}
-
-.search-input {
-    width: 100%;
-    padding: 12px 15px;
-    border-radius: 30px;
-    border: none;
-    background-color: rgba(255, 255, 255, 0.1);
-    color: white;
-    font-size: 14px;
-    transition: all 0.3s ease;
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
-}
-
-.search-input:focus {
-    background-color: rgba(255, 255, 255, 0.15);
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2), 0 0 5px rgba(76, 145, 205, 0.3);
-    outline: none;
-}
-
-.search-input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
 }
 
 .stats-row {
@@ -687,7 +715,6 @@ body {
 .status-filter.blue {
     background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%);
 }
- 
 
 /* Стили для контекстного меню */
 .context-menu {
@@ -988,7 +1015,6 @@ body {
     flex: 1;
     gap: 2px;
     padding: 0 2px;
-    background-color: rgba(0, 0, 0, 0.2);
 }
 
 .report-tab {
@@ -1266,7 +1292,6 @@ body {
     }
 }
 
-
 @keyframes slide-in {
     0% {
         opacity: 0;
@@ -1277,8 +1302,6 @@ body {
         transform: translateY(0);
     }
 }
-
-
 
 /* Стили для вкладок периода */
 .period-tabs {
@@ -1313,4 +1336,322 @@ body {
     height: 1px;
     background: rgba(255, 255, 255, 0.1);
     margin: 10px 0;
-} 
+}
+
+/* Стили для компонентов-заглушек */
+.component-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background-color: #f8f9fc;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.component-placeholder h3 {
+    color: #4e73df;
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.component-placeholder p {
+    color: #5a5c69;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+/* Добавляем стили для предотвращения конфликтов с TrackMap */
+.reports-container {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 110px);
+    overflow: hidden;
+}
+
+.default-dashboard {
+    padding: 20px;
+}
+
+/* Стили для режима разделения экрана */
+.reports-container.split-screen-mode {
+    padding: 0;
+    overflow: hidden;
+}
+
+.split-mode-controls {
+    display: flex;
+    align-items: center;
+    margin-left: 15px;
+}
+
+.split-mode-button {
+    background: none;
+    border: none;
+    width: 32px;
+    height: 32px;
+    margin: 0 5px;
+    border-radius: 4px;
+    color: #555;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.split-mode-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.split-mode-button.active {
+    background-color: #1a73e8;
+    color: white;
+}
+
+/* Стили для отчетов в разделенном режиме */
+.split-report-content {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    position: relative;
+    box-sizing: border-box;
+}
+
+/* Кнопка выхода из режима разделения экрана */
+#exit-split-screen {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    padding: 8px 12px;
+    background-color: #1a73e8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    z-index: 1000;
+    cursor: pointer;
+    font-size: 14px;
+    display: none;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+#exit-split-screen:hover {
+    background-color: #1558b3;
+}
+
+#exit-split-screen svg {
+    margin-right: 8px;
+}
+
+/* Стили для сообщений об ошибках */
+.error-message {
+    width: 100%;
+    padding: 20px;
+    text-align: center;
+    color: #d32f2f;
+    background-color: #ffebee;
+    border: 1px solid #ffcdd2;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+/* Адаптация элементов управления */
+.report-tabs {
+    flex: 1;
+    overflow-x: auto;
+}
+
+.report-actions {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
+}
+
+.top-bar {
+    justify-content: space-between;
+}
+
+/* Модификации для режима разделения экрана */
+.split-screen-mode .report-container {
+    position: relative;
+}
+
+.split-screen-mode .report-container .control-panel,
+.split-screen-mode .report-container .period-selector {
+    display: none;
+}
+
+.split-screen-mode .report-container .map-container,
+.split-screen-mode .report-container .chart-container {
+    height: calc(100% - 10px) !important;
+}
+
+/* Индикатор загрузки для контейнеров отчетов */
+.container-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.loading-spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #1a73e8;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Стили для компонента выбора отчетов */
+.report-selector {
+    width: 100%;
+    max-width: 800px;
+    max-height: 600px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.report-selector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+}
+
+.report-selector-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.report-selector-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #555;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.report-selector-close:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.report-selector-categories {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 16px;
+    max-height: 500px;
+}
+
+.report-category {
+    margin-bottom: 24px;
+}
+
+.report-category h4 {
+    margin: 0 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+    color: #333;
+    font-size: 16px;
+}
+
+.report-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-gap: 16px;
+}
+
+.report-card {
+    background-color: white;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.report-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #1a73e8;
+    transform: translateY(-2px);
+}
+
+.report-card-icon {
+    font-size: 24px;
+    color: #1a73e8;
+    margin-bottom: 12px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(26, 115, 232, 0.1);
+}
+
+.report-card-title {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.report-card-description {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.4;
+}
+
+.report-selector-warning {
+    padding: 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.report-selector-warning p {
+    color: #d32f2f;
+    margin-bottom: 16px;
+}
+
+.report-selector-warning button {
+    padding: 8px 16px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #333;
+}

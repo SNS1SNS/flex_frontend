@@ -138,4 +138,73 @@
 
 .main-content.split-mode-split-4 .stat-value {
   font-size: 1.2rem;
+}
+
+/* Стили для элемента date-display */
+.date-display {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.date-display:hover {
+  background-color: rgba(78, 115, 223, 0.1);
+}
+
+.date-value {
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+  color: #4e73df;
+}
+
+/* Стили для модального окна выбора диапазона дат */
+.date-range-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-field label {
+  font-size: 14px;
+  color: #555;
+  font-weight: 500;
+}
+
+/* Дополнительные стили для модального окна в ReportsPage */
+.reports-page .date-modal-overlay {
+  z-index: 1100; /* Убедитесь, что z-index выше, чем у других элементов на странице отчетов */
+}
+
+.reports-page .date-modal-content {
+  max-width: 400px; /* Увеличиваем максимальную ширину для удобства */
+}
+
+.reports-page .date-picker {
+  font-size: 15px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 100%;
+}
+
+/* Стили для кнопок */
+.date-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px;
+  border-top: 1px solid #eee;
+  gap: 10px;
+}
+
+.reports-page .apply-date:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 } 

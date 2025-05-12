@@ -200,58 +200,155 @@ const getDemoData = (endpoint) => {
   console.log('Получение демо-данных для эндпоинта:', endpoint);
   
   // Демо-данные для разных эндпоинтов
+  if (endpoint.startsWith('/api/vehicles') && endpoint !== '/api/vehicles') {
+    // Для отдельного ТС - извлекаем ID из URL
+    const vehicleId = endpoint.split('/').pop();
+    
+    // Возвращаем демо-данные для конкретного ТС
+    const demoVehicles = {
+      '1': {
+        id: 1,
+        name: 'Самосвал Volvo',
+        garage_number: 'СВ-1254',
+        imei: '356938035643809',
+        factory_number: 'V12345',
+        phone: '+7(777)123-45-67',
+        groups: 'Строительная техника',
+        last_data: '2025-05-02 11:45:23',
+        status: 'Готово',
+        created_at: '2024-10-15',
+        type: 'Самосвал',
+        fuel_type: 'Дизель',
+        fuel_tank_volume: 400,
+        terminal: 'Teltonika FMB640',
+        engineHours: '3245 ч',
+        mileage: '12540',
+        driver: 'Иванов И.И.',
+        registration_number: 'А123ВС',
+        vin: 'WVGZZZ5NZJM131395',
+        year: '2018',
+        maintenance_date: '2024-08-15',
+        maintenance_km: '10000',
+        maintenance_status: 'Плановое',
+        last_position: {
+          lat: 55.755814,
+          lng: 37.617635,
+          timestamp: '2025-05-02 11:45:23'
+        }
+      },
+      '2': {
+        id: 2,
+        name: 'Экскаватор Caterpillar',
+        garage_number: 'ЭК-5678',
+        imei: '356938035643810',
+        factory_number: 'C98765',
+        phone: '+7(777)234-56-78',
+        groups: 'Строительная техника',
+        last_data: '2025-05-02 12:30:15',
+        status: 'В обработке',
+        created_at: '2024-09-22',
+        type: 'Экскаватор',
+        fuel_type: 'Дизель',
+        fuel_tank_volume: 300,
+        terminal: 'Teltonika FMB920',
+        engineHours: '1560 ч',
+        mileage: '5240',
+        driver: 'Петров П.П.',
+        registration_number: 'В456АС',
+        vin: 'WDBHA28E6SF069731',
+        year: '2020',
+        maintenance_date: '2024-07-20',
+        maintenance_km: '5000',
+        maintenance_status: 'Требуется',
+        last_position: {
+          lat: 55.751244,
+          lng: 37.618423,
+          timestamp: '2025-05-02 12:30:15'
+        }
+      },
+      '3': {
+        id: 3,
+        name: 'Бульдозер Komatsu',
+        garage_number: 'БД-9012',
+        imei: '356938035643811',
+        factory_number: 'K54321',
+        phone: '+7(777)345-67-89',
+        groups: 'Землеройная техника',
+        last_data: '2025-05-01 09:15:42',
+        status: 'Ошибка',
+        created_at: '2024-11-05',
+        type: 'Бульдозер',
+        fuel_type: 'Дизель',
+        fuel_tank_volume: 350,
+        terminal: 'Teltonika FMB125',
+        engineHours: '890 ч',
+        mileage: '3120',
+        driver: 'Сидоров С.С.',
+        registration_number: 'Т789УХ',
+        vin: 'JH4KA7650NC003943',
+        year: '2021',
+        maintenance_date: '2024-09-10',
+        maintenance_km: '3000',
+        maintenance_status: 'Выполнено',
+        last_position: {
+          lat: 55.7622,
+          lng: 37.6155,
+          timestamp: '2025-05-01 09:15:42'
+        }
+      }
+    };
+    
+    // Возвращаем данные для запрашиваемого ТС или информацию об ошибке
+    return demoVehicles[vehicleId] || { error: 'Транспортное средство не найдено', status: 404 };
+  }
+  
+  // Для списка ТС
   if (endpoint === '/api/vehicles') {
     return [
       {
         id: 1,
-        name: "МАЗ-5440",
-        garageNumber: "Г-123",
-        terminal: "ABC123",
-        imei: "123456789012345",
-        factoryNumber: "FN-12345",
-        phone: "+79001234567",
-        groups: "Грузовые,Дальнобойщики",
-        lastData: "2025-05-02T15:04:01.609473",
-        status: "ACTIVE",
-        createdAt: "2025-05-02T15:04:01.61448",
-        vehicleType: "Тягач",
-        type: "truck",
-        fuelType: "Дизель",
-        fuelTankVolume: 500.0
+        name: 'Самосвал Volvo',
+        garage_number: 'СВ-1254',
+        imei: '356938035643809',
+        factory_number: 'V12345',
+        phone: '+7(777)123-45-67',
+        groups: 'Строительная техника',
+        last_data: '2025-05-02 11:45:23',
+        status: 'Готово',
+        created_at: '2024-10-15',
+        type: 'Самосвал',
+        fuel_type: 'Дизель',
+        fuel_tank_volume: 400
       },
       {
         id: 2,
-        name: "КамАЗ-6520",
-        garageNumber: "Г-456",
-        terminal: "DEF456",
-        imei: "234567890123456",
-        factoryNumber: "FN-67890",
-        phone: "+79009876543",
-        groups: "Грузовые,Самосвалы",
-        lastData: "2025-05-01T10:30:15.123456",
-        status: "INACTIVE",
-        createdAt: "2025-05-01T08:15:30.987654",
-        vehicleType: "Самосвал",
-        type: "dump_truck",
-        fuelType: "Дизель",
-        fuelTankVolume: 350.0
+        name: 'Экскаватор Caterpillar',
+        garage_number: 'ЭК-5678',
+        imei: '356938035643810',
+        factory_number: 'C98765',
+        phone: '+7(777)234-56-78',
+        groups: 'Строительная техника',
+        last_data: '2025-05-02 12:30:15',
+        status: 'В обработке',
+        created_at: '2024-09-22',
+        type: 'Экскаватор',
+        fuel_type: 'Дизель',
+        fuel_tank_volume: 300
       },
       {
         id: 3,
-        name: "Volvo FH",
-        garageNumber: "Г-789",
-        terminal: "GHI789",
-        imei: "345678901234567",
-        factoryNumber: "FN-12345-V",
-        phone: "+79001122334",
-        groups: "Грузовые,Международные",
-        lastData: "2025-05-02T12:45:20.456789",
-        status: "ACTIVE",
-        createdAt: "2025-04-15T14:20:10.123456",
-        vehicleType: "Тягач",
-        type: "truck",
-        fuelType: "Дизель",
-        fuelTankVolume: 600.0
+        name: 'Бульдозер Komatsu',
+        garage_number: 'БД-9012',
+        imei: '356938035643811',
+        factory_number: 'K54321',
+        phone: '+7(777)345-67-89',
+        groups: 'Землеройная техника',
+        last_data: '2025-05-01 09:15:42',
+        status: 'Ошибка',
+        created_at: '2024-11-05',
+        type: 'Бульдозер',
+        fuel_type: 'Дизель',
+        fuel_tank_volume: 350
       }
     ];
   }

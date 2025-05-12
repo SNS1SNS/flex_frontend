@@ -1,1554 +1,926 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
-import zoomPlugin from 'chartjs-plugin-zoom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faTachometerAlt, faCalendarAlt, 
-  faSync, faChartLine, 
-  faCog, faInfoCircle, faGasPump, faCar, faBolt,
-  faSearchPlus, faSearchMinus, faRedo, faExpand, faCompress
-} from '@fortawesome/free-solid-svg-icons';
-import './SpeedChart.css';
+import React, { useState, useEffect, useRef } from 'react';
+import BaseChart from './BaseChart';
+import { getAuthToken } from '../../utils/authUtils';
+import { toast } from 'react-toastify';
 
-// Регистрируем необходимые компоненты Chart.js
-ChartJS.register(
-  CategoryScale, 
-  LinearScale, 
-  PointElement, 
-  LineElement, 
-  Title, 
-  Tooltip, 
-  Legend, 
-  Filler, 
-  zoomPlugin
-);
-
-// Конфигурация типов телеметрии
-const TELEMETRY_TYPES = {
-  speed: {
-    title: 'График скорости',
-    icon: faTachometerAlt,
-    unit: 'км/ч',
-    endpoint: 'speed',
-    color: '#2c7be5',
-    bgColor: 'rgba(44, 123, 229, 0.2)',
-    limitValue: 90,
-    limitLabel: 'Ограничение скорости',
-    limitColor: 'rgba(255, 99, 132, 0.8)',
-    enabled: false, // По умолчанию выключена
-    statistics: {
-      average: 'Средняя скорость',
-      max: 'Максимальная скорость',
-      movingTime: 'Время в движении',
-      exceedCount: 'Превышения скорости'
-    }
-  },
-  fuel: {
-    title: 'График расхода топлива',
-    icon: faGasPump,
-    unit: 'л',
-    endpoint: 'fuel',
-    color: '#00d97e',
-    bgColor: 'rgba(0, 217, 126, 0.2)',
-    limitValue: null,
-    limitLabel: 'Средний расход',
-    limitColor: 'rgba(255, 193, 7, 0.8)',
-    statistics: {
-      average: 'Средний расход',
-      max: 'Максимальный расход',
-      movingTime: 'Время в движении',
-      exceedCount: 'Заправки'
-    }
-  },
-  rpm: {
-    title: 'График оборотов двигателя',
-    icon: faCar,
-    unit: 'об/мин',
-    endpoint: 'rpm',
-    color: '#fd7e14',
-    bgColor: 'rgba(253, 126, 20, 0.2)',
-    limitValue: 3000,
-    limitLabel: 'Рекомендуемые обороты',
-    limitColor: 'rgba(220, 53, 69, 0.8)',
-    statistics: {
-      average: 'Средние обороты',
-      max: 'Максимальные обороты',
-      movingTime: 'Время работы',
-      exceedCount: 'Превышения оборотов'
-    }
-  },
-  voltage: {
-    title: 'График напряжения',
-    icon: faBolt,
-    unit: 'В',
-    endpoint: 'voltage',
-    color: '#39afd1',
-    bgColor: 'rgba(57, 175, 209, 0.2)',
-    limitValue: 12,
-    limitLabel: 'Нормальное напряжение',
-    limitColor: 'rgba(108, 117, 125, 0.8)',
-    statistics: {
-      average: 'Среднее напряжение',
-      max: 'Максимальное напряжение',
-      movingTime: 'Время работы',
-      exceedCount: 'Отклонения'
-    }
-  }
-};
-
-/**
- * Универсальный компонент для отображения графиков телеметрии
- * @param {Object} props - Свойства компонента
- * @param {Object} props.vehicle - Данные о транспортном средстве (id, name, imei)
- * @param {Date} props.startDate - Начальная дата диапазона (не используется, используем локальное состояние)
- * @param {Date} props.endDate - Конечная дата диапазона (не используется, используем локальное состояние)
- * @param {string} props.telemetryType - Тип телеметрии: 'speed', 'fuel', 'rpm', 'voltage'
- */
-const TelemetryChart = ({ vehicle, telemetryType = 'speed' }) => {
-  const [chartData, setChartData] = useState(null);
+const SpeedChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }) => {
+  const [chartData, setChartData] = useState([]);
+  const [chartLabels, setChartLabels] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [statistics, setStatistics] = useState({
-    average: '-',
-    max: '-',
-    movingTime: '-',
-    exceedCount: '-'
-  });
-  const [selectedPeriod, setSelectedPeriod] = useState('day');
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  // Локальные состояния для дат с корректными начальными значениями
-  const [localStartDate, setLocalStartDate] = useState(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
-  });
+  const [error, setError] = useState(null);
+  const abortControllerRef = useRef(null);
   
-  const [localEndDate, setLocalEndDate] = useState(() => {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    return today;
-  });
-  const chartContainerRef = useRef(null);
-  const chartRef = useRef(null);
+  // Состояние для хранения дат, которые будут синхронизироваться с localStorage
+  const [startDate, setStartDate] = useState(propsStartDate);
+  const [endDate, setEndDate] = useState(propsEndDate);
   
-  // Получаем конфигурацию для текущего типа телеметрии
-  const telemetryConfig = TELEMETRY_TYPES[telemetryType] || TELEMETRY_TYPES.speed;
-  
-  // Форматирование даты для отображения на графике
-  const formatDateForChart = (dateString) => {
-    const date = new Date(dateString);
-    return `${date.getDate().toString().padStart(2, '0')}.${(date.getMonth() + 1).toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-  };
-  
-  // Сброс зума для графика
-  const resetZoom = () => {
-    console.log('Вызвана функция resetZoom');
+  // Функция для обеспечения валидных дат (аналогично TrackMap)
+  const ensureValidDate = (dateInput) => {
     try {
-      if (chartRef.current) {
-        console.log('chartRef.current найден:', chartRef.current);
-        
-        // Проверяем доступ к внутренним свойствам chartRef.current
-        if (chartRef.current._reactInternals) {
-          console.log('Найдены _reactInternals:', !!chartRef.current._reactInternals);
+      // Если дата уже является объектом Date и она валидна
+      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+        return dateInput;
+      }
+      
+      // Если дата - строка
+      if (typeof dateInput === 'string') {
+        // Проверяем, не является ли строка пустой или невалидной
+        if (!dateInput || dateInput === 'Invalid Date') {
+          console.warn('Получена невалидная строка даты:', dateInput);
+          return new Date();
         }
         
-        // Chart.js v4: использование метода getChart() для получения экземпляра
-        const canvasElement = document.querySelector('.speed-chart canvas');
-        if (canvasElement) {
-          console.log('Canvas элемент найден');
-          try {
-            // Метод ChartJS.getChart появился в Chart.js v3+
-            const chartInstance = ChartJS.getChart(canvasElement);
-            if (chartInstance) {
-              console.log('Экземпляр графика получен через ChartJS.getChart');
-              
-              // Chart.js v4 zoom plugin API
-              if (chartInstance.zoom && typeof chartInstance.zoom === 'function') {
-                console.log('Метод zoom найден, вызываем resetZoom');
-                chartInstance.resetZoom();
-                return;
-              }
-              
-              // На случай если нужен прямой доступ к плагину зума в Chart.js v4
-              if (chartInstance.options && chartInstance.options.plugins && chartInstance.options.plugins.zoom) {
-                console.log('Плагин zoom найден в опциях');
-                chartInstance.update();
-                return;
-              }
-              
-              console.warn('Метод resetZoom не найден на экземпляре графика');
-            } else {
-              console.warn('Экземпляр графика не получен через ChartJS.getChart');
-            }
-          } catch (e) {
-            console.error('Ошибка при получении экземпляра графика:', e);
-          }
-        } else {
-          console.warn('Canvas элемент не найден');
+        // Пробуем стандартный метод
+        const newDate = new Date(dateInput);
+        if (!isNaN(newDate.getTime())) {
+          return newDate;
         }
-        
-        // Проверяем DOM-элементы для отладки
-        console.log('Все canvas на странице:', document.querySelectorAll('canvas').length);
-        console.log('Все элементы с классом .speed-chart:', document.querySelectorAll('.speed-chart').length);
-      } else {
-        console.warn('chartRef.current не определен');
       }
-    } catch (error) {
-      console.error('Ошибка при сбросе зума:', error);
-    }
-  };
-  
-  // Увеличение зума по оси Y
-  const zoomIn = () => {
-    try {
-      if (chartRef.current) {
-        const canvasElement = document.querySelector('.speed-chart canvas');
-        if (canvasElement) {
-          const chartInstance = ChartJS.getChart(canvasElement);
-          if (chartInstance) {
-            // Chart.js v4 zoom plugin API
-            if (chartInstance.zoom && typeof chartInstance.zoom === 'function') {
-              chartInstance.zoom(1.1);
-              return;
-            }
-          }
+      
+      // Если дата - timestamp (число)
+      if (typeof dateInput === 'number') {
+        const newDate = new Date(dateInput);
+        if (!isNaN(newDate.getTime())) {
+          return newDate;
         }
-        console.warn('Объект графика не найден для увеличения зума');
       }
+      
+      // Если не удалось создать валидную дату, возвращаем текущую
+      console.warn('Невозможно создать валидную дату из:', dateInput);
+      return new Date();
     } catch (error) {
-      console.error('Ошибка при увеличении зума:', error);
+      console.error('Ошибка при обработке даты:', error, dateInput);
+      return new Date();
     }
   };
   
-  // Уменьшение зума по оси Y
-  const zoomOut = () => {
-    try {
-      if (chartRef.current) {
-        const canvasElement = document.querySelector('.speed-chart canvas');
-        if (canvasElement) {
-          const chartInstance = ChartJS.getChart(canvasElement);
-          if (chartInstance) {
-            // Chart.js v4 zoom plugin API
-            if (chartInstance.zoom && typeof chartInstance.zoom === 'function') {
-              chartInstance.zoom(0.9);
-              return;
-            }
-          }
-        }
-        console.warn('Объект графика не найден для уменьшения зума');
-      }
-    } catch (error) {
-      console.error('Ошибка при уменьшении зума:', error);
-    }
-  };
-  
-  // Обработка полноэкранного режима
-  const toggleFullscreen = () => {
-    if (!chartContainerRef.current) return;
-    
-    if (!isFullscreen) {
-      if (chartContainerRef.current.requestFullscreen) {
-        chartContainerRef.current.requestFullscreen();
-      } else if (chartContainerRef.current.mozRequestFullScreen) {
-        chartContainerRef.current.mozRequestFullScreen();
-      } else if (chartContainerRef.current.webkitRequestFullscreen) {
-        chartContainerRef.current.webkitRequestFullscreen();
-      } else if (chartContainerRef.current.msRequestFullscreen) {
-        chartContainerRef.current.msRequestFullscreen();
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (document.mozCancelFullScreen) {
-        document.mozCancelFullScreen();
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen();
-      }
-    }
-    
-    setIsFullscreen(!isFullscreen);
-  };
-  
-  // Обработчик изменения полноэкранного режима
+  // Эффект для инициализации дат из localStorage и подписки на их изменение
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+    // Функция для чтения дат из localStorage
+    const getDateRangeFromLocalStorage = () => {
+      try {
+        const storedRange = localStorage.getItem('lastDateRange');
+        if (storedRange) {
+          const parsed = JSON.parse(storedRange);
+          return {
+            startDate: parsed.startDate ? ensureValidDate(parsed.startDate) : null,
+            endDate: parsed.endDate ? ensureValidDate(parsed.endDate) : null,
+            updateTimestamp: parsed.updateTimestamp
+          };
+        }
+      } catch (e) {
+        console.warn('Ошибка при чтении диапазона дат из localStorage:', e);
+      }
+      return { startDate: null, endDate: null };
     };
     
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-    
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-    };
-  }, []);
-  
-  // Добавляем обработчик клавиатуры для сброса зума по клавише пробел
-  useEffect(() => {
-    // Создаем переменную для дебаунса
-    let debounceTimer = null;
-    // Флаг для предотвращения повторных вызовов
-    let isProcessing = false;
-    
-    const handleKeyDown = (event) => {
-      // Проверяем, что нажат пробел и не в поле ввода
-      if ((event.code === 'Space' || event.key === ' ' || event.keyCode === 32) && 
-         event.target.tagName !== 'INPUT' && 
-         event.target.tagName !== 'TEXTAREA' && 
-         !event.target.isContentEditable) {
+    // Обработчик события изменения дат (переработан для соответствия TrackMap)
+    const handleDateRangeChanged = (event) => {
+      try {
+        const { startDate: newStartDate, endDate: newEndDate, period, timestamp } = event.detail;
         
-        // Предотвращаем стандартное поведение
-        event.preventDefault();
+        // Проверяем, не слишком ли недавно мы сами обновили даты
+        const now = new Date().getTime();
+        const lastUpdate = window.lastDateUpdateTime || 0;
         
-        // Если уже обрабатываем, пропускаем
-        if (isProcessing) {
-          console.log('Пропускаем обработку нажатия, предыдущий запрос еще в процессе');
+        // Если обновление было менее 1 секунды назад и это мы сами его сделали, игнорируем
+        if ((now - lastUpdate) < 1000 && window.lastDateUpdateTime === timestamp) {
+          console.log('SpeedChart: Игнорируем событие dateRangeChanged - недавнее собственное обновление');
           return;
         }
         
-        // Устанавливаем флаг обработки
-        isProcessing = true;
+        console.log('SpeedChart: Получено событие изменения диапазона дат:', event.detail);
         
-        // Очищаем предыдущий таймер дебаунса
-        clearTimeout(debounceTimer);
-        
-        // Устанавливаем новый таймер
-        debounceTimer = setTimeout(() => {
-          console.log('Обработка нажатия клавиши пробел для сброса зума');
+        // Если передан предустановленный период (неделя, месяц и т.д.)
+        if (period) {
+          console.log('SpeedChart: Обработка предустановленного периода:', period);
           
-          // Проверяем загрузку графика
-          if (!chartData) {
-            console.warn('График еще не загружен, сброс зума невозможен');
-            isProcessing = false;
+          // Создаем даты на основе предустановленного периода
+          let validStartDate = new Date();
+          let validEndDate = new Date();
+          
+          switch(period) {
+            case 'day':
+              // Текущий день
+              validStartDate.setHours(0, 0, 0, 0);
+              break;
+            case 'week':
+              // Последние 7 дней
+              validStartDate = new Date(validEndDate);
+              validStartDate.setDate(validEndDate.getDate() - 7);
+              validStartDate.setHours(0, 0, 0, 0);
+              break;
+            case 'month':
+              // Последние 30 дней
+              validStartDate = new Date(validEndDate);
+              validStartDate.setDate(validEndDate.getDate() - 30);
+              break;
+            case 'year':
+              // Последние 365 дней
+              validStartDate = new Date(validEndDate);
+              validStartDate.setDate(validEndDate.getDate() - 365);
+              break;
+            default:
+              // По умолчанию - неделя
+              validStartDate = new Date(validEndDate);
+              validStartDate.setDate(validEndDate.getDate() - 7);
+          }
+          
+          // Сохраняем метку времени последнего обновления
+          window.lastDateUpdateTime = timestamp || new Date().getTime();
+          
+          console.log('SpeedChart: Обновление дат на основе периода:', {
+            start: validStartDate.toISOString(),
+            end: validEndDate.toISOString()
+          });
+          
+          setStartDate(validStartDate);
+          setEndDate(validEndDate);
+          
+          return;
+        }
+        
+        if (!newStartDate || !newEndDate) {
+          if (event.detail.forceUpdate) {
+            const { startDate: storedStartDate, endDate: storedEndDate } = getDateRangeFromLocalStorage();
+            
+            if (storedStartDate && storedEndDate) {
+              const startChanged = !startDate || 
+                Math.abs(storedStartDate.getTime() - startDate.getTime()) > 1000;
+              const endChanged = !endDate || 
+                Math.abs(storedEndDate.getTime() - endDate.getTime()) > 1000;
+                
+              if (startChanged || endChanged) {
+                console.log('SpeedChart: Обновление дат из localStorage через forceUpdate:', {
+                  startDate: storedStartDate.toISOString(),
+                  endDate: storedEndDate.toISOString()
+                });
+                
+                setStartDate(storedStartDate);
+                setEndDate(storedEndDate);
+              }
+            }
+          } else {
+            console.warn('SpeedChart: Получены неполные данные в событии dateRangeChanged:', event.detail);
+          }
+          return;
+        }
+        
+        // Обрабатываем полученные даты
+        const validStartDate = ensureValidDate(newStartDate);
+        const validEndDate = ensureValidDate(newEndDate);
+        
+        // Сохраняем метку времени последнего обновления
+        window.lastDateUpdateTime = timestamp || new Date().getTime();
+        
+        // Проверяем, изменились ли даты
+        const startChanged = !startDate || 
+          Math.abs(validStartDate.getTime() - startDate.getTime()) > 1000;
+        const endChanged = !endDate || 
+          Math.abs(validEndDate.getTime() - endDate.getTime()) > 1000;
+          
+        if (startChanged || endChanged) {
+          console.log('SpeedChart: Обновление дат из события:', {
+            startDate: validStartDate.toISOString(),
+            endDate: validEndDate.toISOString()
+          });
+          
+          setStartDate(validStartDate);
+          setEndDate(validEndDate);
+        } else {
+          console.log('SpeedChart: Даты не изменились, обновление не требуется');
+        }
+      } catch (error) {
+        console.error('SpeedChart: Ошибка при обработке события изменения дат:', error);
+      }
+    };
+    
+    // Обработчик события изменения дат внутри текущей вкладки
+    const handleDateRangeChangedInTab = (event) => {
+      try {
+        const { startDate: newStartDate, endDate: newEndDate, timestamp } = event.detail;
+        
+        // Проверяем, не слишком ли недавно мы сами обновили даты
+        const now = new Date().getTime();
+        const lastUpdate = window.lastDateUpdateTime || 0;
+        
+        // Если обновление было менее 1 секунды назад и это мы сами его сделали, игнорируем
+        if ((now - lastUpdate) < 1000 && window.lastDateUpdateTime === timestamp) {
+          console.log('SpeedChart: Игнорируем событие dateRangeChangedInTab - недавнее собственное обновление');
+          return;
+        }
+        
+        console.log('SpeedChart: Получено событие изменения дат в текущей вкладке:', {
+          startDate: newStartDate instanceof Date ? newStartDate.toISOString() : newStartDate,
+          endDate: newEndDate instanceof Date ? newEndDate.toISOString() : newEndDate
+        });
+        
+        const validStartDate = ensureValidDate(newStartDate);
+        const validEndDate = ensureValidDate(newEndDate);
+        
+        // Проверяем, изменились ли даты
+        const startChanged = !startDate || 
+          Math.abs(validStartDate.getTime() - startDate.getTime()) > 1000;
+        const endChanged = !endDate || 
+          Math.abs(validEndDate.getTime() - endDate.getTime()) > 1000;
+          
+        if (startChanged || endChanged) {
+          console.log('SpeedChart: Обновление дат из события в текущей вкладке:', {
+            startDate: validStartDate.toISOString(),
+            endDate: validEndDate.toISOString()
+          });
+          
+          setStartDate(validStartDate);
+          setEndDate(validEndDate);
+        }
+      } catch (error) {
+        console.error('SpeedChart: Ошибка при обработке события изменения дат в текущей вкладке:', error);
+      }
+    };
+    
+    // Обработчик события изменения в localStorage 
+    const handleStorageChange = (event) => {
+      if (event.key === 'lastDateRange') {
+        try {
+          // Проверяем, не слишком ли недавно мы сами обновили даты
+          const now = new Date().getTime();
+          const lastUpdate = window.lastDateUpdateTime || 0;
+          
+          // Если обновление было менее 1 секунды назад, игнорируем
+          if ((now - lastUpdate) < 1000) {
+            console.log('SpeedChart: Игнорируем событие storage - недавнее собственное обновление');
             return;
           }
           
-          // Выводим дополнительную информацию о состоянии графика
-          console.log('Состояние chartRef.current:', chartRef.current);
-          if (chartRef.current) {
-            console.log('Объект chart в chartRef:', chartRef.current.chart);
-            console.log('Наличие chartInstance:', !!chartRef.current.chartInstance);
-          }
+          console.log('SpeedChart: Обнаружено изменение диапазона дат в localStorage');
           
-          // Проверяем наличие canvas-элемента
-          const canvasElement = document.querySelector('.speed-chart canvas');
-          console.log('Найден canvas-элемент:', !!canvasElement);
-          if (canvasElement) {
-            console.log('Доступные методы canvas:', Object.getOwnPropertyNames(canvasElement));
+          const newRange = JSON.parse(event.newValue);
+          if (newRange && newRange.startDate && newRange.endDate) {
+            const validStartDate = ensureValidDate(newRange.startDate);
+            const validEndDate = ensureValidDate(newRange.endDate);
             
-            try {
-              const charts = ChartJS.instances;
-              console.log('Все экземпляры графиков:', charts);
+            // Проверяем, изменились ли даты
+            const startChanged = !startDate || 
+              Math.abs(validStartDate.getTime() - startDate.getTime()) > 1000;
+            const endChanged = !endDate || 
+              Math.abs(validEndDate.getTime() - endDate.getTime()) > 1000;
               
-              // Попытка получить график по canvas
-              const chart = ChartJS.getChart(canvasElement);
-              console.log('График получен через ChartJS.getChart:', chart);
-            } catch (e) {
-              console.error('Ошибка при получении графика:', e);
+            if (startChanged || endChanged) {
+              console.log('SpeedChart: Обновление дат из localStorage:', {
+                startDate: validStartDate.toISOString(),
+                endDate: validEndDate.toISOString()
+              });
+              
+              setStartDate(validStartDate);
+              setEndDate(validEndDate);
             }
           }
-          
-          resetZoom();
-          
-          // Добавляем визуальную индикацию нажатия
-          const resetBtn = document.querySelector('.speed-chart-btn[title="Сбросить масштаб (Пробел)"]');
-          if (resetBtn) {
-            resetBtn.classList.add('btn-flash');
-            setTimeout(() => {
-              resetBtn.classList.remove('btn-flash');
-            }, 300);
-          }
-          
-          // Сбрасываем флаг обработки
-          isProcessing = false;
-        }, 200); // Дебаунс 200 мс
+        } catch (error) {
+          console.warn('SpeedChart: Ошибка при разборе диапазона дат из localStorage:', error);
+        }
       }
     };
     
-    // Добавляем обработчик на document для гарантированного перехвата события
-    document.addEventListener('keydown', handleKeyDown, true);
+    // При первой загрузке компонента читаем даты из localStorage
+    const { startDate: initialStartDate, endDate: initialEndDate } = getDateRangeFromLocalStorage();
+    
+    // Если даты есть в localStorage и не установлены через пропсы, используем их
+    if (initialStartDate && initialEndDate) {
+      if (!propsStartDate) setStartDate(initialStartDate);
+      if (!propsEndDate) setEndDate(initialEndDate);
+      console.log('SpeedChart: Инициализированы даты из localStorage:', {
+        startDate: initialStartDate.toISOString(),
+        endDate: initialEndDate.toISOString()
+      });
+    }
+    
+    // Подписываемся на все события изменения дат
+    document.addEventListener('dateRangeChanged', handleDateRangeChanged);
+    document.addEventListener('dateRangeChangedInTab', handleDateRangeChangedInTab);
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Отписка при размонтировании
+    return () => {
+      document.removeEventListener('dateRangeChanged', handleDateRangeChanged);
+      document.removeEventListener('dateRangeChangedInTab', handleDateRangeChangedInTab);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [startDate, endDate, propsStartDate, propsEndDate]);
+  
+  // Обновляем даты из пропсов при их изменении
+  useEffect(() => {
+    if (propsStartDate) setStartDate(propsStartDate);
+    if (propsEndDate) setEndDate(propsEndDate);
+  }, [propsStartDate, propsEndDate]);
+  
+  // Добавляем обработчик события изменения текущего транспортного средства 
+  useEffect(() => {
+    const handleVehicleChanged = (event) => {
+      // Проверяем наличие данных о ТС
+      if (event.detail && event.detail.vehicle) {
+        const newVehicle = event.detail.vehicle;
+        
+        // Проверяем, отличается ли новое ТС от текущего
+        if (vehicle?.imei !== newVehicle.imei) {
+          console.log('SpeedChart: Получено событие изменения ТС:', {
+            oldImei: vehicle?.imei,
+            newImei: newVehicle.imei,
+            name: newVehicle.name || 'Неизвестно'
+          });
+          
+          // Отменяем текущий запрос, если он есть
+          if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+          }
+          
+          // Обнуляем данные для предотвращения отображения старых данных
+          setChartData([]);
+          setChartLabels([]);
+          setError(null);
+        }
+      }
+    };
+    
+    // Подписываемся на событие изменения ТС
+    document.addEventListener('changeCurrentVehicle', handleVehicleChanged);
     
     return () => {
-      document.removeEventListener('keydown', handleKeyDown, true);
-      clearTimeout(debounceTimer);
+      document.removeEventListener('changeCurrentVehicle', handleVehicleChanged);
     };
-  }, [chartData, resetZoom]); // Добавляем chartData и resetZoom как зависимости
+  }, [vehicle]);
   
-  /**
-   * Обработка полученных данных телеметрии
-   * @param {Array} data - массив данных телеметрии
-   */
-  const processData = (data) => {
-    // Подготовка данных для графика
-    const labels = data.map(item => formatDateForChart(item.timestamp || item.time));
-    const values = data.map(item => parseFloat(item.value));
-    
-    // Создаем массив данных для ограничения, если оно задано и включено
-    const showLimit = telemetryConfig.limitValue && 
-                    (telemetryConfig.enabled !== undefined ? telemetryConfig.enabled : true);
-    
-    const limitValues = showLimit ? Array(labels.length).fill(telemetryConfig.limitValue) : null;
-    
-    console.log(`Ограничение скорости ${showLimit ? 'включено' : 'отключено'}, значение: ${telemetryConfig.limitValue}`);
-    
-    // Анализируем изменения скорости для цветовой дифференциации
-    const increaseSpeeds = [];
-    const decreaseSpeeds = [];
-    const exceedSpeeds = [];
-    const normalSpeeds = [];
-    
-    for (let i = 0; i < values.length; i++) {
-      const currentValue = values[i];
-      
-      // Проверка превышения только если ограничение включено
-      const isExceeding = showLimit && currentValue > telemetryConfig.limitValue;
-      
-      // Определяем, является ли это повышением или понижением скорости
-      if (i > 0) {
-        const prevValue = values[i-1];
-        const diff = currentValue - prevValue;
-        
-        // Если превышение скорости
-        if (isExceeding) {
-          exceedSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          normalSpeeds.push(null);
-        }
-        // Если значительное повышение скорости (более 5 км/ч)
-        else if (diff > 5) {
-          increaseSpeeds.push({ x: labels[i], y: currentValue });
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-          normalSpeeds.push(null);
-        }
-        // Если значительное снижение скорости (более 5 км/ч)
-        else if (diff < -5) {
-          decreaseSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-          normalSpeeds.push(null);
-        }
-        // Обычная скорость
-        else {
-          normalSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-        }
-      } else {
-        // Для первой точки
-        if (isExceeding) {
-          exceedSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          normalSpeeds.push(null);
-        } else {
-          normalSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-        }
-      }
+  // Эффект сбрасывает сообщение об ошибке через 10 секунд
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 10000);
+      return () => clearTimeout(timer);
     }
-    
-    const datasets = [
-      {
-        label: `${telemetryConfig.title} (${telemetryConfig.unit})`,
-        data: values,
-        fill: false,
-        backgroundColor: 'rgba(153, 216, 217, 0.5)',
-        borderColor: 'rgba(153, 216, 217, 0.8)',
-        tension: 0.2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        borderWidth: 1.5
-      },
-      {
-        label: 'Повышение скорости',
-        data: increaseSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(0, 200, 150, 0.8)',
-        borderColor: 'rgba(0, 200, 150, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(0, 200, 150, 0.8)',
-        },
-        spanGaps: false
-      },
-      {
-        label: 'Снижение скорости',
-        data: decreaseSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(255, 140, 0, 0.8)',
-        borderColor: 'rgba(255, 140, 0, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(255, 140, 0, 0.8)',
-        },
-        spanGaps: false
-      },
-      {
-        label: 'Превышение скорости',
-        data: exceedSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(255, 99, 132, 0.8)',
-        borderColor: 'rgba(255, 99, 132, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(255, 99, 132, 0.8)',
-        },
-        spanGaps: false
-      }
-    ];
-    
-    // Добавляем линию ограничения, если оно задано и включено
-    if (limitValues !== null) {
-      datasets.push({
-        label: telemetryConfig.limitLabel,
-        data: limitValues,
-        fill: false,
-        borderColor: telemetryConfig.limitColor,
-        borderDash: [5, 5],
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        borderWidth: 2
-      });
-    }
-    
-    setChartData({
-      labels,
-      datasets
-    });
-    
-    // Обновляем статистику с реальными данными
-    const stats = calculateStatistics(data);
-    setStatistics(stats);
-  };
-  
-  /**
-   * Установка демонстрационной статистики
-   */
-  const setDemoStatistics = () => {
-    setStatistics({
-      average: `52 ${telemetryConfig.unit}`,
-      max: `95 ${telemetryConfig.unit}`,
-      movingTime: '5ч 30мин',
-      exceedCount: '3'
-    });
-  };
-  
-  /**
-   * Расчет статистики на основе данных телеметрии
-   * @param {Array} data - массив данных телеметрии
-   * @returns {Object} - объект со статистикой
-   */
-  const calculateStatistics = (data) => {
-    // Фильтруем только валидные значения
-    const validValues = data
-      .map(item => parseFloat(item.value))
-      .filter(value => !isNaN(value));
-    
-    if (validValues.length === 0) {
-      return {
-        average: '-',
-        max: '-',
-        movingTime: '-',
-        exceedCount: '-'
-      };
-    }
-    
-    // Расчет средней величины
-    const avg = Math.round(validValues.reduce((sum, val) => sum + val, 0) / validValues.length);
-    
-    // Расчет максимальной величины
-    const max = Math.max(...validValues);
-    
-    // Определяем, показывать ли ограничение
-    const showLimit = telemetryConfig.limitValue && 
-                    (telemetryConfig.enabled !== undefined ? telemetryConfig.enabled : true);
-    
-    // Количество превышений ограничения (если оно задано и включено)
-    const exceedCount = showLimit 
-      ? validValues.filter(value => value > telemetryConfig.limitValue).length
-      : '-';
-    
-    // Примерное время активности (упрощенно: считаем точки с значением > 5% от максимального)
-    const threshold = max * 0.05;
-    const activePoints = validValues.filter(value => value > threshold).length;
-    const totalMinutes = Math.round(activePoints * 5); // предполагаем, что точки снимаются раз в 5 минут
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    
-    return {
-      average: `${avg} ${telemetryConfig.unit}`,
-      max: `${max} ${telemetryConfig.unit}`,
-      movingTime: `${hours}ч ${minutes}мин`,
-      exceedCount: exceedCount === '-' ? '-' : `${exceedCount}`
-    };
-  };
-  
-  // Загрузка данных для выбранного периода
-  const loadDataForPeriod = useCallback((period) => {
-    setSelectedPeriod(period);
-    
-    // Определяем диапазон дат в зависимости от периода
-    let start = new Date();
-    let end = new Date();
-    
-    switch (period) {
-      case 'day':
-        // Сегодня - устанавливаем начало и конец дня (00:00:00 - 23:59:59)
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        console.log('Выбран период "день", установлен диапазон:', start, 'до', end);
-        break;
-      case 'yesterday':
-        start = new Date();
-        start.setDate(start.getDate() - 1);
-        start.setHours(0, 0, 0, 0);
-        end = new Date(start);
-        end.setHours(23, 59, 59, 999);
-        break;
-      case 'week':
-        // Последние 7 дней
-        start = new Date();
-        start.setDate(start.getDate() - 7);
-        // Устанавливаем конец текущего дня
-        end.setHours(23, 59, 59, 999);
-        break;
-      case 'month':
-        // Последние 30 дней
-        start = new Date();
-        start.setDate(start.getDate() - 30);
-        // Устанавливаем конец текущего дня
-        end.setHours(23, 59, 59, 999);
-        break;
-      default:
-        // По умолчанию - сегодня с 00:00 до 23:59
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        break;
-    }
-    
-    // Обновляем локальные состояния дат
-    setLocalStartDate(start);
-    setLocalEndDate(end);
-    
-    // Загружаем данные для нового диапазона
-    // Запускаем loadData в следующем тике, чтобы состояния успели обновиться
-    setTimeout(() => loadData(), 0);
-  }, [loadData]);
-  
-  /**
-   * Загрузка данных телеметрии из API
-   */
-  const loadData = useCallback(async () => {
-    if (!vehicle || !vehicle.imei) {
-      console.warn('Нет доступных данных о ТС для загрузки телеметрии');
+  }, [error]);
+
+  const fetchSpeedData = async () => {
+    if (!vehicle || !vehicle.imei || !startDate || !endDate) {
+      console.warn('Не выбран транспорт или период для загрузки данных о скорости');
+      setError('Не выбран транспорт или не указан период');
       return;
     }
+
+    // Проверяем даты на "будущность"
+    const now = new Date();
+    const startDateObj = startDate instanceof Date ? startDate : new Date(startDate);
+    const endDateObj = endDate instanceof Date ? endDate : new Date(endDate);
     
+    const debugData = {
+      vehicle: vehicle.imei,
+      vehicleName: vehicle.name || 'Неизвестно',
+      startDate: startDateObj.toISOString(),
+      endDate: endDateObj.toISOString(),
+      now: now.toISOString(),
+      isFutureStart: startDateObj > now,
+      isFutureEnd: endDateObj > now
+    };
+    
+    // Если дата в будущем, показываем предупреждение, но не блокируем запрос
+    if (startDateObj > now || endDateObj > now) {
+      console.warn('Запрос данных о скорости для будущих дат!', debugData);
+      setError(`Внимание: запрос содержит будущие даты, данные могут отсутствовать. 
+        Начало: ${startDateObj.toLocaleDateString()}, 
+        Конец: ${endDateObj.toLocaleDateString()}`);
+    } else {
+      setError(null);
+    }
+    
+    // Если есть предыдущий запрос, отменяем его
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Создаем новый AbortController для текущего запроса
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    
+    // Сбрасываем ошибки и устанавливаем состояние загрузки
+    setError(null);
     setIsLoading(true);
-    
+
     try {
-      // Преобразуем даты в строки ISO
-      const startTimeStr = localStartDate.toISOString();
-      const endTimeStr = localEndDate.toISOString();
+      // Преобразование дат в ISO формат для API
+      const startISOString = startDateObj.toISOString();
+      const endISOString = endDateObj.toISOString();
+
+      // Получаем токен авторизации
+      const authToken = getAuthToken();
       
-      // URL API для получения данных телеметрии
-      const apiUrl = `http://localhost:8081/api/telemetry/v3/${vehicle.imei}/${telemetryConfig.endpoint}?startTime=${startTimeStr}&endTime=${endTimeStr}`;
+      // Базовый URL API - заменяем с учетом текущего окружения
+      // Определяем базовый URL в зависимости от среды запуска
+      const baseUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:8081' 
+        : `${window.location.protocol}//${window.location.host}`;
       
-      console.log(`Загрузка данных ${telemetryConfig.title}: ${apiUrl}`);
-      console.log(`Временной диапазон: с ${localStartDate.toLocaleString()} до ${localEndDate.toLocaleString()}`);
-      
-      // Получаем JWT токен для авторизации
-      const getAuthToken = () => {
-        // Проверяем различные варианты хранения токена
-        const possibleTokenKeys = ['authToken', 'token', 'jwt', 'access_token'];
-        
-        for (const key of possibleTokenKeys) {
-          const token = localStorage.getItem(key);
-          if (token) {
-            // Проверяем, является ли токен корректным JWT (содержит 2 точки)
-            if (token.split('.').length === 3) {
-              return token;
-            }
-          }
-        }
-        
-        // Если не нашли JWT токен, возвращаем тестовый
-        const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-        const payload = btoa(JSON.stringify({ 
-          sub: 'test-user', 
-          name: 'Test User', 
-          role: 'ADMIN',
-          exp: Math.floor(Date.now() / 1000) + 3600 // срок действия 1 час
-        }));
-        const signature = btoa('test-signature');
-        
-        return `${header}.${payload}.${signature}`;
-      };
-      
-      // Выполняем запрос с использованием fetch
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`
-        }
+      // Формируем параметры запроса
+      const params = new URLSearchParams({
+        startTime: startISOString,
+        endTime: endISOString
       });
       
+      // Полный URL для API скорости
+      const apiUrl = `${baseUrl}/api/telemetry/v3/${vehicle.imei}/speed?${params.toString()}`;
+      
+      // Подготавливаем заголовки
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      // Добавляем токен авторизации, если он есть
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      
+      console.log(`Запрос данных о скорости для ТС ${vehicle.name || vehicle.imei}: ${apiUrl}`);
+      
+      // Выполняем запрос
+      const response = await fetch(apiUrl, { 
+        method: 'GET',
+        headers: headers,
+        signal: signal
+      });
+      
+      // Проверяем ответ
       if (!response.ok) {
-        throw new Error(`Ошибка HTTP: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Ошибка API: ${response.status} - ${errorText || response.statusText}`);
       }
       
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Ответ сервера не является JSON');
-      }
+      const responseData = await response.json();
       
-      // Получаем данные телеметрии
-      const data = await response.json();
-      console.log(`Получены данные ${telemetryConfig.title}:`, data);
+      console.log('Получен ответ от API:', responseData);
       
-      // Проверяем структуру данных и находим массив точек
-      if (data) {
-        // Проверяем, содержит ли ответ массив точек в поле data или points
-        const points = data.data || data.points || data.values;
-        
-        if (points && Array.isArray(points) && points.length > 0) {
-          // У нас есть массив точек в одном из стандартных полей
-          processData(points);
-        } else if (data.totalPoints && data.totalPoints > 0) {
-          // Данные есть, но они в другом формате
-          console.log('Данные получены в нестандартном формате, пытаемся обработать');
+      // Проверяем формат данных (новый формат с метаданными)
+      if (responseData && typeof responseData === 'object') {
+        // Проверяем есть ли поле points, указывающее на новую структуру API
+        if (Array.isArray(responseData.points)) {
+          // Это новый формат с полем points и метриками
           
-          // Попробуем использовать всё тело ответа как точки данных, если оно содержит нужные поля
-          if (data.items && Array.isArray(data.items)) {
-            processData(data.items);
+          // Если в points нет данных
+          if (responseData.points.length === 0) {
+            console.warn(`API вернул пустой массив данных о скорости для ${vehicle.name || vehicle.imei}`);
+            setChartData([]);
+            setChartLabels([]);
+            setIsLoading(false);
+            setError(`Нет данных о скорости за выбранный период для ТС ${vehicle.name || vehicle.imei}`);
+            return;
+          }
+          
+          console.log(`Получено ${responseData.points.length} точек для графика скорости ${vehicle.name || vehicle.imei}`);
+          
+          // Изучаем структуру первого элемента для отладки
+          if (responseData.points.length > 0) {
+            console.log('Пример структуры данных:', responseData.points[0]);
+          }
+          
+          // Обрабатываем точки из нового формата
+          const processedData = preprocessSpeedData(responseData.points);
+          
+          if (processedData.values.length === 0) {
+            console.warn('После обработки данных не осталось точек для графика');
+            setError('Не удалось обработать полученные данные');
+            setChartData([]);
+            setChartLabels([]);
           } else {
-            // Создаем демо-данные, но с количеством точек, как в реальных данных
-            const demoData = generateDemoDataWithCount(data.totalPoints || 24);
-            setChartData(demoData);
-            setDemoStatistics();
-            console.warn('Используем демо-данные, имитирующие реальное количество точек:', data.totalPoints);
+            // Обновляем состояние компонента
+            setChartData(processedData.values);
+            setChartLabels(processedData.labels);
+          }
+        } else if (Array.isArray(responseData)) {
+          // Это старый формат, где ответ - просто массив точек
+          
+          if (responseData.length === 0) {
+            console.warn(`API вернул пустой массив данных о скорости для ${vehicle.name || vehicle.imei}`);
+            setChartData([]);
+            setChartLabels([]);
+            setIsLoading(false);
+            setError(`Нет данных о скорости за выбранный период для ТС ${vehicle.name || vehicle.imei}`);
+            return;
+          }
+          
+          console.log(`Получено ${responseData.length} точек для графика скорости ${vehicle.name || vehicle.imei}`);
+          
+          // Изучаем структуру первого элемента для отладки
+          if (responseData.length > 0) {
+            console.log('Пример структуры данных:', responseData[0]);
+          }
+          
+          // Фильтруем и подготавливаем данные
+          const processedData = preprocessSpeedData(responseData);
+          
+          if (processedData.values.length === 0) {
+            console.warn('После обработки данных не осталось точек для графика');
+            setError('Не удалось обработать полученные данные');
+            setChartData([]);
+            setChartLabels([]);
+          } else {
+            // Вычисляем метрики вручную для старого формата
+            const maxSpeed = Math.max(...processedData.values);
+            const avgSpeed = processedData.values.reduce((sum, val) => sum + val, 0) / processedData.values.length;
+            
+            setError(`Макс. скорость: ${maxSpeed} км/ч, Средняя скорость: ${avgSpeed.toFixed(2)} км/ч`);
+            
+            // Обновляем состояние компонента
+            setChartData(processedData.values);
+            setChartLabels(processedData.labels);
           }
         } else {
-          console.warn(`Нет данных ${telemetryConfig.title} за выбранный период или непонятный формат данных`);
-          
-          // В режиме разработки используем демо данные
-          if (process.env.NODE_ENV === 'development') {
-            setDemoStatistics();
-            setChartData(generateDemoData());
-          }
+          // Неизвестный формат
+          console.error('API вернул неизвестный формат данных:', responseData);
+          setError('Неизвестный формат данных');
+          setChartData([]);
+          setChartLabels([]);
         }
       } else {
-        console.warn(`Пустой ответ от API ${telemetryConfig.title}`);
-        
-        // В режиме разработки используем демо данные
-        if (process.env.NODE_ENV === 'development') {
-          setDemoStatistics();
-          setChartData(generateDemoData());
-        }
+        console.error('API вернул неверный формат данных:', responseData);
+        setError('Неверный формат данных');
+        setChartData([]);
+        setChartLabels([]);
       }
     } catch (error) {
-      console.error(`Ошибка при загрузке данных ${telemetryConfig.title}:`, error);
-      
-      // Выводим дополнительную информацию об ошибке
-      if (error.response) {
-        console.warn('Статус ошибки:', error.response.status);
-        console.warn('Детали ошибки:', error.response.data);
+      if (error.name === 'AbortError') {
+        console.log('Запрос данных о скорости был отменен');
       } else {
-        console.warn('Детали ошибки:', error.message);
-      }
-      
-      // В режиме разработки используем демо данные
-      if (process.env.NODE_ENV === 'development') {
-        setDemoStatistics();
-        setChartData(generateDemoData());
+        console.error('Ошибка при загрузке данных скорости:', error);
+        setError(error.message);
+        // Показываем уведомление об ошибке
+        toast.error(`Ошибка загрузки данных о скорости: ${error.message}`);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [vehicle, localStartDate, localEndDate, telemetryType, telemetryConfig]);
-  
-  // Опции для графика Chart.js
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          usePointStyle: true,
-          boxWidth: 10,
-          font: {
-            size: 12
-          }
-        }
-      },
-      title: {
-        display: false
-      },
-      tooltip: {
-        mode: 'index',
-        intersect: false,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        titleFont: {
-          size: 13
-        },
-        bodyFont: {
-          size: 12
-        },
-        padding: 10,
-        cornerRadius: 6,
-        callbacks: {
-          label: function(context) {
-            if (context.datasetIndex === 0) {
-              return `${telemetryConfig.title}: ${context.parsed.y.toFixed(1)} ${telemetryConfig.unit}`;
-            } else if (context.datasetIndex === 1 && telemetryConfig.limitValue) {
-              return `${telemetryConfig.limitLabel}: ${context.parsed.y.toFixed(1)} ${telemetryConfig.unit}`;
-            }
-            return context.dataset.label;
-          }
-        }
-      },
-      // Настройки плагина зума
-      zoom: {
-        pan: {
-          enabled: true,
-          mode: 'x',
-          modifierKey: 'ctrl',
-        },
-        zoom: {
-          wheel: {
-            enabled: true,
-          },
-          pinch: {
-            enabled: true,
-          },
-          mode: 'x',
-          drag: {
-            enabled: true,
-            borderColor: 'rgba(44, 123, 229, 0.3)',
-            borderWidth: 1,
-            backgroundColor: 'rgba(44, 123, 229, 0.1)',
-          },
-        },
-        limits: {
-          y: {min: 0},
-        }
-      }
-    },
-    scales: {
-      x: {
-        display: true,
-        title: {
-          display: true,
-          text: 'Время',
-          font: {
-            size: 12,
-            weight: 'normal'
-          }
-        },
-        ticks: {
-          maxRotation: 45,
-          minRotation: 45,
-          font: {
-            size: 10
-          },
-          color: '#666'
-        },
-        grid: {
-          display: true,
-          color: 'rgba(0, 0, 0, 0.05)'
-        }
-      },
-      y: {
-        display: true,
-        title: {
-          display: true,
-          text: `${telemetryConfig.title} (${telemetryConfig.unit})`,
-          font: {
-            size: 12,
-            weight: 'normal'
-          }
-        },
-        min: 0,
-        ticks: {
-          font: {
-            size: 11
-          },
-          color: '#666'
-        },
-        grid: {
-          display: true,
-          color: 'rgba(0, 0, 0, 0.05)'
-        }
-      }
-    },
-    interaction: {
-      mode: 'nearest',
-      intersect: false
-    },
-    animation: {
-      duration: 1000
-    },
-    elements: {
-      line: {
-        borderWidth: 2
-      },
-      point: {
-        radius: 2,
-        hoverRadius: 5,
-        borderWidth: 1
-      }
-    }
   };
   
-  // Обработка изменения транспортного средства или типа телеметрии
+  // Эффект для первоначальной загрузки данных и обновления при изменении параметров
   useEffect(() => {
-    // Добавляем логирование при изменении транспортного средства
-    if (vehicle) {
-      console.log('Выбрано транспортное средство:', vehicle.name, 'IMEI:', vehicle.imei);
+    // Сохраняем текущее транспортное средство и даты в Ref, чтобы избежать race condition
+    const currentVehicleImei = vehicle?.imei;
+    
+    if (currentVehicleImei && startDate && endDate) {
+      console.log(`SpeedChart: Изменение параметров для ТС ${vehicle.name || currentVehicleImei}`);
+      
+      // Отменяем предыдущий запрос, если он все еще выполняется
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Сбрасываем данные при изменении ТС для избежания отображения неправильных данных
+      if (chartData.length > 0) {
+        setChartData([]);
+        setChartLabels([]);
+      }
+      
+      // Добавляем небольшую задержку, чтобы избежать множественных запросов
+      // Используем более длинную задержку для смены ТС, чтобы предотвратить "мерцание"
+      const delay = 500;
+      
+      const timeoutId = setTimeout(() => {
+        // Дополнительная проверка: убеждаемся, что ТС не изменилось с момента начала таймаута
+        if (vehicle?.imei === currentVehicleImei) {
+          console.log(`SpeedChart: Запуск запроса данных для ТС ${vehicle.name || currentVehicleImei} после задержки`);
+          fetchSpeedData();
+        } else {
+          console.log(`SpeedChart: ТС изменилось с ${currentVehicleImei} на ${vehicle?.imei}, запрос отменен`);
+        }
+      }, delay);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        // Очистка при изменении зависимостей (при размонтировании компонента или изменении ТС/дат)
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
     }
     
-    // Загружаем данные для выбранного транспортного средства
-    loadData();
-    
-  }, [vehicle, telemetryType, loadData]); // Перезагружаем данные при смене vehicle или telemetryType
+    // Очистка при размонтировании компонента
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [vehicle?.imei, startDate, endDate]);
   
-  // Добавляем слушатель события изменения диапазона дат
+  // Подписка на событие обновления данных
   useEffect(() => {
-    const handleDateRangeChange = (event) => {
-      if (event && event.detail) {
-        const { startDate: newStartDate, endDate: newEndDate } = event.detail;
-        
-        // Обновляем период и даты
-        if (newStartDate && newEndDate) {
-          // Обновляем локальное состояние дат
-          const newStart = new Date(newStartDate);
-          const newEnd = new Date(newEndDate);
+    const handleForceUpdate = (event) => {
+      if (event.detail) {
+        // Проверяем, есть ли в событии информация о транспортном средстве
+        if (event.detail.vehicle && vehicle?.imei !== event.detail.vehicle.imei) {
+          console.log('SpeedChart: Получено новое ТС из события forceVehicleUpdate:', {
+            oldImei: vehicle?.imei,
+            newImei: event.detail.vehicle.imei,
+            vehicleName: event.detail.vehicle.name || 'Неизвестно'
+          });
           
-          // Определяем выбранный период
-          const diffDays = Math.round((newEnd - newStart) / (1000 * 60 * 60 * 24));
-          let period = 'custom';
-          
-          if (diffDays === 1) period = 'day';
-          else if (diffDays === 7) period = 'week';
-          else if (diffDays >= 28 && diffDays <= 31) period = 'month';
-          
-          setSelectedPeriod(period);
-          
-          // Загружаем данные для нового диапазона
-          loadData();
+          // Не вызываем fetchSpeedData здесь, т.к. он будет вызван автоматически 
+          // при изменении vehicle через эффект, который следит за vehicle?.imei
+          return;
         }
+        
+        // Если есть конкретные даты в событии, используем их
+        if (event.detail.startDate && event.detail.endDate) {
+          const validStartDate = ensureValidDate(event.detail.startDate);
+          const validEndDate = ensureValidDate(event.detail.endDate);
+          
+          console.log('SpeedChart: Получены даты из события forceVehicleUpdate:', {
+            startDate: validStartDate.toISOString(),
+            endDate: validEndDate.toISOString()
+          });
+          
+          // Проверяем, изменились ли даты
+          const startChanged = !startDate || 
+            Math.abs(validStartDate.getTime() - startDate.getTime()) > 1000;
+          const endChanged = !endDate || 
+            Math.abs(validEndDate.getTime() - endDate.getTime()) > 1000;
+            
+          if (startChanged || endChanged) {
+            setStartDate(validStartDate);
+            setEndDate(validEndDate);
+            
+            // fetchSpeedData вызовется автоматически из-за изменения зависимостей
+            return;
+          }
+        }
+        
+        // Предотвращаем множественные запросы в течение короткого времени
+        if (abortControllerRef.current) {
+          console.log('SpeedChart: Отмена предыдущего запроса для ТС', vehicle?.name || vehicle?.imei);
+          abortControllerRef.current.abort();
+        }
+        
+        // Используем setTimeout для снижения нагрузки при множественных событиях
+        setTimeout(() => {
+          if (vehicle?.imei) {
+            console.log(`SpeedChart: Выполнение forceVehicleUpdate для ТС ${vehicle.name || vehicle.imei}`);
+            fetchSpeedData();
+          }
+        }, 300);
       }
     };
     
-    window.addEventListener('dateRangeChanged', handleDateRangeChange);
+    document.addEventListener('forceVehicleUpdate', handleForceUpdate);
     
     return () => {
-      window.removeEventListener('dateRangeChanged', handleDateRangeChange);
+      document.removeEventListener('forceVehicleUpdate', handleForceUpdate);
     };
-  }, [loadData]); // Зависимость только от loadData
+  }, [vehicle, startDate, endDate]);
   
-  // Генерация демо-данных
-  const generateDemoData = () => {
-    const labels = [];
+  // Функция для предварительной обработки данных скорости
+  const preprocessSpeedData = (rawData) => {
+    // Проверяем наличие и корректность данных
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      return { values: [], labels: [] };
+    }
+    
+    // Сортируем по времени
+    const sortedData = [...rawData].sort((a, b) => {
+      // Поддерживаем оба формата времени: time и _time
+      const timeFieldA = a._time || a.time;
+      const timeFieldB = b._time || b.time;
+      
+      const timeA = new Date(timeFieldA).getTime();
+      const timeB = new Date(timeFieldB).getTime();
+      return timeA - timeB;
+    });
+    
+    // Выводим информацию о структуре данных
+    if (sortedData.length > 0) {
+      const firstItem = sortedData[0];
+      console.log(`Структура данных точки:`, 
+                  `время: ${firstItem._time || firstItem.time}`, 
+                  `скорость: ${firstItem.value !== undefined ? firstItem.value : 'не найдено'}`);
+    }
+    
+    // Отключено прореживание данных, чтобы отображать все точки
+    // (раскомментируйте код ниже, если нужно включить прореживание)
+    let processedData = sortedData;
+    /*
+    // Прореживаем данные, если их слишком много (более 1000 точек)
+    if (sortedData.length > 1000) {
+      const step = Math.ceil(sortedData.length / 1000);
+      processedData = sortedData.filter((_, index) => index % step === 0);
+      console.log(`Прореживание данных: ${sortedData.length} -> ${processedData.length} точек`);
+    }
+    */
+    
+    // Преобразуем данные в формат для графика
     const values = [];
+    const labels = [];
     
-    // Проверяем, включено ли отображение ограничения
-    const showLimit = telemetryConfig.limitValue && 
-                    (telemetryConfig.enabled !== undefined ? telemetryConfig.enabled : true);
-    
-    const limitValues = showLimit ? [] : null;
-    
-    // Создаем данные за 24 часа с интервалом в час
-    const baseTime = new Date(localStartDate);
-    
-    // Генерируем данные с учетом времени суток
-    for (let i = 0; i < 24; i++) {
-      const currentTime = new Date(baseTime);
-      currentTime.setHours(baseTime.getHours() + i);
-      
-      labels.push(formatDateForChart(currentTime.toISOString()));
-      
-      // Имитируем разную активность в зависимости от времени суток
-      let value = 0;
-      const hour = currentTime.getHours();
-      const maxValue = telemetryType === 'speed' ? 100 :
-                     telemetryType === 'fuel' ? 15 :
-                     telemetryType === 'rpm' ? 5000 : 14;
-      
-      if (hour >= 8 && hour <= 20) { // Дневное время - активное движение
-        if (hour >= 8 && hour <= 10) { // Утренний час пик
-          value = maxValue * 0.5 + Math.random() * (maxValue * 0.5);
-        } else if (hour >= 17 && hour <= 19) { // Вечерний час пик
-          value = maxValue * 0.4 + Math.random() * (maxValue * 0.6);
-        } else { // Обычное дневное время
-          value = maxValue * 0.3 + Math.random() * (maxValue * 0.4);
-        }
-      } else { // Ночное время - меньше движения или стоянка
-        if (Math.random() > 0.7) { // 30% вероятность движения ночью
-          value = Math.random() * (maxValue * 0.7);
-        } else {
-          value = telemetryType === 'voltage' ? maxValue * 0.8 : 0; // Стоянка (для напряжения показываем значение)
-        }
+    for (const item of processedData) {
+      // Получаем значение времени (поддерживаем оба поля: time и _time)
+      const timeField = item._time || item.time;
+      if (!timeField) {
+        console.warn('Пропуск элемента без времени:', item);
+        continue;
       }
       
-      values.push(Math.round(value * 10) / 10); // Округляем до 1 десятичного знака
+      const timeValue = new Date(timeField);
       
-      if (limitValues !== null) {
-        limitValues.push(telemetryConfig.limitValue);
+      // Получаем значение скорости
+      let speedValue = null;
+      
+      // В новом формате скорость хранится в поле value
+      if (typeof item.value === 'number') {
+        speedValue = item.value;
+      }
+      // Для обратной совместимости
+      else if (typeof item.speed === 'number') {
+        speedValue = item.speed;
+      }
+      
+      // Если не нашли подходящего поля, пропускаем точку
+      if (speedValue === null) {
+        console.warn('Пропуск элемента с неизвестным форматом данных скорости:', item);
+        continue;
+      }
+      
+      // Добавляем точку в результаты
+      values.push(speedValue);
+      labels.push(timeValue);
+    }
+    
+    return { values, labels };
+  };
+  
+  // Форматирование подписей осей
+  const formatSpeedLabel = (value) => `${value} км/ч`;
+  
+  // Форматирование временных меток на оси X
+  const formatTimeLabel = (dateTime) => {
+    if (!dateTime || !(dateTime instanceof Date)) return '';
+    
+    // Опции форматирования для казахстанского времени
+    const options = {
+      timeZone: 'Asia/Almaty',
+      day: 'numeric',
+      month: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    };
+    
+    // Если данные за несколько дней, добавляем дату
+    if (startDate && endDate) {
+      const startDateObj = startDate instanceof Date ? startDate : new Date(startDate);
+      const endDateObj = endDate instanceof Date ? endDate : new Date(endDate);
+      
+      const diffInDays = Math.floor((endDateObj.getTime() - startDateObj.getTime()) / (24 * 60 * 60 * 1000));
+      
+      if (diffInDays > 30) {
+        // Для большого диапазона показываем только день и месяц
+        return dateTime.toLocaleString('ru-RU', {
+          timeZone: 'Asia/Almaty',
+          day: 'numeric',
+          month: 'numeric'
+        });
+      } else if (diffInDays > 2) {
+        // Для нескольких дней показываем день, месяц и время
+        return dateTime.toLocaleString('ru-RU', options);
       }
     }
     
-    // Анализируем изменения скорости для цветовой дифференциации
-    const increaseSpeeds = [];
-    const decreaseSpeeds = [];
-    const exceedSpeeds = [];
-    const normalSpeeds = [];
-    
-    for (let i = 0; i < values.length; i++) {
-      const currentValue = values[i];
-      const isExceeding = showLimit && currentValue > telemetryConfig.limitValue;
-      
-      // Определяем, является ли это повышением или понижением скорости
-      if (i > 0) {
-        const prevValue = values[i-1];
-        const diff = currentValue - prevValue;
-        
-        // Если превышение скорости
-        if (isExceeding) {
-          exceedSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          normalSpeeds.push(null);
+    // Для небольшого интервала показываем только часы и минуты
+    return dateTime.toLocaleString('ru-RU', {
+      timeZone: 'Asia/Almaty',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  
+  // Получение максимальной и минимальной скорости для подсветки нарушений
+  const getChartOptions = () => {
+    const options = {
+      tooltips: {
+        mode: 'index',
+        intersect: false,
+        callbacks: {
+          label: (tooltipItem) => formatSpeedLabel(tooltipItem.value),
+          title: (tooltipItems) => {
+            if (tooltipItems.length > 0) {
+              const dateTime = tooltipItems[0].xLabel;
+              if (dateTime && dateTime instanceof Date) {
+                return dateTime.toLocaleString('ru-RU', {
+                  timeZone: 'Asia/Almaty',
+                  day: 'numeric',
+                  month: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                });
+              }
+            }
+            return '';
+          }
         }
-        // Если значительное повышение скорости (более 5 км/ч)
-        else if (diff > 5) {
-          increaseSpeeds.push({ x: labels[i], y: currentValue });
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-          normalSpeeds.push(null);
+      },
+      elements: {
+        point: {
+          radius: 0, // Полностью отключаем точки для соответствия скриншоту
+          hitRadius: 10, // Область для взаимодействия
+          hoverRadius: 5, // Размер точки при наведении
+        },
+        line: {
+          tension: 0, // Убираем сглаживание для получения прямых линий
+          borderWidth: 2 // Устанавливаем толщину линии
         }
-        // Если значительное снижение скорости (более 5 км/ч)
-        else if (diff < -5) {
-          decreaseSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-          normalSpeeds.push(null);
-        }
-        // Обычная скорость
-        else {
-          normalSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-        }
-      } else {
-        // Для первой точки
-        if (isExceeding) {
-          exceedSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          normalSpeeds.push(null);
-        } else {
-          normalSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-        }
+      },
+      annotation: {
+        annotations: []
       }
-    }
+    };
     
-    const datasets = [
-      {
-        label: `${telemetryConfig.title} (${telemetryConfig.unit}) - ДЕМО`,
-        data: values,
-        fill: false,
-        backgroundColor: 'rgba(153, 216, 217, 0.5)',
-        borderColor: 'rgba(153, 216, 217, 0.8)',
-        tension: 0.2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        borderWidth: 1.5
-      },
-      {
-        label: 'Повышение скорости',
-        data: increaseSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(0, 200, 150, 0.8)',
-        borderColor: 'rgba(0, 200, 150, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(0, 200, 150, 0.8)',
-        },
-        spanGaps: false
-      },
-      {
-        label: 'Снижение скорости',
-        data: decreaseSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(255, 140, 0, 0.8)',
-        borderColor: 'rgba(255, 140, 0, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(255, 140, 0, 0.8)',
-        },
-        spanGaps: false
-      },
-      {
-        label: 'Превышение скорости',
-        data: exceedSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(255, 99, 132, 0.8)',
-        borderColor: 'rgba(255, 99, 132, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(255, 99, 132, 0.8)',
-        },
-        spanGaps: false
-      }
-    ];
-    
-    if (limitValues !== null) {
-      datasets.push({
-        label: telemetryConfig.limitLabel,
-        data: limitValues,
-        fill: false,
-        borderColor: telemetryConfig.limitColor,
-        borderDash: [5, 5],
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        borderWidth: 2
+    // Добавляем линию максимальной разрешенной скорости, если известна для этого транспорта
+    if (vehicle && vehicle.maxSpeed && vehicle.maxSpeed > 0) {
+      options.annotation.annotations.push({
+        type: 'line',
+        mode: 'horizontal',
+        scaleID: 'y-axis-0',
+        value: vehicle.maxSpeed,
+        borderColor: 'rgba(255, 0, 0, 0.5)',
+        borderWidth: 1,
+        label: {
+          content: `Макс. ${vehicle.maxSpeed} км/ч`,
+          enabled: true,
+          position: 'right'
+        }
       });
     }
     
-    return {
-      labels,
-      datasets
-    };
+    return options;
   };
   
-  // Генерация демо-данных с заданным количеством точек
-  const generateDemoDataWithCount = (count) => {
-    const labels = [];
-    const values = [];
-    
-    // Проверяем, включено ли отображение ограничения
-    const showLimit = telemetryConfig.limitValue && 
-                    (telemetryConfig.enabled !== undefined ? telemetryConfig.enabled : true);
-    
-    const limitValues = showLimit ? [] : null;
-    
-    // Создаем данные за указанное количество точек
-    for (let i = 0; i < count; i++) {
-      const currentTime = new Date(localStartDate);
-      currentTime.setHours(0, 0, 0, 0);
-      currentTime.setMinutes(i * 5); // Предполагаем, что точки снимаются раз в 5 минут
-      
-      labels.push(formatDateForChart(currentTime.toISOString()));
-      
-      // Имитируем разную активность в зависимости от времени суток
-      let value = 0;
-      const hour = currentTime.getHours();
-      const maxValue = telemetryType === 'speed' ? 100 :
-                     telemetryType === 'fuel' ? 15 :
-                     telemetryType === 'rpm' ? 5000 : 14;
-      
-      if (hour >= 8 && hour <= 20) { // Дневное время - активное движение
-        if (hour >= 8 && hour <= 10) { // Утренний час пик
-          value = maxValue * 0.5 + Math.random() * (maxValue * 0.5);
-        } else if (hour >= 17 && hour <= 19) { // Вечерний час пик
-          value = maxValue * 0.4 + Math.random() * (maxValue * 0.6);
-        } else { // Обычное дневное время
-          value = maxValue * 0.3 + Math.random() * (maxValue * 0.4);
-        }
-      } else { // Ночное время - меньше движения или стоянка
-        if (Math.random() > 0.7) { // 30% вероятность движения ночью
-          value = Math.random() * (maxValue * 0.7);
-        } else {
-          value = telemetryType === 'voltage' ? maxValue * 0.8 : 0; // Стоянка (для напряжения показываем значение)
-        }
-      }
-      
-      values.push(Math.round(value * 10) / 10); // Округляем до 1 десятичного знака
-      
-      if (limitValues !== null) {
-        limitValues.push(telemetryConfig.limitValue);
-      }
-    }
-    
-    // Анализируем изменения скорости для цветовой дифференциации
-    const increaseSpeeds = [];
-    const decreaseSpeeds = [];
-    const exceedSpeeds = [];
-    const normalSpeeds = [];
-    
-    for (let i = 0; i < values.length; i++) {
-      const currentValue = values[i];
-      const isExceeding = showLimit && currentValue > telemetryConfig.limitValue;
-      
-      // Определяем, является ли это повышением или понижением скорости
-      if (i > 0) {
-        const prevValue = values[i-1];
-        const diff = currentValue - prevValue;
-        
-        // Если превышение скорости
-        if (isExceeding) {
-          exceedSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          normalSpeeds.push(null);
-        }
-        // Если значительное повышение скорости (более 5 км/ч)
-        else if (diff > 5) {
-          increaseSpeeds.push({ x: labels[i], y: currentValue });
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-          normalSpeeds.push(null);
-        }
-        // Если значительное снижение скорости (более 5 км/ч)
-        else if (diff < -5) {
-          decreaseSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-          normalSpeeds.push(null);
-        }
-        // Обычная скорость
-        else {
-          normalSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-        }
-      } else {
-        // Для первой точки
-        if (isExceeding) {
-          exceedSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          normalSpeeds.push(null);
-        } else {
-          normalSpeeds.push({ x: labels[i], y: currentValue });
-          increaseSpeeds.push(null);
-          decreaseSpeeds.push(null);
-          exceedSpeeds.push(null);
-        }
-      }
-    }
-    
-    const datasets = [
-      {
-        label: `${telemetryConfig.title} (${telemetryConfig.unit}) - ДЕМО`,
-        data: values,
-        fill: false,
-        backgroundColor: 'rgba(153, 216, 217, 0.5)',
-        borderColor: 'rgba(153, 216, 217, 0.8)',
-        tension: 0.2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        borderWidth: 1.5
-      },
-      {
-        label: 'Повышение скорости',
-        data: increaseSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(0, 200, 150, 0.8)',
-        borderColor: 'rgba(0, 200, 150, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(0, 200, 150, 0.8)',
-        },
-        spanGaps: false
-      },
-      {
-        label: 'Снижение скорости',
-        data: decreaseSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(255, 140, 0, 0.8)',
-        borderColor: 'rgba(255, 140, 0, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(255, 140, 0, 0.8)',
-        },
-        spanGaps: false
-      },
-      {
-        label: 'Превышение скорости',
-        data: exceedSpeeds,
-        fill: false,
-        backgroundColor: 'rgba(255, 99, 132, 0.8)',
-        borderColor: 'rgba(255, 99, 132, 0.8)',
-        tension: 0,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        segment: {
-          borderColor: 'rgba(255, 99, 132, 0.8)',
-        },
-        spanGaps: false
-      }
-    ];
-    
-    if (limitValues !== null) {
-      datasets.push({
-        label: telemetryConfig.limitLabel,
-        data: limitValues,
-        fill: false,
-        borderColor: telemetryConfig.limitColor,
-        borderDash: [5, 5],
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        borderWidth: 2
-      });
-    }
-    
-    return {
-      labels,
-      datasets
-    };
-  };
-  
-  // Инициализация данных при первой загрузке
-  useEffect(() => {
-    console.log('Компонент инициализирован с периодом "день", загружаем данные');
-    console.log(`Начальный диапазон: ${localStartDate.toLocaleString()} - ${localEndDate.toLocaleString()}`);
-    loadData();
-  }, [loadData]);
-  
-  // Рендер компонента (без изменений, просто заменены ссылки на конфигурацию)
-    return (
-    <div className="speed-chart-container" ref={chartContainerRef}>
-      <div className="speed-chart-header">
-        <div className="speed-chart-title">
-          <div className="speed-chart-title-icon">
-            <FontAwesomeIcon icon={telemetryConfig.icon} />
-          </div>
-          {telemetryConfig.title}
-          {vehicle && vehicle.name && <span> - {vehicle.name}</span>}
+  return (
+    <>
+      {/* {debugInfo && (
+        <div className="chart-debug-info" style={{
+          padding: '8px 12px',
+          margin: '0 0 10px 0',
+          backgroundColor: '#fff3cd',
+          color: '#856404',
+          borderRadius: '4px',
+          fontSize: '14px'
+        }}>
+          <strong>Отладка:</strong> {debugInfo}
         </div>
-        
-        {/* Рендер кнопок управления */}
-      <div className="speed-chart-actions">
-        <button 
-          className="speed-chart-btn" 
-          onClick={zoomIn}
-          title="Увеличить масштаб"
-        >
-          <FontAwesomeIcon icon={faSearchPlus} className="speed-chart-btn-icon" />
-          Увеличить
-        </button>
-        <button 
-          className="speed-chart-btn" 
-          onClick={zoomOut}
-          title="Уменьшить масштаб"
-        >
-          <FontAwesomeIcon icon={faSearchMinus} className="speed-chart-btn-icon" />
-          Уменьшить
-        </button>
-        <button 
-          className="speed-chart-btn" 
-          onClick={resetZoom}
-          title="Сбросить масштаб (Пробел)"
-        >
-          <FontAwesomeIcon icon={faRedo} className="speed-chart-btn-icon" />
-          Сбросить
-        </button>
-        <button 
-          className="speed-chart-btn" 
-          onClick={toggleFullscreen}
-          title="Полноэкранный режим"
-        >
-          <FontAwesomeIcon icon={isFullscreen ? faCompress : faExpand} className="speed-chart-btn-icon" />
-          {isFullscreen ? 'Свернуть' : 'Развернуть'}
-        </button>
-        <button 
-          className="speed-chart-btn" 
-          onClick={() => loadDataForPeriod(selectedPeriod)}
-          disabled={isLoading}
-        >
-          <FontAwesomeIcon icon={faSync} className="speed-chart-btn-icon" spin={isLoading} />
-          Обновить
-        </button>
-        <button 
-          className={`speed-chart-btn ${showSettings ? 'active' : ''}`} 
-          onClick={() => setShowSettings(!showSettings)}
-        >
-          <FontAwesomeIcon icon={faCog} className="speed-chart-btn-icon" />
-          Настройки
-        </button>
-      </div>
-      </div>
+      )} */}
       
-      {/* Рендер блока с информацией о графике */}
-      {showSettings && (
-      <div className="chart-settings">
-        <div className="chart-settings-header">
-          <FontAwesomeIcon icon={faInfoCircle} />
-          <span>Информация о графике</span>
-        </div>
-        <div className="chart-settings-content">
-          <div className="settings-row">
-              <label>Тип данных:</label>
-              <span>{telemetryConfig.title}</span>
-            </div>
-            <div className="settings-row">
-              <label>Единица измерения:</label>
-              <span>{telemetryConfig.unit}</span>
-          </div>
-          <div className="settings-row">
-            <label>Период:</label>
-            <div className="period-selector">
-              <button 
-                className={`period-btn ${selectedPeriod === 'day' ? 'active' : ''}`}
-                onClick={() => loadDataForPeriod('day')}
-              >
-                Сегодня
-              </button>
-              <button 
-                className={`period-btn ${selectedPeriod === 'yesterday' ? 'active' : ''}`}
-                onClick={() => loadDataForPeriod('yesterday')}
-              >
-                Вчера
-              </button>
-              <button 
-                className={`period-btn ${selectedPeriod === 'week' ? 'active' : ''}`}
-                onClick={() => loadDataForPeriod('week')}
-              >
-                Неделя
-              </button>
-              <button 
-                className={`period-btn ${selectedPeriod === 'month' ? 'active' : ''}`}
-                onClick={() => loadDataForPeriod('month')}
-              >
-                Месяц
-              </button>
+      {/* Блок метрик */}
+      {/* {chartData.length > 0 && (
+        <div className="speed-metrics" style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          padding: '10px 15px',
+          marginBottom: '15px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '4px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        }}>
+          <div className="metric-item">
+            <div style={{ fontSize: '12px', color: '#6c757d' }}>Макс. скорость</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#495057' }}>
+              {formatNumber(metrics.maxSpeed)} км/ч
             </div>
           </div>
-          <div className="settings-row">
-            <label>Временной интервал:</label>
-            <span>{localStartDate.toLocaleString()} - {localEndDate.toLocaleString()}</span>
-          </div>
-          <div className="settings-row">
-            <label>Всего записей:</label>
-            <span>{chartData ? chartData.labels.length : 0}</span>
-          </div>
-          <div className="settings-row">
-            <label>Горячие клавиши:</label>
-            <span>Пробел - сбросить масштаб, CTRL+мышь - панорамирование</span>
-          </div>
-          </div>
-        </div>
-      )}
-      
-      
-      
-      {/* Рендер графика */}
-      <div className="speed-chart-content">
-        {isLoading ? (
-          <div className="chart-loading">
-            Загрузка данных {telemetryConfig.title.toLowerCase()}...
-          </div>
-        ) : (
-          chartData ? (
-            <div className="speed-chart">
-              <Line 
-                data={chartData} 
-                options={chartOptions} 
-                ref={chartRef}
-              />
+          <div className="metric-item">
+            <div style={{ fontSize: '12px', color: '#6c757d' }}>Средняя скорость</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#495057' }}>
+              {formatNumber(metrics.avgSpeed)} км/ч
             </div>
-          ) : (
-            <div className="demo-chart-container">
-              <div className="demo-chart-header">
-                <FontAwesomeIcon icon={faInfoCircle} />
-                <span>Демонстрационные данные</span>
-              </div>
-              <Line 
-                data={generateDemoData()} 
-                options={{
-                  ...chartOptions, 
-                  plugins: {
-                    ...chartOptions.plugins, 
-                    title: {
-                      display: true, 
-                      text: `Демонстрационные данные ${telemetryConfig.title.toLowerCase()}`,
-                      font: { size: 14, weight: 'bold' }
-                    }
-                  }
-                }} 
-                ref={chartRef}
-              />
-              <div className="demo-data-message">
-                <p>Показаны демонстрационные данные. В реальном приложении здесь будут отображаться фактические данные.</p>
-              </div>
+          </div>
+          <div className="metric-item">
+            <div style={{ fontSize: '12px', color: '#6c757d' }}>Точек данных</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#495057' }}>
+              {metrics.totalPoints || chartData.length}
             </div>
-          )
-        )}
-      </div>
-
-
-      {/* Рендер статистики */}
-      <div className="speed-stats">
-        <div className="speed-stat">
-          <div className="speed-stat-icon">
-            <FontAwesomeIcon icon={faChartLine} />
           </div>
-          <div className="speed-stat-value">{statistics.average}</div>
-          <div className="speed-stat-label">{telemetryConfig.statistics.average}</div>
         </div>
-        <div className="speed-stat">
-          <div className="speed-stat-icon">
-            <FontAwesomeIcon icon={telemetryConfig.icon} />
-          </div>
-          <div className="speed-stat-value">{statistics.max}</div>
-          <div className="speed-stat-label">{telemetryConfig.statistics.max}</div>
-        </div>
-        <div className="speed-stat">
-          <div className="speed-stat-icon">
-            <FontAwesomeIcon icon={faCalendarAlt} />
-          </div>
-          <div className="speed-stat-value">{statistics.movingTime}</div>
-          <div className="speed-stat-label">{telemetryConfig.statistics.movingTime}</div>
-        </div>
-        <div className="speed-stat">
-          <div className="speed-stat-icon">
-            <FontAwesomeIcon icon={faInfoCircle} />
-          </div>
-          <div className="speed-stat-value">{statistics.exceedCount}</div>
-          <div className="speed-stat-label">{telemetryConfig.statistics.exceedCount}</div>
-        </div>
-      </div>
-    </div>
+      )} */}
+      
+      <BaseChart
+        title="График скорости"
+        vehicle={vehicle}
+        startDate={startDate}
+        endDate={endDate}
+        data={chartData}
+        labels={chartLabels}
+        color="rgb(75, 192, 192)"
+        fetchData={fetchSpeedData}
+        formatTooltipLabel={formatSpeedLabel}
+        formatYAxisLabel={formatSpeedLabel}
+        formatXAxisLabel={formatTimeLabel}
+        emptyDataMessage="Нет данных о скорости за выбранный период"
+        isLoading={isLoading}
+        error={error}
+        options={getChartOptions()}
+      />
+    </>
   );
 };
 
-export default TelemetryChart; 
+export default SpeedChart; 

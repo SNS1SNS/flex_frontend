@@ -1,0 +1,112 @@
+.split-screen-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Стили для элементов управления разделением */
+.split-screen-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  transition: opacity 0.3s ease;
+}
+
+.split-control-btn {
+  background: none;
+  border: none;
+  color: #444;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 2px;
+  padding: 0;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.split-control-btn:hover {
+  background-color: #e0e0e0;
+  color: #000;
+}
+
+.split-control-btn:active {
+  background-color: #ccc;
+}
+
+/* Стили для разделенных контейнеров */
+.split-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.horizontal-split {
+  flex-direction: column;
+}
+
+.vertical-split {
+  flex-direction: row;
+}
+
+.split-pane {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+/* Разделитель (resizer) */
+.split-divider {
+  background-color: #ccc;
+  position: relative;
+}
+
+.split-divider:hover {
+  background-color: #999;
+}
+
+.split-divider.horizontal {
+  height: 4px;
+  cursor: row-resize;
+}
+
+.split-divider.vertical {
+  width: 4px;
+  cursor: col-resize;
+}
+
+/* Стили для различных режимов разделения */
+.quad-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+.quad-split .split-pane {
+  border: 1px solid #ccc;
+}
+
+/* Медиа-запрос для мобильных устройств */
+@media (max-width: 768px) {
+  .split-screen-controls {
+    top: 5px;
+    right: 5px;
+  }
+  
+  .split-control-btn {
+    width: 20px;
+    height: 20px;
+  }
+} 

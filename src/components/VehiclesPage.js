@@ -368,6 +368,28 @@ const VehiclesPage = () => {
     setContextMenu({ ...contextMenu, visible: false });
   };
 
+  // Обработчик для кнопки "Профиль ТС"
+  const handleVehicleProfile = () => {
+    // Проверяем, что выбрано ровно одно ТС
+    if (selectedVehicles.length !== 1) {
+      console.error('Должно быть выбрано ровно одно ТС для просмотра профиля');
+      return;
+    }
+    
+    const vehicleId = selectedVehicles[0];
+    const selectedVehicle = vehicles.find(v => v.id === vehicleId);
+    
+    if (!selectedVehicle) {
+      console.error('Выбранное ТС не найдено в списке');
+      return;
+    }
+    
+    console.log('Переход на страницу профиля ТС:', selectedVehicle.name);
+    
+    // Редирект на страницу профиля ТС (используем правильный формат URL)
+    window.location.href = `/admin/vehicles/profile?id=${vehicleId}`;
+  };
+
   // Функция для определения доступности кнопок
   const isButtonDisabled = (buttonType) => {
     // Кнопки, которые всегда активны
@@ -420,6 +442,7 @@ const VehiclesPage = () => {
             <button 
               className="control-button" 
               disabled={isButtonDisabled('Профиль ТС')}
+              onClick={handleVehicleProfile}
             >
               <FontAwesomeIcon icon={faDatabase} /> <span>Профиль ТС</span>
             </button>
@@ -524,7 +547,7 @@ const VehiclesPage = () => {
         <div className="vehicles-table-container">
           {!isDataFetched && vehicles.length === 0 && (
             <div className="no-data">
-              Данные не загружены. Нажмите "Обновить", чтобы загрузить список ТС
+              Данные не загружены. Нажмите Обновить, чтобы загрузить список ТС
             </div>
           )}
           

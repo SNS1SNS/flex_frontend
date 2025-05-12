@@ -114,14 +114,12 @@ const DateRangePicker = ({ initialRange, onApply, onCancel }) => {
     switch (presetId) {
       case 'today':
         startDate = new Date(now.setHours(0, 0, 0, 0));
-        endDate = new Date(now.setHours(23, 59, 59, 999));
         break;
       case 'yesterday':
         startDate = new Date(now);
         startDate.setDate(startDate.getDate() - 1);
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(startDate);
-        endDate.setHours(23, 59, 59, 999);
         break;
       case 'thisWeek':
         startDate = new Date(now);
@@ -135,7 +133,6 @@ const DateRangePicker = ({ initialRange, onApply, onCancel }) => {
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + 6);
-        endDate.setHours(23, 59, 59, 999);
         break;
       case 'thisMonth':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -146,7 +143,6 @@ const DateRangePicker = ({ initialRange, onApply, onCancel }) => {
         startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(now.getFullYear(), now.getMonth(), 0);
-        endDate.setHours(23, 59, 59, 999);
         break;
       default:
         // Если выбран пользовательский диапазон, найдем его в сохраненных

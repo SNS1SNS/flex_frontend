@@ -1,0 +1,311 @@
+
+/* Основные стили для компонента TrackMap */
+
+.tm-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.tm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 15px;
+  background-color: #0a2747 ;
+  color: white;
+}
+
+.tm-title {
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.tm-title svg {
+  margin-right: 8px;
+}
+
+.tm-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.tm-map-wrapper {
+  flex: 1;
+  position: relative;
+  min-height: 300px;
+}
+
+.tm-map-instance {
+  width: 100%;
+  height: 100%;
+}
+
+.tm-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.tm-control-group {
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin-left: 8px;
+}
+
+.tm-control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.tm-control-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.tm-control-button.active {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.tm-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.tm-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4e73df;
+  border-radius: 50%;
+  animation: tm-spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes tm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tm-info-panel {
+  width: 280px;
+  background-color: #f8f9fc;
+  border-left: 1px solid #e3e6f0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.tm-info-header {
+  padding: 12px 15px;
+  background-color: #4e73df;
+  color: white;
+  font-weight: 600;
+}
+
+.tm-info-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.tm-info-body {
+  padding: 15px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.tm-info-row {
+  display: flex;
+  margin-bottom: 10px;
+  align-items: center;
+  font-size: 13px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ededed;
+}
+
+.tm-info-row:last-child {
+  border-bottom: none;
+}
+
+.tm-info-label {
+  width: 50%;
+  font-weight: 600;
+  color: #5a5c69;
+  display: flex;
+  align-items: center;
+}
+
+.tm-info-label svg {
+  margin-right: 6px;
+  color: #4e73df;
+}
+
+.tm-info-value {
+  width: 50%;
+  text-align: right;
+  color: #333;
+}
+
+/* Элементы воспроизведения и разделения экрана */
+.tm-time-slider-container {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+.tm-time-slider {
+  width: 100%;
+  margin-bottom: 8px;
+  -webkit-appearance: none;
+  height: 4px;
+  background: #4e73df;
+  outline: none;
+  border-radius: 4px;
+}
+
+.tm-time-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border: 2px solid #4e73df;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.tm-time-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: white;
+  border: 2px solid #4e73df;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.tm-playback-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.tm-playback-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background-color: #4e73df;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.tm-playback-button:hover {
+  background-color: #375ad3;
+}
+
+.tm-play-pause {
+  width: 48px;
+  height: 48px;
+}
+
+.tm-speed-selector {
+  display: flex;
+  align-items: center;
+  margin-left: 10px;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.tm-speed-selector select {
+  border: 1px solid #d1d3e2;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 12px;
+}
+
+/* Режимы разделения экрана */
+.tm-expanded {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  border: none;
+  border-radius: 0;
+  height: 100vh !important;
+  width: 100vw !important;
+}
+
+.tm-split-view {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.tm-split-horizontal .tm-map-wrapper {
+  width: 100%;
+  height: 50%;
+}
+
+.tm-split-vertical .tm-map-wrapper {
+  width: 50%;
+  height: 100%;
+}
+
+.tm-split-quad .tm-map-wrapper {
+  width: 50%;
+  height: 50%;
+}
+
+/* Медиа-запросы для адаптивности */
+@media (max-width: 768px) {
+  .tm-info-panel {
+    display: none;
+  }
+
+  .tm-split-horizontal .tm-map-wrapper,
+  .tm-split-vertical .tm-map-wrapper,
+  .tm-split-quad .tm-map-wrapper {
+    width: 100%;
+    height: 100%;
+  }
+} 

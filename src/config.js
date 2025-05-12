@@ -25,6 +25,17 @@ const config = {
     user: '/api/auth/user',
     changeLanguage: '/api/auth/change-language',
     healthCheck: '/api/health-check'
+  },
+  
+  // Пути API для работы с транспортными средствами и их данными
+  endpoints: {
+    vehicles: '/api/vehicles',
+    // Тарировочные таблицы
+    calibration: {
+      base: (vehicleId) => `/api/vehicles/${vehicleId}/calibration`,
+      getAll: (vehicleId) => `/api/vehicles/${vehicleId}/calibration`,
+      save: (vehicleId) => `/api/vehicles/${vehicleId}/calibration`
+    }
   }
 };
 

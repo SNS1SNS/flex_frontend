@@ -1,818 +1,629 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faGasPump, faCalendarDay, faCalendarWeek, faCalendarAlt, 
-  faSync, faDownload, faChartLine, faExpand, faCompress, 
-  faCog, faInfoCircle, faFire, faTint, faRoute
-} from '@fortawesome/free-solid-svg-icons';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import BaseChart from './BaseChart';
+import { getAuthToken } from '../../utils/authUtils';
 import { toast } from 'react-toastify';
 import './FuelChart.css';
 
-// Регистрируем необходимые компоненты Chart.js
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
-
-/**
- * Компонент для отображения графика расхода топлива транспортного средства
- * @param {Object} props - Свойства компонента
- * @param {Object} props.vehicle - Данные о транспортном средстве (id, name, imei)
- * @param {Date} props.startDate - Начальная дата диапазона
- * @param {Date} props.endDate - Конечная дата диапазона
- */
-const FuelChart = ({ vehicle, startDate, endDate }) => {
-  const [chartData, setChartData] = useState(null);
+const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }) => {
+  const [chartData, setChartData] = useState([]);
+  const [chartLabels, setChartLabels] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [statistics, setStatistics] = useState({
-    averageConsumption: '-',
-    totalConsumption: '-',
-    refills: '-',
-    fuelDrains: '-'
-  });
-  const [selectedPeriod, setSelectedPeriod] = useState('day');
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showConsumption, setShowConsumption] = useState(true);
-  const [showFillings, setShowFillings] = useState(true);
-  const chartContainerRef = useRef(null);
-  const chartRef = useRef(null);
+  const [error, setError] = useState(null);
+  const abortControllerRef = useRef(null);
   
-  // Форматирование даты в формат ISO с микросекундами для API
-  const formatToMicroISOString = (date) => {
-    if (!date) return '';
-    const isoString = date.toISOString();
-    return isoString.replace('Z', '000Z');
-  };
+  // Состояние для хранения дат, которые будут синхронизироваться с localStorage
+  const [startDate, setStartDate] = useState(propsStartDate || null);
+  const [endDate, setEndDate] = useState(propsEndDate || null);
   
-  // Форматирование даты для отображения на графике
-  const formatDateForChart = (dateString) => {
-    const date = new Date(dateString);
-    return `${date.getDate().toString().padStart(2, '0')}.${(date.getMonth() + 1).toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-  };
-  
-  // Расчет статистики по расходу топлива
-  const calculateFuelStatistics = (fuelData, fillings, drains) => {
-    if (!fuelData || fuelData.length === 0) {
-      return {
-        averageConsumption: '-',
-        totalConsumption: '-',
-        refills: '-',
-        fuelDrains: '-'
-      };
+  // Функция для обеспечения валидных дат
+  const ensureValidDate = useCallback((dateInput) => {
+    try {
+      // Если дата уже является объектом Date и она валидна
+      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+        return dateInput;
+      }
+      
+      // Если дата - строка
+      if (typeof dateInput === 'string') {
+        // Проверяем, не является ли строка пустой или невалидной
+        if (!dateInput || dateInput === 'Invalid Date') {
+          console.warn('Получена невалидная строка даты:', dateInput);
+          return new Date();
+        }
+        
+        // Пробуем стандартный метод
+        const newDate = new Date(dateInput);
+        if (!isNaN(newDate.getTime())) {
+          return newDate;
+        }
+      }
+      
+      // Если дата - timestamp (число)
+      if (typeof dateInput === 'number') {
+        const newDate = new Date(dateInput);
+        if (!isNaN(newDate.getTime())) {
+          return newDate;
+        }
+      }
+      
+      // Если не удалось создать валидную дату, возвращаем текущую
+      console.warn('Невозможно создать валидную дату из:', dateInput);
+      return new Date();
+    } catch (error) {
+      console.error('Ошибка при обработке даты:', error, dateInput);
+      return new Date();
     }
-    
-    // Считаем общий расход топлива - разница между начальным и конечным значением
-    // плюс учитываем все заправки и сливы
-    const initialFuel = fuelData[0].value;
-    const finalFuel = fuelData[fuelData.length - 1].value;
-    
-    // Сумма всех заправок
-    const totalRefills = fillings.reduce((sum, filling) => sum + filling.volume, 0);
-    
-    // Сумма всех сливов
-    const totalDrains = drains.reduce((sum, drain) => sum + drain.volume, 0);
-    
-    // Общий расход = (начальный уровень + заправки - сливы - конечный уровень)
-    const totalConsumption = initialFuel + totalRefills - totalDrains - finalFuel;
-    
-    // Рассчитываем средний расход топлива на 100 км
-    // Для этого нам нужно знать пройденное расстояние. Предположим, что у нас есть данные о пробеге
-    const estimatedDistance = 100; // Примерное расстояние в км, в реальном приложении это будет переменная
-    
-    // Средний расход на 100 км
-    const averageConsumption = totalConsumption / estimatedDistance * 100;
-    
-    return {
-      averageConsumption: `${averageConsumption.toFixed(1)} л/100км`,
-      totalConsumption: `${totalConsumption.toFixed(1)} л`,
-      refills: fillings.length.toString(),
-      fuelDrains: drains.length.toString()
-    };
-  };
-  
-  // Загрузка данных для выбранного периода
-  const loadDataForPeriod = useCallback((period) => {
-    setSelectedPeriod(period);
-    
-    // Определяем диапазон дат в зависимости от периода
-    let start = new Date();
-    let end = new Date();
-    
-    switch (period) {
-      case 'day':
-        start = new Date();
-        start.setHours(0, 0, 0, 0);
-        end = new Date(start);
-        end.setHours(23, 59, 59, 999);
-        break;
-      case 'yesterday':
-        start = new Date();
-        start.setDate(start.getDate() - 1);
-        start.setHours(0, 0, 0, 0);
-        end = new Date(start);
-        end.setHours(23, 59, 59, 999);
-        break;
-      case 'week':
-        // Последние 7 дней
-        start = new Date();
-        start.setDate(start.getDate() - 7);
-        break;
-      case 'month':
-        // Последние 30 дней
-        start = new Date();
-        start.setDate(start.getDate() - 30);
-        break;
-      default:
-        // По умолчанию - сегодня
-        start.setHours(0, 0, 0, 0);
-        break;
-    }
-    
-    // Загружаем данные для нового диапазона
-    loadFuelData(start, end);
   }, []);
   
-  // Загрузка данных о топливе
-  const loadFuelData = async (customStartDate, customEndDate) => {
-    if (!vehicle || !vehicle.imei) {
-      toast.warning('Не выбрано транспортное средство или отсутствует IMEI');
-      return;
+  // Обновляем startDate и endDate, когда меняются props
+  useEffect(() => {
+    if (propsStartDate) {
+      const validStartDate = ensureValidDate(propsStartDate);
+      setStartDate(validStartDate);
     }
     
+    if (propsEndDate) {
+      const validEndDate = ensureValidDate(propsEndDate);
+      setEndDate(validEndDate);
+    }
+  }, [propsStartDate, propsEndDate, ensureValidDate]);
+  
+  // Функция получения дат из localStorage
+  const getDateRangeFromLocalStorage = useCallback(() => {
+    try {
+      const storedRange = localStorage.getItem('lastDateRange');
+      if (storedRange) {
+        const parsed = JSON.parse(storedRange);
+        return {
+          startDate: parsed.startDate ? ensureValidDate(parsed.startDate) : null,
+          endDate: parsed.endDate ? ensureValidDate(parsed.endDate) : null,
+          updateTimestamp: parsed.updateTimestamp
+        };
+      }
+    } catch (e) {
+      console.warn('Ошибка при чтении диапазона дат из localStorage:', e);
+    }
+    return { startDate: null, endDate: null };
+  }, [ensureValidDate]);
+  
+  // Загрузка данных при изменении дат или ТС - оптимизирована с useCallback
+  const fetchFuelData = useCallback(async () => {
+    if (!vehicle || !startDate || !endDate) {
+      console.warn('FuelChart: Невозможно загрузить данные - отсутствует транспорт или даты');
+      return;
+    }
+
+    // Если уже идет загрузка, отменяем предыдущий запрос
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Создаем новый AbortController для возможности отмены запроса
+    abortControllerRef.current = new AbortController();
+    
     setIsLoading(true);
+    setError(null);
     
     try {
-      // Используем заданные даты или те, что были переданы через пропсы
-      const startTimeStr = formatToMicroISOString(customStartDate || startDate);
-      const endTimeStr = formatToMicroISOString(customEndDate || endDate);
+      // Форматируем даты для запроса в формате ISO без миллисекунд
+      const formatDateForAPI = (date) => {
+        if (!date) return '';
+        // Преобразуем в формат YYYY-MM-DDThh:mm:ssZ (без миллисекунд)
+        return date.toISOString().split('.')[0] + 'Z';
+      };
       
-      const fuelUrl = `/api/telemetry/fuel/${vehicle.imei}?start_time=${encodeURIComponent(startTimeStr)}&end_time=${encodeURIComponent(endTimeStr)}`;
-      const fillingsUrl = `/api/events/refill/${vehicle.imei}?start_time=${encodeURIComponent(startTimeStr)}&end_time=${encodeURIComponent(endTimeStr)}`;
-      const drainsUrl = `/api/events/drain/${vehicle.imei}?start_time=${encodeURIComponent(startTimeStr)}&end_time=${encodeURIComponent(endTimeStr)}`;
+      const startISO = formatDateForAPI(startDate);
+      const endISO = formatDateForAPI(endDate);
       
-      // Параллельно запрашиваем данные о топливе, заправках и сливах
-      const [fuelResponse, fillingsResponse, drainsResponse] = await Promise.all([
-        fetch(fuelUrl),
-        fetch(fillingsUrl),
-        fetch(drainsUrl)
-      ]);
-      
-      if (!fuelResponse.ok || !fillingsResponse.ok || !drainsResponse.ok) {
-        throw new Error(`Ошибка HTTP при загрузке данных о топливе`);
+      // Проверяем наличие IMEI
+      if (!vehicle.imei) {
+        throw new Error('IMEI транспортного средства не определен');
       }
       
-      const fuelData = await fuelResponse.json();
-      const fillingsData = await fillingsResponse.json();
-      const drainsData = await drainsResponse.json();
+      // URL для запроса данных о топливе
+      const url = `http://localhost:8081/api/fuel/${vehicle.imei}/liters?startTime=${startISO}&endTime=${endISO}`;
       
-      // Обработка данных о топливе
-      if (fuelData && fuelData.data && Array.isArray(fuelData.data) && fuelData.data.length > 0) {
-        // Готовим данные для графика
-        const labels = fuelData.data.map(item => formatDateForChart(item.time));
-        const fuelValues = fuelData.data.map(item => item.value);
-        
-        // Подготовка данных о заправках для графика
-        const fillings = [];
-        if (fillingsData && fillingsData.data && Array.isArray(fillingsData.data)) {
-          fillingsData.data.forEach(filling => {
-            // Ищем соответствующую метку времени
-            const timeLabel = formatDateForChart(filling.time);
-            const index = labels.indexOf(timeLabel);
-            
-            if (index !== -1) {
-              fillings.push({
-                x: timeLabel,
-                y: fuelValues[index],
-                volume: filling.volume
-              });
-            }
-          });
-        }
-        
-        // Подготовка данных о сливах для графика
-        const drains = [];
-        if (drainsData && drainsData.data && Array.isArray(drainsData.data)) {
-          drainsData.data.forEach(drain => {
-            // Ищем соответствующую метку времени
-            const timeLabel = formatDateForChart(drain.time);
-            const index = labels.indexOf(timeLabel);
-            
-            if (index !== -1) {
-              drains.push({
-                x: timeLabel,
-                y: fuelValues[index],
-                volume: drain.volume
-              });
-            }
-          });
-        }
-        
-        setChartData({
-          labels,
-          datasets: [
-            {
-              label: 'Уровень топлива (л)',
-              data: fuelValues,
-              fill: true,
-              backgroundColor: 'rgba(255, 159, 64, 0.2)',
-              borderColor: '#ff9f40',
-              tension: 0.4,
-              pointRadius: 2,
-              pointHoverRadius: 5,
-              borderWidth: 2
-            },
-            {
-              label: 'Заправки',
-              data: fillings,
-              backgroundColor: 'rgba(75, 192, 192, 0.8)',
-              borderColor: 'rgba(75, 192, 192, 1)',
-              pointRadius: 6,
-              pointHoverRadius: 8,
-              pointStyle: 'triangle',
-              showLine: false,
-              hidden: !showFillings
-            },
-            {
-              label: 'Сливы',
-              data: drains,
-              backgroundColor: 'rgba(255, 99, 132, 0.8)',
-              borderColor: 'rgba(255, 99, 132, 1)',
-              pointRadius: 6,
-              pointHoverRadius: 8,
-              pointStyle: 'rect',
-              showLine: false,
-              hidden: !showFillings
-            }
-          ]
-        });
-        
-        // Обновляем статистику
-        const stats = calculateFuelStatistics(fuelData.data, fillingsData.data || [], drainsData.data || []);
-        setStatistics(stats);
-      } else {
-        toast.warning(`Нет данных о топливе для ${vehicle.name} за выбранный период`);
-        setChartData(null);
-        setStatistics({
-          averageConsumption: '-',
-          totalConsumption: '-',
-          refills: '-',
-          fuelDrains: '-'
-        });
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки данных о топливе:', error);
-      toast.error(`Ошибка загрузки данных о топливе: ${error.message}`);
-      setChartData(null);
-      setStatistics({
-        averageConsumption: '-',
-        totalConsumption: '-',
-        refills: '-',
-        fuelDrains: '-'
+      console.log('FuelChart: Запрос данных топлива:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        signal: abortControllerRef.current.signal
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Неизвестная ошибка');
+        throw new Error(`Ошибка получения данных: ${response.status} ${response.statusText}. ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('FuelChart: Получены данные о топливе:', data);
+      
+      // Проверка на пустой ответ
+      if (!data || !data.data || !Array.isArray(data.data)) {
+        console.warn('FuelChart: Получен неверный формат данных:', data);
+        setChartData([]);
+        setChartLabels([]);
+        return;
+      }
+      
+      // Обрабатываем полученные данные
+      processFuelData(data);
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('FuelChart: Запрос был отменен');
+        return;
+      }
+      
+      console.error('FuelChart: Ошибка при загрузке данных о топливе:', error);
+      setError(`Ошибка: ${error.message}`);
+      toast.error(`Не удалось загрузить данные о топливе: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [vehicle, startDate, endDate]);
   
-  // Опции для графика Chart.js
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          usePointStyle: true,
-          boxWidth: 10,
-          font: {
-            size: 12
-          }
-        }
-      },
-      title: {
-        display: false
-      },
-      tooltip: {
-        mode: 'index',
-        intersect: false,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        titleFont: {
-          size: 13
-        },
-        bodyFont: {
-          size: 12
-        },
-        padding: 10,
-        cornerRadius: 6,
-        callbacks: {
-          label: function(context) {
-            if (context.dataset.label === 'Уровень топлива (л)') {
-              return `Уровень топлива: ${context.parsed.y.toFixed(1)} л`;
-            } else if (context.dataset.label === 'Заправки') {
-              const dataPoint = context.dataset.data[context.dataIndex];
-              return `Заправка: +${dataPoint.volume.toFixed(1)} л`;
-            } else if (context.dataset.label === 'Сливы') {
-              const dataPoint = context.dataset.data[context.dataIndex];
-              return `Слив: -${dataPoint.volume.toFixed(1)} л`;
-            }
-            return context.dataset.label;
-          }
-        }
-      }
-    },
-    scales: {
-      x: {
-        display: true,
-        title: {
-          display: true,
-          text: 'Время',
-          font: {
-            size: 12,
-            weight: 'normal'
-          }
-        },
-        ticks: {
-          maxRotation: 45,
-          minRotation: 45,
-          font: {
-            size: 10
-          },
-          color: '#666'
-        },
-        grid: {
-          display: true,
-          color: 'rgba(0, 0, 0, 0.05)'
-        }
-      },
-      y: {
-        display: true,
-        title: {
-          display: true,
-          text: 'Уровень топлива (л)',
-          font: {
-            size: 12,
-            weight: 'normal'
-          }
-        },
-        min: 0,
-        ticks: {
-          font: {
-            size: 11
-          },
-          color: '#666'
-        },
-        grid: {
-          display: true,
-          color: 'rgba(0, 0, 0, 0.05)'
-        }
-      }
-    },
-    interaction: {
-      mode: 'nearest',
-      intersect: false
-    },
-    animation: {
-      duration: 1000
-    },
-    elements: {
-      line: {
-        borderWidth: 2
-      },
-      point: {
-        radius: 2,
-        hoverRadius: 5,
-        borderWidth: 1
-      }
-    }
-  };
-  
-  // Обработка полноэкранного режима
-  const toggleFullscreen = () => {
-    if (!chartContainerRef.current) return;
-    
-    if (!isFullscreen) {
-      if (chartContainerRef.current.requestFullscreen) {
-        chartContainerRef.current.requestFullscreen();
-      } else if (chartContainerRef.current.mozRequestFullScreen) {
-        chartContainerRef.current.mozRequestFullScreen();
-      } else if (chartContainerRef.current.webkitRequestFullscreen) {
-        chartContainerRef.current.webkitRequestFullscreen();
-      } else if (chartContainerRef.current.msRequestFullscreen) {
-        chartContainerRef.current.msRequestFullscreen();
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (document.mozCancelFullScreen) {
-        document.mozCancelFullScreen();
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen();
-      }
-    }
-    
-    setIsFullscreen(!isFullscreen);
-  };
-  
-  // Обработчик изменения полноэкранного режима
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-    
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-    };
-  }, []);
-  
-  // Инициализация и загрузка данных при монтировании компонента
-  useEffect(() => {
-    // По умолчанию загружаем данные за сегодня
-    loadFuelData(startDate, endDate);
-    
-    // Добавляем слушатель события изменения диапазона дат
-    const handleDateRangeChange = (event) => {
-      console.log('FuelChart: Получено событие dateRangeChanged:', event.detail);
-      
-      if (event.detail && event.detail.forceUpdate) {
-        const newStartDate = event.detail.startDate ? new Date(event.detail.startDate.split('.').reverse().join('-')) : startDate;
-        const newEndDate = event.detail.endDate ? new Date(event.detail.endDate.split('.').reverse().join('-')) : endDate;
-        
-        // Обновляем период
-        if (event.detail.periodType) {
-          setSelectedPeriod(event.detail.periodType);
-        }
-        
-        // Загружаем данные для нового диапазона
-        loadFuelData(newStartDate, newEndDate);
-      }
-    };
-    
-    // Устанавливаем слушатель
-    document.addEventListener('dateRangeChanged', handleDateRangeChange);
-    
-    // Очистка при размонтировании
-    return () => {
-      document.removeEventListener('dateRangeChanged', handleDateRangeChange);
-    };
-  }, [startDate, endDate, loadFuelData]);
-  
-  // Обработчик экспорта данных
-  const handleExportData = () => {
-    if (!chartData || !chartData.labels || !chartData.datasets || !chartData.datasets[0]) {
-      toast.warning('Нет данных для экспорта');
+  // Обработка данных о топливе
+  const processFuelData = useCallback((data) => {
+    if (!data || !data.data || !Array.isArray(data.data) || data.data.length === 0) {
+      setChartData([]);
+      setChartLabels([]);
       return;
     }
     
-    // Создаем CSV данные
-    const labels = chartData.labels;
-    const fuelLevels = chartData.datasets[0].data;
+    // Сортируем данные по времени
+    const sortedData = [...data.data].sort((a, b) => 
+      new Date(a.time).getTime() - new Date(b.time).getTime()
+    );
     
-    let csvContent = 'data:text/csv;charset=utf-8,Время,Уровень топлива (л)\n';
+    // Извлекаем метки времени и значения уровня топлива
+    const labels = sortedData.map(item => new Date(item.time));
+    const fuelValues = sortedData.map(item => item.liters);
     
-    for (let i = 0; i < labels.length; i++) {
-      csvContent += `${labels[i]},${fuelLevels[i]}\n`;
-    }
+    // Сохраняем данные для графика
+    setChartLabels(labels);
+    setChartData(fuelValues);
     
-    // Создаем ссылку для скачивания
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `fuel_data_${vehicle.name}_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    
-    // Скачиваем файл
-    link.click();
-    
-    // Удаляем ссылку
-    document.body.removeChild(link);
-    
-    toast.success('Данные успешно экспортированы');
-  };
+    console.log('FuelChart: Данные обработаны:', {
+      labels: labels.length,
+      values: fuelValues.length,
+    });
+  }, []);
   
-  // Обработчик кнопки обновления данных
-  const handleRefreshData = () => {
-    loadDataForPeriod(selectedPeriod);
-  };
-  
-  // Генерация демо-данных, если в реальном приложении нет данных
-  const generateDemoData = () => {
-    const labels = [];
-    const fuelData = [];
-    const fillings = [];
-    const drains = [];
-    
-    // Создаем данные за 24 часа с интервалом в час
-    const baseTime = new Date(startDate);
-    
-    // Начальный уровень топлива
-    let currentFuel = 70 + Math.random() * 20; // от 70 до 90 литров
-    
-    // Генерируем данные об уровне топлива
-    for (let i = 0; i < 24; i++) {
-      const currentTime = new Date(baseTime);
-      currentTime.setHours(baseTime.getHours() + i);
-      
-      const timeLabel = formatDateForChart(currentTime.toISOString());
-      labels.push(timeLabel);
-      
-      // Имитируем расход топлива (снижение 0.5-2 литра за час)
-      const consumption = 0.5 + Math.random() * 1.5;
-      currentFuel -= consumption;
-      
-      // Периодически добавляем заправки
-      if (i === 8 || i === 16) {
-        const refillAmount = 15 + Math.random() * 15; // 15-30 литров
-        currentFuel += refillAmount;
+  // Эффект для инициализации дат из localStorage и подписки на их изменение
+  useEffect(() => {
+    // Обработчик события изменения дат
+    const handleDateRangeChanged = (event) => {
+      try {
+        const { startDate: newStartDate, endDate: newEndDate, period, timestamp, forceUpdate } = event.detail;
         
-        fillings.push({
-          x: timeLabel,
-          y: currentFuel,
-          volume: refillAmount
-        });
-      }
-      
-      // С небольшой вероятностью добавляем слив топлива
-      if (i === 12 && Math.random() > 0.7) {
-        const drainAmount = 5 + Math.random() * 10; // 5-15 литров
-        currentFuel -= drainAmount;
+        // Проверяем, не слишком ли недавно мы сами обновили даты
+        const now = new Date().getTime();
+        const lastUpdate = window.lastDateUpdateTime || 0;
         
-        drains.push({
-          x: timeLabel,
-          y: currentFuel,
-          volume: drainAmount
-        });
-      }
-      
-      // Убеждаемся, что уровень топлива не уходит в отрицательные значения
-      currentFuel = Math.max(currentFuel, 0);
-      
-      fuelData.push(currentFuel);
-    }
-    
-    return {
-      labels,
-      datasets: [
-        {
-          label: 'Уровень топлива (л) - ДЕМО',
-          data: fuelData,
-          fill: true,
-          backgroundColor: 'rgba(255, 159, 64, 0.2)',
-          borderColor: '#ff9f40',
-          tension: 0.4,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          borderWidth: 2
-        },
-        {
-          label: 'Заправки',
-          data: fillings,
-          backgroundColor: 'rgba(75, 192, 192, 0.8)',
-          borderColor: 'rgba(75, 192, 192, 1)',
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          pointStyle: 'triangle',
-          showLine: false
-        },
-        {
-          label: 'Сливы',
-          data: drains,
-          backgroundColor: 'rgba(255, 99, 132, 0.8)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          pointStyle: 'rect',
-          showLine: false
+        // Если обновление было менее 1 секунды назад и это мы сами его сделали, игнорируем
+        if ((now - lastUpdate) < 1000 && window.lastDateUpdateTime === timestamp) {
+          console.log('FuelChart: Игнорируем событие dateRangeChanged - недавнее собственное обновление');
+          return;
         }
-      ]
-    };
-  };
-  
-  // Рендер кнопок управления
-  const renderControls = () => {
-    return (
-      <div className="fuel-chart-actions">
-        <button 
-          className={`fuel-chart-btn ${selectedPeriod === 'day' ? 'active' : ''}`} 
-          onClick={() => loadDataForPeriod('day')}
-        >
-          <FontAwesomeIcon icon={faCalendarDay} className="fuel-chart-btn-icon" />
-          Сегодня
-        </button>
-        <button 
-          className={`fuel-chart-btn ${selectedPeriod === 'yesterday' ? 'active' : ''}`} 
-          onClick={() => loadDataForPeriod('yesterday')}
-        >
-          <FontAwesomeIcon icon={faCalendarDay} className="fuel-chart-btn-icon" />
-          Вчера
-        </button>
-        <button 
-          className={`fuel-chart-btn ${selectedPeriod === 'week' ? 'active' : ''}`} 
-          onClick={() => loadDataForPeriod('week')}
-        >
-          <FontAwesomeIcon icon={faCalendarWeek} className="fuel-chart-btn-icon" />
-          Неделя
-        </button>
-        <button 
-          className={`fuel-chart-btn ${selectedPeriod === 'month' ? 'active' : ''}`} 
-          onClick={() => loadDataForPeriod('month')}
-        >
-          <FontAwesomeIcon icon={faCalendarAlt} className="fuel-chart-btn-icon" />
-          Месяц
-        </button>
-        <button 
-          className="fuel-chart-btn" 
-          onClick={handleRefreshData}
-          disabled={isLoading}
-        >
-          <FontAwesomeIcon icon={faSync} className="fuel-chart-btn-icon" spin={isLoading} />
-          Обновить
-        </button>
-        <button 
-          className="fuel-chart-btn" 
-          onClick={toggleFullscreen}
-        >
-          <FontAwesomeIcon 
-            icon={isFullscreen ? faCompress : faExpand} 
-            className="fuel-chart-btn-icon" 
-          />
-          {isFullscreen ? 'Свернуть' : 'Развернуть'}
-        </button>
-        <button 
-          className="fuel-chart-btn" 
-          onClick={handleExportData}
-          disabled={!chartData}
-        >
-          <FontAwesomeIcon icon={faDownload} className="fuel-chart-btn-icon" />
-          Экспорт
-        </button>
-        <button 
-          className={`fuel-chart-btn ${showSettings ? 'active' : ''}`} 
-          onClick={() => setShowSettings(!showSettings)}
-        >
-          <FontAwesomeIcon icon={faCog} className="fuel-chart-btn-icon" />
-          Настройки
-        </button>
-      </div>
-    );
-  };
-  
-  // Рендер блока с информацией о графике
-  const renderInfo = () => {
-    if (!showSettings) return null;
-    
-    return (
-      <div className="chart-settings">
-        <div className="chart-settings-header">
-          <FontAwesomeIcon icon={faInfoCircle} />
-          <span>Настройки графика</span>
-        </div>
-        <div className="chart-settings-content">
-          <div className="settings-toggles">
-            <label className="settings-toggle">
-              <input 
-                type="checkbox" 
-                checked={showConsumption} 
-                onChange={() => setShowConsumption(!showConsumption)} 
-              />
-              <span className="toggle-label">Показывать уровень топлива</span>
-            </label>
+        
+        console.log('FuelChart: Получено событие изменения диапазона дат:', event.detail);
+        
+        // Если передан предустановленный период (неделя, месяц и т.д.)
+        if (period) {
+          console.log('FuelChart: Обработка предустановленного периода:', period);
+          
+          // Создаем даты на основе предустановленного периода
+          let validStartDate = new Date();
+          let validEndDate = new Date();
+          
+          switch(period) {
+            case 'day':
+              // Текущий день
+              validStartDate.setHours(0, 0, 0, 0);
+              break;
+            case 'week':
+              // Последние 7 дней
+              validStartDate = new Date(validEndDate);
+              validStartDate.setDate(validEndDate.getDate() - 7);
+              break;
+            case 'month':
+              // Последние 30 дней
+              validStartDate = new Date(validEndDate);
+              validStartDate.setDate(validEndDate.getDate() - 30);
+              break;
+            case 'year':
+              // Последние 365 дней
+              validStartDate = new Date(validEndDate);
+              validStartDate.setDate(validEndDate.getDate() - 365);
+              break;
+            default:
+              // По умолчанию - неделя
+              validStartDate = new Date(validEndDate);
+              validStartDate.setDate(validEndDate.getDate() - 7);
+          }
+          
+          // Сохраняем метку времени последнего обновления
+          window.lastDateUpdateTime = timestamp || new Date().getTime();
+          
+          console.log('FuelChart: Установка дат на основе периода:', {
+            start: validStartDate.toISOString(),
+            end: validEndDate.toISOString()
+          });
+          
+          setStartDate(validStartDate);
+          setEndDate(validEndDate);
+          return;
+        }
+        
+        // Проверяем наличие дат или запрос на принудительное обновление
+        if ((!newStartDate || !newEndDate) && forceUpdate) {
+          // Получаем актуальные данные из localStorage
+          const { startDate: storedStartDate, endDate: storedEndDate } = getDateRangeFromLocalStorage();
+          
+          if (storedStartDate && storedEndDate) {
+            // Проверяем, изменились ли даты
+            const startChanged = !startDate || 
+              Math.abs(storedStartDate.getTime() - startDate.getTime()) > 1000;
+            const endChanged = !endDate || 
+              Math.abs(storedEndDate.getTime() - endDate.getTime()) > 1000;
+                
+            if (startChanged || endChanged) {
+              console.log('FuelChart: Установка дат из localStorage через forceUpdate:', {
+                startDate: storedStartDate.toISOString(),
+                endDate: storedEndDate.toISOString()
+              });
+              
+              setStartDate(storedStartDate);
+              setEndDate(storedEndDate);
+            }
+          }
+          return;
+        }
+        
+        // Обрабатываем полученные даты, если они есть
+        if (newStartDate && newEndDate) {
+          const validStartDate = ensureValidDate(newStartDate);
+          const validEndDate = ensureValidDate(newEndDate);
+          
+          // Сохраняем метку времени последнего обновления
+          window.lastDateUpdateTime = timestamp || new Date().getTime();
+          
+          // Проверяем, изменились ли даты
+          const startChanged = !startDate || 
+            Math.abs(validStartDate.getTime() - startDate.getTime()) > 1000;
+          const endChanged = !endDate || 
+            Math.abs(validEndDate.getTime() - endDate.getTime()) > 1000;
             
-            <label className="settings-toggle">
-              <input 
-                type="checkbox" 
-                checked={showFillings} 
-                onChange={() => setShowFillings(!showFillings)} 
-              />
-              <span className="toggle-label">Показывать заправки и сливы</span>
-            </label>
-          </div>
+          if (startChanged || endChanged) {
+            console.log('FuelChart: Установка дат из события:', {
+              startDate: validStartDate.toISOString(),
+              endDate: validEndDate.toISOString()
+            });
+            
+            setStartDate(validStartDate);
+            setEndDate(validEndDate);
+          } else {
+            console.log('FuelChart: Даты не изменились, обновление не требуется');
+          }
+        }
+      } catch (error) {
+        console.error('FuelChart: Ошибка при обработке события изменения дат:', error);
+      }
+    };
+    
+    // Обработчик события изменения дат внутри текущей вкладки
+    const handleDateRangeChangedInTab = (event) => {
+      try {
+        const { startDate: newStartDate, endDate: newEndDate, timestamp } = event.detail;
+        
+        // Проверяем, не слишком ли недавно мы сами обновили даты
+        const now = new Date().getTime();
+        const lastUpdate = window.lastDateUpdateTime || 0;
+        
+        // Если обновление было менее 1 секунды назад и это мы сами его сделали, игнорируем
+        if ((now - lastUpdate) < 1000 && window.lastDateUpdateTime === timestamp) {
+          console.log('FuelChart: Игнорируем событие dateRangeChangedInTab - недавнее собственное обновление');
+          return;
+        }
+        
+        console.log('FuelChart: Получено событие изменения дат в текущей вкладке:', {
+          startDate: newStartDate instanceof Date ? newStartDate.toISOString() : newStartDate,
+          endDate: newEndDate instanceof Date ? newEndDate.toISOString() : newEndDate
+        });
+        
+        const validStartDate = ensureValidDate(newStartDate);
+        const validEndDate = ensureValidDate(newEndDate);
+        
+        // Проверяем, изменились ли даты
+        const startChanged = !startDate || 
+          Math.abs(validStartDate.getTime() - startDate.getTime()) > 1000;
+        const endChanged = !endDate || 
+          Math.abs(validEndDate.getTime() - endDate.getTime()) > 1000;
           
-          <div className="settings-row">
-            <label>Период:</label>
-            <span>
-              {selectedPeriod === 'day' && 'Сегодня'}
-              {selectedPeriod === 'yesterday' && 'Вчера'}
-              {selectedPeriod === 'week' && 'Последние 7 дней'}
-              {selectedPeriod === 'month' && 'Последние 30 дней'}
-            </span>
-          </div>
+        if (startChanged || endChanged) {
+          console.log('FuelChart: Обновление дат из события в текущей вкладке:', {
+            startDate: validStartDate.toISOString(),
+            endDate: validEndDate.toISOString()
+          });
           
-          <div className="settings-row">
-            <label>Всего записей:</label>
-            <span>{chartData ? chartData.labels.length : 0}</span>
-          </div>
+          setStartDate(validStartDate);
+          setEndDate(validEndDate);
+        }
+      } catch (error) {
+        console.error('FuelChart: Ошибка при обработке события изменения дат в текущей вкладке:', error);
+      }
+    };
+    
+    // Обработчик события изменения в localStorage 
+    const handleStorageChange = (event) => {
+      if (event.key === 'lastDateRange') {
+        try {
+          const newValue = JSON.parse(event.newValue);
           
-          <div className="chart-legend">
-            <div className="legend-item">
-              <div className="legend-color fuel"></div>
-              <span>Уровень топлива</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color refill"></div>
-              <span>Заправки</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color drain"></div>
-              <span>Сливы</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+          // Если данных нет, выходим
+          if (!newValue || !newValue.startDate || !newValue.endDate) {
+            return;
+          }
+          
+          const validStartDate = ensureValidDate(newValue.startDate);
+          const validEndDate = ensureValidDate(newValue.endDate);
+          
+          // Проверяем, изменились ли даты
+          const startChanged = !startDate || 
+            Math.abs(validStartDate.getTime() - startDate.getTime()) > 1000;
+          const endChanged = !endDate || 
+            Math.abs(validEndDate.getTime() - endDate.getTime()) > 1000;
+            
+          if (startChanged || endChanged) {
+            console.log('FuelChart: Установка дат из localStorage:', {
+              startDate: validStartDate.toISOString(),
+              endDate: validEndDate.toISOString()
+            });
+            
+            setStartDate(validStartDate);
+            setEndDate(validEndDate);
+          }
+        } catch (error) {
+          console.error('FuelChart: Ошибка при обработке изменения localStorage:', error);
+        }
+      }
+    };
+    
+    // Обработчик события изменения выбранного ТС
+    const handleVehicleChanged = (event) => {
+      console.log('FuelChart: Получено событие смены транспорта:', event.detail);
+      // Если это событие обновления данных после выбора ТС, то просто загружаем данные заново
+      if (vehicle && startDate && endDate) {
+        console.log('FuelChart: Перезагрузка данных после смены транспорта');
+        fetchFuelData();
+      }
+    };
+    
+    // Обработчик события принудительного обновления графиков
+    const handleForceUpdate = () => {
+      console.log('FuelChart: Получено событие принудительного обновления');
+      if (vehicle && startDate && endDate) {
+        fetchFuelData();
+      }
+    };
+    
+    // Добавляем слушатели событий
+    window.addEventListener('dateRangeChanged', handleDateRangeChanged);
+    window.addEventListener('dateRangeChangedInTab', handleDateRangeChangedInTab);
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('vehicleChanged', handleVehicleChanged);
+    window.addEventListener('forceUpdateCharts', handleForceUpdate);
+    
+    // Инициализация - проверяем, есть ли даты в состоянии, если нет - берем из localStorage
+    if (!startDate || !endDate) {
+      const { startDate: storedStartDate, endDate: storedEndDate } = getDateRangeFromLocalStorage();
+      
+      if (storedStartDate && storedEndDate) {
+        console.log('FuelChart: Инициализация дат из localStorage:', {
+          startDate: storedStartDate.toISOString(),
+          endDate: storedEndDate.toISOString()
+        });
+        
+        setStartDate(storedStartDate);
+        setEndDate(storedEndDate);
+      } else {
+        // Если в localStorage нет дат, устанавливаем последнюю неделю
+        const now = new Date();
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 7);
+        
+        console.log('FuelChart: Установка дат по умолчанию (неделя):', {
+          startDate: weekAgo.toISOString(),
+          endDate: now.toISOString()
+        });
+        
+        setStartDate(weekAgo);
+        setEndDate(now);
+      }
+    }
+    
+    return () => {
+      // Удаляем слушатели событий при размонтировании
+      window.removeEventListener('dateRangeChanged', handleDateRangeChanged);
+      window.removeEventListener('dateRangeChangedInTab', handleDateRangeChangedInTab);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('vehicleChanged', handleVehicleChanged);
+      window.removeEventListener('forceUpdateCharts', handleForceUpdate);
+      
+      // Отменяем все запросы при размонтировании
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [ensureValidDate, getDateRangeFromLocalStorage, startDate, endDate, vehicle, fetchFuelData]);
+  
+  // Загрузка данных при изменении дат или ТС
+  useEffect(() => {
+    if (vehicle && startDate && endDate) {
+      console.log('FuelChart: Загрузка данных при изменении зависимостей:', { 
+        vehicle: vehicle.imei,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      });
+      fetchFuelData();
+    }
+  }, [vehicle, startDate, endDate, fetchFuelData]);
+  
+  // Форматирование метки для оси Y (значение топлива)
+  const formatFuelLabel = (value) => `${value} л`;
+  
+  // Форматирование метки времени для оси X
+  const formatTimeLabel = (dateTime) => {
+    if (!dateTime) return '';
+    
+    const date = new Date(dateTime);
+    
+    // Проверяем валидность даты
+    if (isNaN(date.getTime())) {
+      return 'Неверная дата';
+    }
+    
+    // Определяем диапазон дат
+    const diffDays = startDate && endDate 
+      ? Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) 
+      : 0;
+    
+    if (diffDays > 30) {
+      // Для больших периодов показываем только день и месяц
+      return date.toLocaleString('ru-RU', {
+        timeZone: 'Asia/Almaty',
+        day: 'numeric', 
+        month: 'numeric'
+      });
+    } else if (diffDays > 3) {
+      // Для периода более 3 дней - день, месяц и время
+      return date.toLocaleString('ru-RU', {
+        timeZone: 'Asia/Almaty',
+        day: 'numeric',
+        month: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } else {
+      // Для коротких периодов показываем только время
+      return date.toLocaleString('ru-RU', {
+        timeZone: 'Asia/Almaty',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
   };
   
   return (
-    <div className="fuel-chart-container" ref={chartContainerRef}>
-      <div className="fuel-chart-header">
+    <div className="fuel-chart-container">
+      {/* <div className="fuel-chart-header">
         <div className="fuel-chart-title">
           <div className="fuel-chart-title-icon">
-            <FontAwesomeIcon icon={faGasPump} />
+             <i className="fa-solid fa-gas-pump"></i>
           </div>
-          График топлива
-          {vehicle && vehicle.name && <span> - {vehicle.name}</span>}
+          <span>График уровня топлива</span>
         </div>
         
-        {renderControls()}
-      </div>
+        <div className="fuel-chart-actions">
+          <div className="fuel-chart-date-info">
+            {dateDebugInfo}
+            {vehicle && <span className="fuel-chart-imei">IMEI: {vehicle.imei}</span>}
+          </div>
+          <button 
+            className="fuel-chart-refresh-btn" 
+            onClick={fetchFuelData} 
+            disabled={isLoading}>
+            <i className="fas fa-sync-alt"></i>
+            {isLoading ? 'Загрузка...' : 'Обновить'}
+          </button>
+        </div>
+      </div> */}
       
-      {renderInfo()}
-      
-      <div className="fuel-stats">
+      {/* <div className="fuel-stats">
         <div className="fuel-stat">
           <div className="fuel-stat-icon">
-            <FontAwesomeIcon icon={faFire} />
+            <i className="fas fa-arrow-up"></i>
           </div>
-          <div className="fuel-stat-value">{statistics.averageConsumption}</div>
-          <div className="fuel-stat-label">Средний расход</div>
+          <div className="fuel-stat-value">{formatNumber(metrics.maxFuel)} л</div>
+          <div className="fuel-stat-label">Максимум</div>
         </div>
+        
         <div className="fuel-stat">
           <div className="fuel-stat-icon">
-            <FontAwesomeIcon icon={faTint} />
+            <i className="fas fa-arrows-alt-v"></i>
           </div>
-          <div className="fuel-stat-value">{statistics.totalConsumption}</div>
-          <div className="fuel-stat-label">Общий расход</div>
+          <div className="fuel-stat-value">{formatNumber(metrics.avgFuel)} л</div>
+          <div className="fuel-stat-label">Среднее</div>
         </div>
+        
         <div className="fuel-stat">
           <div className="fuel-stat-icon">
-            <FontAwesomeIcon icon={faGasPump} />
+            <i className="fas fa-arrow-down"></i>
           </div>
-          <div className="fuel-stat-value">{statistics.refills}</div>
-          <div className="fuel-stat-label">Заправки</div>
+          <div className="fuel-stat-value">{formatNumber(metrics.minFuel)} л</div>
+          <div className="fuel-stat-label">Минимум</div>
         </div>
-        <div className="fuel-stat">
-          <div className="fuel-stat-icon">
-            <FontAwesomeIcon icon={faInfoCircle} />
-          </div>
-          <div className="fuel-stat-value">{statistics.fuelDrains}</div>
-          <div className="fuel-stat-label">Сливы</div>
-        </div>
-      </div>
+      </div> */}
       
       <div className="fuel-chart-content">
         {isLoading ? (
           <div className="chart-loading">
-            Загрузка данных о топливе...
+            <div>Загрузка данных...</div>
+          </div>
+        ) : error ? (
+          <div className="chart-error">
+            <div>{error}</div>
+            <button onClick={fetchFuelData}>Повторить загрузку</button>
+          </div>
+        ) : chartData.length === 0 ? (
+          <div className="chart-empty">
+            <div>Нет данных о топливе за выбранный период</div>
+            <button onClick={fetchFuelData}>Обновить</button>
           </div>
         ) : (
-          chartData ? (
-            <div className="fuel-chart" ref={chartRef}>
-              <Line data={chartData} options={chartOptions} />
-            </div>
-          ) : (
-            <div className="demo-chart-container">
-              <div className="demo-chart-header">
-                <FontAwesomeIcon icon={faInfoCircle} />
-                <span>Демонстрационные данные</span>
-              </div>
-              <Line 
-                data={generateDemoData()} 
-                options={{
-                  ...chartOptions, 
-                  plugins: {
-                    ...chartOptions.plugins, 
-                    title: {
-                      display: true, 
-                      text: 'Демонстрационные данные расхода топлива',
-                      font: { size: 14, weight: 'bold' }
-                    }
-                  }
-                }} 
-              />
-              <div className="demo-data-message">
-                <p>Показаны демонстрационные данные. В реальном приложении здесь будут отображаться фактические данные о расходе топлива.</p>
-              </div>
-            </div>
-          )
+    <BaseChart
+      title="Уровень топлива"
+      vehicle={vehicle}
+      startDate={startDate}
+      endDate={endDate}
+      data={chartData}
+      labels={chartLabels}
+      color="rgb(64, 80, 255)"
+      fetchData={fetchFuelData}
+      formatTooltipLabel={formatFuelLabel}
+      formatYAxisLabel={formatFuelLabel}
+      formatXAxisLabel={formatTimeLabel}
+      emptyDataMessage="Нет данных о топливе за выбранный период"
+      options={{
+        tooltips: {
+          mode: 'index',
+          callbacks: {
+            title: (tooltipItems) => {
+              if (tooltipItems.length > 0) {
+                const dateTime = tooltipItems[0].xLabel;
+                if (dateTime && dateTime instanceof Date) {
+                  return dateTime.toLocaleString('ru-RU', {
+                    timeZone: 'Asia/Almaty',
+                    day: 'numeric',
+                    month: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  });
+                }
+              }
+              return '';
+            }
+          }
+        }
+      }}
+    />
+
+    
         )}
       </div>
     </div>

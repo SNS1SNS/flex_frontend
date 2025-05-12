@@ -15,7 +15,7 @@ import {
   faSyncAlt,
   faSpinner, 
   faExclamationTriangle, 
-  faTimes,
+  faTimes
 } from '@fortawesome/free-solid-svg-icons';
 import FolderService from './FolderService';
 import classNames from 'classnames';
@@ -73,6 +73,15 @@ const FolderList = ({ onVehicleSelect }) => {
   // Инициализация данных при загрузке компонента
   useEffect(() => {
     initData();
+    
+    // Проверяем и создаем папку "Данные по тарифам" при инициализации
+    FolderService.ensureTariffDataFolder().then(exists => {
+      if (!exists) {
+        showNotification('info', 'Создана папка "Данные по тарифам"');
+      }
+    }).catch(error => {
+      console.error('Ошибка при проверке папки "Данные по тарифам":', error);
+    });
   }, []);
   
   // Обработчик для закрытия контекстного меню при клике вне него
@@ -98,6 +107,24 @@ const FolderList = ({ onVehicleSelect }) => {
       onVehicleSelect(selectedVehicle);
     }
   }, [selectedVehicle, onVehicleSelect]);
+
+  // Добавляем эффект для визуального выделения восстановленного из localStorage ТС
+  useEffect(() => {
+    if (selectedVehicle && !loading) {
+      // Удаляем старые выделения из всех ТС
+      const allVehicles = document.querySelectorAll('.vehicle-item');
+      allVehicles.forEach(el => el.classList.remove('selected'));
+      
+      // Добавляем задержку, чтобы DOM успел обновиться
+      setTimeout(() => {
+        // Выделяем выбранное ТС
+        const selectedElement = document.querySelector(`.vehicle-item[data-id="${selectedVehicle.id}"]`);
+        if (selectedElement) {
+          selectedElement.classList.add('selected');
+        }
+      }, 200);
+    }
+  }, [selectedVehicle, loading, folderTree]);
   
   // Инициализация обработчика глобального контекстного меню
   useEffect(() => {
@@ -544,6 +571,9 @@ const FolderList = ({ onVehicleSelect }) => {
         case 'delete':
           await removeVehicleFromFolder(selectedVehicle, selectedFolder.id);
           break;
+        case 'clearSelection':
+          clearSelectedVehicle();
+          break;
         default:
           break;
       }
@@ -552,7 +582,7 @@ const FolderList = ({ onVehicleSelect }) => {
     else if (selectedFolder) {
       switch(action) {
         case 'add-tariff':
-          addTariffToFolder(selectedFolder);
+          addTariffToFolder();
           break;
         case 'add-group': {
           if (selectedFolder.type === 'tariff') {
@@ -837,15 +867,54 @@ const FolderList = ({ onVehicleSelect }) => {
   };
 
   // Функция добавления тарифа в папку "Данные по тарифам"
-  const addTariffToFolder = (folder) => {
-    // Открываем модальное окно создания нового тарифа
-    setNewFolder({
-      name: 'Новый тариф',
-      type: 'tariff',
-      parent_id: folder.id
-    });
-    
-    setShowModal(true);
+  const addTariffToFolder = async () => {
+    try {
+      // Сначала убедимся, что папка "Данные по тарифам" существует
+      await FolderService.ensureTariffDataFolder();
+      
+      // Находим папку "Данные по тарифам" в дереве папок
+      const tariffDataFolder = folderTree.find(f => f.name === 'Данные по тарифам');
+      if (!tariffDataFolder) {
+        // Если папка не найдена в текущем состоянии, обновляем дерево и пробуем снова
+        showNotification('info', 'Обновление дерева папок...');
+        const updatedFolderTree = await FolderService.getFolderTreeWithVehiclesByUserGroup();
+        const adaptedFolderTree = adaptFolderTree(updatedFolderTree);
+        setFolderTree(adaptedFolderTree);
+        
+        // Повторно ищем папку "Данные по тарифам"
+        const refreshedTariffDataFolder = adaptedFolderTree.find(f => f.name === 'Данные по тарифам');
+        if (!refreshedTariffDataFolder) {
+          showNotification('error', 'Не удалось найти папку "Данные по тарифам"');
+          return;
+        }
+        
+        // Открываем модальное окно создания нового тарифа в папке "Данные по тарифам"
+        setNewFolder({
+          name: 'Новый тариф',
+          type: 'tariff',
+          parent_id: refreshedTariffDataFolder.id
+        });
+      } else {
+        // Открываем модальное окно создания нового тарифа в папке "Данные по тарифам"
+        setNewFolder({
+          name: 'Новый тариф',
+          type: 'tariff',
+          parent_id: tariffDataFolder.id
+        });
+      }
+      
+      // Разворачиваем папку "Данные по тарифам" для удобства
+      setExpandedFolders(prev => ({
+        ...prev,
+        [tariffDataFolder ? tariffDataFolder.id : null]: true
+      }));
+      
+      setShowModal(true);
+      showNotification('info', 'Тариф будет создан в папке "Данные по тарифам"');
+    } catch (error) {
+      console.error('Ошибка при подготовке создания тарифа:', error);
+      showNotification('error', `Ошибка: ${error.message}`);
+    }
   };
 
   // Функция добавления группы в тариф
@@ -1016,7 +1085,8 @@ const FolderList = ({ onVehicleSelect }) => {
   // Обработка выбора транспортного средства
   const handleVehicleSelect = (vehicle) => {
     if (selectedVehicle && selectedVehicle.id === vehicle.id) {
-      // Если кликнули на уже выбранное ТС, оставляем выбор
+      // Если кликнули на уже выбранное ТС, сбрасываем выбор
+      clearSelectedVehicle();
       return;
     }
     
@@ -1039,16 +1109,66 @@ const FolderList = ({ onVehicleSelect }) => {
     
     // Сохраняем в localStorage для последующего использования
     try {
-      localStorage.setItem('lastSelectedVehicle', JSON.stringify({
+      // Добавляем временную метку для отслеживания актуальности
+      const vehicleWithTimestamp = {
         id: vehicle.id,
         name: vehicle.name,
         imei: vehicle.imei || '',
         user_group: vehicle.user_group || (vehicle.metadata && vehicle.metadata.user_group) || '',
         timestamp: new Date().getTime()
-      }));
+      };
+      
+      localStorage.setItem('lastSelectedVehicle', JSON.stringify(vehicleWithTimestamp));
+      
+      // Создаем и отправляем пользовательское событие для обновления всех компонентов
+      const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
+        detail: { 
+          vehicle: vehicleWithTimestamp,
+          timestamp: new Date().getTime()
+        }
+      });
+      
+      // Отправляем событие для синхронизации выбора машины между компонентами
+      document.dispatchEvent(forceUpdateEvent);
+      
+      showNotification('success', `Выбрано ТС: ${vehicle.name}`);
     } catch (e) {
       console.warn('Не удалось сохранить данные в localStorage:', e);
+      showNotification('error', 'Не удалось сохранить выбор ТС');
     }
+  };
+
+  // Функция для сброса выбранного ТС
+  const clearSelectedVehicle = () => {
+    // Удаляем выделение из DOM
+    const allVehicles = document.querySelectorAll('.vehicle-item');
+    allVehicles.forEach(el => el.classList.remove('selected'));
+    
+    // Очищаем состояние
+    setSelectedVehicle(null);
+    
+    // Удаляем из localStorage
+    try {
+      localStorage.removeItem('lastSelectedVehicle');
+      
+      // Отправляем событие сброса выбора
+      const clearEvent = new CustomEvent('forceVehicleUpdate', {
+        detail: { 
+          vehicle: null,
+          timestamp: new Date().getTime()
+        }
+      });
+      document.dispatchEvent(clearEvent);
+    } catch (e) {
+      console.warn('Ошибка при удалении данных из localStorage:', e);
+    }
+    
+    // Уведомляем родительский компонент
+    if (onVehicleSelect) {
+      onVehicleSelect(null);
+    }
+    
+    showNotification('info', 'Выбор транспортного средства отменен');
   };
 
   // Функция для рендеринга транспортного средства
@@ -1082,8 +1202,6 @@ const FolderList = ({ onVehicleSelect }) => {
       </div>
     );
   };
-
- 
 
   // Функция для рендеринга отдельной папки
   const renderFolder = (folder) => {
@@ -1261,6 +1379,11 @@ const FolderList = ({ onVehicleSelect }) => {
               <div className="context-menu-separator"></div>
               
               <div className="context-menu-group">
+                <div className="context-menu-item" onClick={() => handleContextMenuAction('clearSelection')}>
+                  <FontAwesomeIcon icon={faTimes} className="text-secondary" />
+                  <span>Отменить выбор</span>
+                </div>
+                
                 <div className="context-menu-item context-menu-item-danger" onClick={() => handleContextMenuAction('delete')}>
                   <FontAwesomeIcon icon={faTrashAlt} />
                   <span>Удалить из группы</span>
@@ -1428,6 +1551,13 @@ const FolderList = ({ onVehicleSelect }) => {
               <FontAwesomeIcon icon={faSyncAlt} className="text-info" />
               <span>Обновить список</span>
             </div>
+            
+            {selectedVehicle && (
+              <div className="context-menu-item" onClick={() => clearSelectedVehicle()}>
+                <FontAwesomeIcon icon={faTimes} className="text-secondary" />
+                <span>Отменить выбор ТС</span>
+              </div>
+            )}
           </div>
           
           <div className="context-menu-separator"></div>

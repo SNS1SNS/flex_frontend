@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
 import VehiclesPage from './components/VehiclesPage';
+import VehicleProfile from './components/VehicleProfile';
 import DriversPage from './components/DriversPage';
 import UsersPage from './components/UsersPage';
 import ReportsPage from './components/reports/ReportsPage';
@@ -46,6 +47,16 @@ function App() {
                 element={
                   <PrivateRoute>
                     <VehiclesPage />
+                  </PrivateRoute>
+                } 
+              />
+              
+              {/* Маршрут для страницы профиля ТС */}
+              <Route 
+                path="/admin/vehicles/profile" 
+                element={
+                  <PrivateRoute>
+                    <VehicleProfile />
                   </PrivateRoute>
                 } 
               />

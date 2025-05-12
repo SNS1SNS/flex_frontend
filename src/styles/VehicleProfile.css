@@ -1,0 +1,364 @@
+/* Стили для эффекта обновления таблицы */
+.table-updated {
+  animation: tableUpdate 1s ease-in-out;
+}
+
+@keyframes tableUpdate {
+  0% {
+    background-color: rgba(0, 123, 255, 0.1);
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.6);
+  }
+  50% {
+    background-color: rgba(0, 123, 255, 0.15);
+    box-shadow: 0 0 12px rgba(0, 123, 255, 0.8);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+/* Стили для сообщения об ошибке в таблице */
+.calibration-error {
+  background-color: #fff3f3;
+  border: 1px solid #ffcccb;
+  border-radius: 5px;
+  padding: 15px;
+  margin-bottom: 15px;
+  color: #d63031;
+}
+
+/* Стили для калибровочных таблиц */
+.calibration-table {
+  background-color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+  border: 1px solid #e9ecef;
+}
+
+.calibration-tables-container {
+  width: 100%;
+  max-height: 950px;
+  overflow-y: auto;
+  padding: 15px;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc #f5f5f5;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  margin-top: 15px;
+  box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+}
+
+.calibration-tables-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.calibration-tables-container::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 10px;
+}
+
+.calibration-tables-container::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 10px;
+  border: 2px solid #f5f5f5;
+}
+
+.calibration-tables-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(3, auto);
+  gap: 20px;
+  width: 100%;
+  grid-auto-rows: 1fr;
+}
+
+.calibration-table-cell {
+  min-width: 0;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.calibration-table-cell .calibration-table {
+  height: 100%;
+  margin-bottom: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+/* Компактные заголовки секций */
+.calibration-table h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.calibration-table h3 svg {
+  margin-right: 8px;
+}
+
+/* Более компактное отображение информации */
+.calibration-format-info {
+  font-size: 13px;
+  margin: 5px 0;
+  line-height: 1.3;
+}
+
+.excel-format-info {
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 12px;
+  margin-top: 5px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.excel-format-info svg {
+  margin-right: 8px;
+  margin-top: 2px;
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.calibration-table-cell .calibration-grid {
+  max-height: 200px;
+  margin: 15px 0;
+  flex-grow: 1;
+}
+
+.calibration-table-cell .calibration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px;
+}
+
+.calibration-table-cell .calibration-actions button {
+  font-size: 12px;
+  padding: 5px 8px;
+  flex-grow: 1;
+}
+
+/* Стили для респонсивности на маленьких экранах */
+@media (max-width: 1200px) {
+  .calibration-tables-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, auto);
+  }
+}
+
+@media (max-width: 768px) {
+  .calibration-tables-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+}
+
+/* Стили для предупреждения о превышении количества датчиков */
+.sensors-warning {
+  margin-top: 15px;
+  padding: 10px 15px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 5px;
+  color: #856404;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.sensors-warning svg {
+  margin-right: 10px;
+  font-size: 18px;
+}
+
+/* Более компактное отображение таблицы */
+.calibration-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 30px;
+  gap: 5px;
+  margin: 10px 0;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 5px;
+  flex-grow: 1;
+}
+
+.calibration-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calibration-grid::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 10px;
+}
+
+.calibration-grid::-webkit-scrollbar-thumb {
+  background-color: #ddd;
+  border-radius: 10px;
+}
+
+.calibration-grid .header {
+  font-weight: bold;
+  background-color: #f8f9fa;
+  padding: 8px;
+  border-radius: 4px;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.calibration-grid .editable {
+  background-color: #f8f9fa;
+  padding: 5px 8px;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.calibration-grid .editable:focus {
+  background-color: #fff;
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.calibration-grid .delete-header {
+  min-width: 30px;
+}
+
+.calibration-grid .delete-row-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background-color: #f8f9fa;
+  color: #6c757d;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.calibration-grid .delete-row-btn:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+/* Стили для секции с калибровочными таблицами */
+.calibration-section .section-content {
+  padding-bottom: 15px;
+}
+
+/* Улучшенные стили для кнопок */
+.calibration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.calibration-actions button {
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #495057;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-grow: 1;
+  white-space: nowrap;
+}
+
+.calibration-actions button svg {
+  margin-right: 5px;
+}
+
+.add-row-btn:hover {
+  background-color: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.save-table-btn:hover {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.import-excel-btn:hover {
+  background-color: #6610f2;
+  color: white;
+  border-color: #6610f2;
+}
+
+.export-excel-btn:hover {
+  background-color: #17a2b8;
+  color: white;
+  border-color: #17a2b8;
+}
+
+/* Кнопка сохранения всех настроек датчиков */
+.btn-profile {
+  padding: 10px 15px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.btn-profile svg {
+  margin-right: 8px;
+}
+
+.btn-profile:hover {
+  background-color: #0069d9;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-profile:active {
+  transform: translateY(1px);
+}
+
+.btn-profile:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Контейнер для кнопки сохранения настроек датчиков */
+.info-row.mt-4.text-center {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+} 

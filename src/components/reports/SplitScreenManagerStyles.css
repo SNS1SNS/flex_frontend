@@ -1,0 +1,160 @@
+/* Стили для компонента SplitScreenManager */
+
+.split-screen-manager {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Контролы разделения экрана */
+.split-screen-controls {
+  display: flex;
+  align-items: center;
+  background-color: #f8f9fc;
+  border-bottom: 1px solid #e3e6f0;
+  padding: 8px 15px;
+  height: 50px;
+  z-index: 100;
+}
+
+.split-mode-button {
+  background: white;
+  border: 1px solid #d1d3e2;
+  border-radius: 4px;
+  color: #4e73df;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 10px;
+  transition: all 0.2s ease;
+}
+
+.split-mode-button:hover {
+  background: #f8f9fc;
+  border-color: #4e73df;
+}
+
+.split-mode-button.active {
+  background: #4e73df;
+  color: white;
+  border-color: #4e73df;
+}
+
+.fullscreen-button {
+  margin-left: auto;
+  background: #1cc88a;
+  color: white;
+  border-color: #1cc88a;
+}
+
+.fullscreen-button:hover {
+  background: #169c6a;
+  border-color: #169c6a;
+}
+
+/* Контейнер для разделенных панелей */
+.split-screen-container {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Стили для различных режимов разделения */
+.split-screen-manager.single .split-screen-container {
+  flex-direction: column;
+}
+
+.split-screen-manager.horizontal .split-screen-container {
+  flex-direction: column;
+}
+
+.split-screen-manager.vertical .split-screen-container {
+  flex-direction: row;
+}
+
+.split-screen-manager.quad .split-screen-container {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+/* Панели для размещения отчетов */
+.split-panel {
+  overflow: hidden;
+  border: 1px solid #e3e6f0;
+  background: white;
+}
+
+/* Размеры панелей для разных режимов */
+.split-panel.single {
+  width: 100%;
+  height: 100%;
+}
+
+.split-panel.horizontal {
+  width: 100%;
+  height: 50%;
+}
+
+.split-panel.vertical {
+  width: 50%;
+  height: 100%;
+}
+
+.split-panel.quad {
+  width: 50%;
+  height: 50%;
+}
+
+/* Заглушка для пустых панелей */
+.split-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: #f8f9fc;
+  color: #858796;
+  font-size: 16px;
+  text-align: center;
+}
+
+/* Полноэкранный режим */
+.split-screen-manager.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: white;
+}
+
+/* Адаптивные стили для маленьких экранов */
+@media (max-width: 768px) {
+  .split-screen-manager.vertical .split-screen-container,
+  .split-screen-manager.quad .split-screen-container {
+    flex-direction: column;
+  }
+  
+  .split-panel.vertical,
+  .split-panel.quad {
+    width: 100%;
+    height: 50%;
+  }
+  
+  .split-screen-controls {
+    padding: 5px;
+  }
+  
+  .split-mode-button {
+    width: 32px;
+    height: 32px;
+    margin-right: 5px;
+  }
+} 

@@ -113,11 +113,13 @@ const ReportsPage = () => {
         // Начало недели (понедельник)
         start = new Date(today);
         start.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
+        start.setHours(0, 0, 0, 0);
         end = new Date(today.setHours(23, 59, 59, 999));
         break;
       case 'month':
         // Начало месяца
         start = new Date(today.getFullYear(), today.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
         end = new Date(today.setHours(23, 59, 59, 999));
         break;
       default:
