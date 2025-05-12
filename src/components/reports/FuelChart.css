@@ -1,13 +1,13 @@
 /* Основная структура контейнера графика топлива */
 .fuel-chart-container {
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #ffffff;
+  overflow: hidden;
+  background: #fff;
   border-radius: 8px;
-  box-shadow: 0 1px 10px rgba(0, 0, 0, 0.05);
-  margin-bottom: 20px;
-  height: 100%;
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .fuel-chart-container:fullscreen {
@@ -189,8 +189,9 @@
 
 .fuel-chart-content {
   flex: 1;
-  min-height: 350px;
+  display: flex;
   position: relative;
+  min-height: 200px;
 }
 
 .fuel-chart {
@@ -198,62 +199,176 @@
   min-height: 350px;
 }
 
-/* Общие стили для состояний загрузки, ошибки и пустых данных */
-.chart-loading {
+/* Стили для компонента KalmanFilterControls */
+.kalman-filter-controls {
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.filter-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.filter-header h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #343a40;
+}
+
+.filter-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.param-control {
+  flex: 1;
+  min-width: 200px;
+}
+
+.param-control label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 13px;
+  color: #495057;
+}
+
+.param-control input[type="range"] {
+  width: 100%;
+  height: 6px;
+  background: #dee2e6;
+  outline: none;
+  -webkit-appearance: none;
+  border-radius: 3px;
+}
+
+.param-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #4050ff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.param-control input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #4050ff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* Стили для переключателя */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .3s;
+  transition: .3s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  -webkit-transition: .3s;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #ff4040;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #ff4040;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(18px);
+  -ms-transform: translateX(18px);
+  transform: translateX(18px);
+}
+
+.toggle-label {
+  margin-left: 50px;
+  font-size: 13px;
+  color: #495057;
+}
+
+/* Стили для сообщений о загрузке и ошибках */
+.chart-loading,
+.chart-error,
+.chart-empty {
+  width: 100%;
   height: 100%;
-  min-height: 350px;
-  color: #5e6e82;
-  font-size: 14px;
-  background-color: #f9fbfd;
-  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+.chart-loading div,
+.chart-error div,
+.chart-empty div {
+  margin-bottom: 15px;
 }
 
 .chart-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  color: #e53935;
-  font-size: 16px;
-  gap: 16px;
-  padding: 20px;
-  text-align: center;
-}
-
-.chart-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  color: #888;
-  font-size: 16px;
-  gap: 16px;
-  padding: 20px;
-  text-align: center;
+  color: #dc3545;
 }
 
 .chart-error button,
 .chart-empty button {
-  background-color: #f0ad4e;
+  margin-top: 10px;
+  padding: 8px 16px;
+  background-color: #4050ff;
   color: white;
   border: none;
   border-radius: 4px;
-  padding: 8px 16px;
-  font-size: 14px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  font-size: 14px;
+  transition: background-color 0.2s;
 }
 
 .chart-error button:hover,
 .chart-empty button:hover {
-  background-color: #e0a800;
+  background-color: #3040ef;
 }
 
 /* Легенда графика */

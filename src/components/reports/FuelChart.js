@@ -2,14 +2,29 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import BaseChart from './BaseChart';
 import { getAuthToken } from '../../utils/authUtils';
 import { toast } from 'react-toastify';
+import KalmanFilter from '../../utils/KalmanFilter';
 import './FuelChart.css';
+
+// Статические параметры фильтра Калмана
+const KALMAN_PROCESS_NOISE = 0.0175;  // Q - шум процесса
+const KALMAN_MEASUREMENT_NOISE = 1.90; // R - шум измерения
 
 const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }) => {
   const [chartData, setChartData] = useState([]);
   const [chartLabels, setChartLabels] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showFiltered, setShowFiltered] = useState(true);
+  const [kalmanParams, setKalmanParams] = useState({
+    processNoise: KALMAN_PROCESS_NOISE,
+    measurementNoise: KALMAN_MEASUREMENT_NOISE
+  });
   const abortControllerRef = useRef(null);
+  const kalmanFilterRef = useRef(new KalmanFilter(
+    KALMAN_PROCESS_NOISE, 
+    KALMAN_MEASUREMENT_NOISE
+  ));
   
   // Состояние для хранения дат, которые будут синхронизироваться с localStorage
   const [startDate, setStartDate] = useState(propsStartDate || null);
@@ -147,6 +162,7 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
         console.warn('FuelChart: Получен неверный формат данных:', data);
         setChartData([]);
         setChartLabels([]);
+        setFilteredData([]);
         return;
       }
       
@@ -166,11 +182,12 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
     }
   }, [vehicle, startDate, endDate]);
   
-  // Обработка данных о топливе
+  // Обработка данных о топливе и применение фильтра Калмана
   const processFuelData = useCallback((data) => {
     if (!data || !data.data || !Array.isArray(data.data) || data.data.length === 0) {
       setChartData([]);
       setChartLabels([]);
+      setFilteredData([]);
       return;
     }
     
@@ -183,14 +200,47 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
     const labels = sortedData.map(item => new Date(item.time));
     const fuelValues = sortedData.map(item => item.liters);
     
+    // Применяем фильтр Калмана к данным
+    // Сначала убедимся, что фильтр настроен с актуальными параметрами
+    kalmanFilterRef.current.setParams(kalmanParams);
+    kalmanFilterRef.current.reset(fuelValues[0] || 0); // Инициализируем первым значением
+    
+    // Применяем фильтрацию
+    const filtered = kalmanFilterRef.current.filterArray(fuelValues);
+    
     // Сохраняем данные для графика
     setChartLabels(labels);
     setChartData(fuelValues);
+    setFilteredData(filtered);
     
     console.log('FuelChart: Данные обработаны:', {
       labels: labels.length,
-      values: fuelValues.length,
+      rawValues: fuelValues.length,
+      filteredValues: filtered.length
     });
+  }, [kalmanParams]);
+  
+  // Функция для обновления параметров фильтра Калмана
+  const updateKalmanParams = useCallback((newParams) => {
+    setKalmanParams(prevParams => {
+      const updatedParams = { ...prevParams, ...newParams };
+      console.log('FuelChart: Обновление параметров фильтра Калмана:', updatedParams);
+      
+      // Если у нас уже есть данные, применяем новые параметры фильтрации
+      if (chartData.length > 0) {
+        kalmanFilterRef.current.setParams(updatedParams);
+        kalmanFilterRef.current.reset(chartData[0] || 0);
+        const newFiltered = kalmanFilterRef.current.filterArray(chartData);
+        setFilteredData(newFiltered);
+      }
+      
+      return updatedParams;
+    });
+  }, [chartData]);
+  
+  // Переключение отображения исходных/отфильтрованных данных
+  const toggleFiltered = useCallback(() => {
+    setShowFiltered(prev => !prev);
   }, []);
   
   // Эффект для инициализации дат из localStorage и подписки на их изменение
@@ -518,56 +568,84 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
     }
   };
   
+  // Создаем данные для графика с двумя линиями
+  const getChartConfig = () => {
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: 'Исходные данные',
+          data: chartData,
+          fill: false,
+          backgroundColor: 'rgba(64, 80, 255, 0.2)',
+          borderColor: 'rgb(64, 80, 255)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          tension: 0,
+        },
+        {
+          label: 'Фильтр Калмана',
+          data: showFiltered ? filteredData : [],
+          fill: false,
+          backgroundColor: 'rgba(255, 64, 64, 0.2)',
+          borderColor: 'rgb(255, 64, 64)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          tension: 0,
+        }
+      ]
+    };
+  };
+  
+  // Компонент для панели управления параметрами фильтра Калмана
+  // const KalmanFilterControls = () => (
+  //   <div className="kalman-filter-controls">
+  //     <div className="filter-header">
+  //       <h4>Параметры фильтра Калмана</h4>
+  //       <label className="toggle-switch">
+  //         <input 
+  //           type="checkbox" 
+  //           checked={showFiltered} 
+  //           onChange={toggleFiltered} 
+  //         />
+  //         <span className="slider"></span>
+  //         <span className="toggle-label">Показать фильтрацию</span>
+  //       </label>
+  //     </div>
+  //     <div className="filter-params">
+  //       <div className="param-control">
+  //         <label>Шум процесса (Q): {kalmanParams.processNoise.toFixed(4)}</label>
+  //         <input 
+  //           type="range" 
+  //           min="0.0001" 
+  //           max="0.1" 
+  //           step="0.0001" 
+  //           value={kalmanParams.processNoise} 
+  //           onChange={(e) => updateKalmanParams({ processNoise: parseFloat(e.target.value) })} 
+  //           disabled
+  //         />
+  //       </div>
+  //       <div className="param-control">
+  //         <label>Шум измерения (R): {kalmanParams.measurementNoise.toFixed(2)}</label>
+  //         <input 
+  //           type="range" 
+  //           min="0.1" 
+  //           max="10" 
+  //           step="0.1" 
+  //           value={kalmanParams.measurementNoise} 
+  //           onChange={(e) => updateKalmanParams({ measurementNoise: parseFloat(e.target.value) })} 
+  //           disabled
+  //         />
+  //       </div>
+  //     </div>
+  //   </div>
+  // );
+  
   return (
     <div className="fuel-chart-container">
-      {/* <div className="fuel-chart-header">
-        <div className="fuel-chart-title">
-          <div className="fuel-chart-title-icon">
-             <i className="fa-solid fa-gas-pump"></i>
-          </div>
-          <span>График уровня топлива</span>
-        </div>
-        
-        <div className="fuel-chart-actions">
-          <div className="fuel-chart-date-info">
-            {dateDebugInfo}
-            {vehicle && <span className="fuel-chart-imei">IMEI: {vehicle.imei}</span>}
-          </div>
-          <button 
-            className="fuel-chart-refresh-btn" 
-            onClick={fetchFuelData} 
-            disabled={isLoading}>
-            <i className="fas fa-sync-alt"></i>
-            {isLoading ? 'Загрузка...' : 'Обновить'}
-          </button>
-        </div>
-      </div> */}
-      
-      {/* <div className="fuel-stats">
-        <div className="fuel-stat">
-          <div className="fuel-stat-icon">
-            <i className="fas fa-arrow-up"></i>
-          </div>
-          <div className="fuel-stat-value">{formatNumber(metrics.maxFuel)} л</div>
-          <div className="fuel-stat-label">Максимум</div>
-        </div>
-        
-        <div className="fuel-stat">
-          <div className="fuel-stat-icon">
-            <i className="fas fa-arrows-alt-v"></i>
-          </div>
-          <div className="fuel-stat-value">{formatNumber(metrics.avgFuel)} л</div>
-          <div className="fuel-stat-label">Среднее</div>
-        </div>
-        
-        <div className="fuel-stat">
-          <div className="fuel-stat-icon">
-            <i className="fas fa-arrow-down"></i>
-          </div>
-          <div className="fuel-stat-value">{formatNumber(metrics.minFuel)} л</div>
-          <div className="fuel-stat-label">Минимум</div>
-        </div>
-      </div> */}
+      {/* <KalmanFilterControls /> */}
       
       <div className="fuel-chart-content">
         {isLoading ? (
@@ -585,45 +663,41 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
             <button onClick={fetchFuelData}>Обновить</button>
           </div>
         ) : (
-    <BaseChart
-      title="Уровень топлива"
-      vehicle={vehicle}
-      startDate={startDate}
-      endDate={endDate}
-      data={chartData}
-      labels={chartLabels}
-      color="rgb(64, 80, 255)"
-      fetchData={fetchFuelData}
-      formatTooltipLabel={formatFuelLabel}
-      formatYAxisLabel={formatFuelLabel}
-      formatXAxisLabel={formatTimeLabel}
-      emptyDataMessage="Нет данных о топливе за выбранный период"
-      options={{
-        tooltips: {
-          mode: 'index',
-          callbacks: {
-            title: (tooltipItems) => {
-              if (tooltipItems.length > 0) {
-                const dateTime = tooltipItems[0].xLabel;
-                if (dateTime && dateTime instanceof Date) {
-                  return dateTime.toLocaleString('ru-RU', {
-                    timeZone: 'Asia/Almaty',
-                    day: 'numeric',
-                    month: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                  });
+          <BaseChart
+            title="Уровень топлива"
+            vehicle={vehicle}
+            startDate={startDate}
+            endDate={endDate}
+            data={getChartConfig()}
+            fetchData={fetchFuelData}
+            formatTooltipLabel={formatFuelLabel}
+            formatYAxisLabel={formatFuelLabel}
+            formatXAxisLabel={formatTimeLabel}
+            emptyDataMessage="Нет данных о топливе за выбранный период"
+            options={{
+              tooltips: {
+                mode: 'index',
+                callbacks: {
+                  title: (tooltipItems) => {
+                    if (tooltipItems.length > 0) {
+                      const dateTime = tooltipItems[0].xLabel;
+                      if (dateTime && dateTime instanceof Date) {
+                        return dateTime.toLocaleString('ru-RU', {
+                          timeZone: 'Asia/Almaty',
+                          day: 'numeric',
+                          month: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        });
+                      }
+                    }
+                    return '';
+                  }
                 }
               }
-              return '';
-            }
-          }
-        }
-      }}
-    />
-
-    
+            }}
+          />
         )}
       </div>
     </div>

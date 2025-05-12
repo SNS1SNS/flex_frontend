@@ -48,6 +48,19 @@ const BaseChart = ({
 
   // Создание и настройка данных для графика
   useEffect(() => {
+    if (data === null || data === undefined) {
+      setChartData(null);
+      return;
+    }
+
+    // Проверяем, передан ли уже готовый config для графика
+    if (data.datasets) {
+      // Если передан готовый конфиг с наборами данных, используем его напрямую
+      setChartData(data);
+      return;
+    }
+
+    // Старая логика для обратной совместимости
     if (!labels || !data) {
       setChartData(null);
       return;
