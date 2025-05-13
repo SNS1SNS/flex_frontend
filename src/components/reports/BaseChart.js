@@ -294,6 +294,65 @@ const BaseChart = ({
     };
   }, [containerId]);
 
+  // Эффект для регистрации обработчика события запроса выбора отчета
+  useEffect(() => {
+    // Функция-обработчик запроса выбора отчета
+    const handleRequestReportSelector = (event) => {
+      const { containerId, direction, activateContainer } = event.detail;
+      
+      console.log(`BaseChart: Получен запрос на открытие селектора отчетов для контейнера ${containerId}`);
+      
+      // Устанавливаем целевой контейнер и открываем выбор отчета
+      setContainerToFill(containerId);
+      
+      // Активируем контейнер для выбора отчета, если требуется
+      if (activateContainer) {
+        const container = document.getElementById(containerId) || 
+                         document.querySelector(`[data-container-id="${containerId}"]`);
+        
+        if (container) {
+          // Сначала снимаем активность со всех контейнеров
+          document.querySelectorAll('.split-screen-container[data-active="true"]')
+            .forEach(el => {
+              el.setAttribute('data-active', 'false');
+              el.classList.remove('active-container');
+            });
+          
+          // Активируем наш контейнер
+          container.setAttribute('data-active', 'true');
+          container.classList.add('active-container');
+          
+          console.log(`BaseChart: Активирован контейнер ${containerId} для выбора отчета`);
+        }
+      }
+      
+      // Открываем выбор отчета
+      console.log('BaseChart: Открываем диалог выбора отчета (setShowReportChooser(true))');
+      setShowReportChooser(true);
+      
+      // Если указано направление разделения, сохраняем его
+      if (direction) {
+        setSplitDirection(direction);
+      }
+      
+      // Проверяем, что диалог действительно открылся через небольшую задержку
+      setTimeout(() => {
+        if (!showReportChooser) {
+          console.warn('BaseChart: Диалог выбора отчета не открылся автоматически, пробуем еще раз');
+          setShowReportChooser(true);
+        }
+      }, 300);
+    };
+    
+    // Добавляем обработчик события
+    document.addEventListener('requestReportSelector', handleRequestReportSelector);
+    
+    // Очистка при размонтировании
+    return () => {
+      document.removeEventListener('requestReportSelector', handleRequestReportSelector);
+    };
+  }, []);
+
   // Функция загрузки данных
   const loadData = async () => {
     if (!vehicle || !startDate || !endDate) {
@@ -412,9 +471,9 @@ const BaseChart = ({
     const targetContainerId = container.id || container.getAttribute('data-container-id');
     if (!targetContainerId) {
       console.error('BaseChart: У контейнера нет ID для разделения');
-      return;
-    }
-    
+        return;
+      }
+      
     console.log(`BaseChart: Разделяем контейнер ${targetContainerId} горизонтально`);
     
     // Создаем пользовательское событие для запроса на разделение
@@ -495,6 +554,14 @@ const BaseChart = ({
         // создаем отчет для этого контейнера
         console.log(`BaseChart: Создаем отчет типа ${selectedReportType} для контейнера ${containerToFill}`);
         
+        // Дополнительный вывод для отладки информации о состоянии и контейнере
+        console.log('BaseChart: Детали создания отчета:', { 
+          containerToFill,
+          vehicle,
+          startDate, 
+          endDate 
+        });
+      
         // Создаем отчет через систему событий
         const createEvent = new CustomEvent('createReport', {
           detail: {
@@ -503,11 +570,21 @@ const BaseChart = ({
             vehicle: vehicle,
             startDate: startDate,
             endDate: endDate,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            // Добавляем пометку, что это важное событие
+            priority: 'high'
           }
         });
         
-        document.dispatchEvent(createEvent);
+        // Небольшая задержка перед отправкой события для гарантии готовности DOM
+        setTimeout(() => {
+          document.dispatchEvent(createEvent);
+          
+          // Добавляем визуальную обратную связь для подтверждения выбора отчета
+          if (window.showNotification) {
+            window.showNotification('success', `Отчет "${selectedReportType}" добавлен в контейнер`);
+          }
+        }, 100);
         
         // Сбрасываем контейнер
         setContainerToFill(null);
@@ -543,6 +620,11 @@ const BaseChart = ({
       setSplitDirection(null);
     } catch (error) {
       console.error('BaseChart: Ошибка при обработке выбора отчета:', error);
+      
+      // Показываем ошибку в уведомлении, если доступно
+      if (window.showNotification) {
+        window.showNotification('error', 'Ошибка при создании отчета: ' + (error.message || 'Неизвестная ошибка'));
+      }
     }
   };
 

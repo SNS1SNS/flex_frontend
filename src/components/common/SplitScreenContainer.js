@@ -140,7 +140,45 @@ const SplitScreenContainer = ({
             }
           });
           document.dispatchEvent(event);
-        }, 50);
+          
+          console.log(`SplitScreenContainer: Отправляем запрос на открытие селектора отчётов для контейнера ${container2Id}`);
+          
+          // Сразу после завершения разделения создаем событие для запроса выбора отчета
+          const selectReportEvent = new CustomEvent('requestReportSelector', {
+            detail: {
+              containerId: container2Id,
+              parentContainerId: id,
+              originalContainerId: containerId,
+              direction: direction,
+              timestamp: Date.now(),
+              // Добавляем признак активации
+              activateContainer: true
+            }
+          });
+          
+          // Даем немного времени на обновление DOM, увеличиваем задержку
+          setTimeout(() => {
+            // Проверяем, что DOM-элемент контейнера существует перед отправкой события
+            const targetContainer = document.getElementById(container2Id);
+            if (targetContainer) {
+              console.log(`SplitScreenContainer: Найден DOM-элемент контейнера ${container2Id}, отправляем событие запроса отчёта`);
+              document.dispatchEvent(selectReportEvent);
+            } else {
+              console.warn(`SplitScreenContainer: DOM-элемент контейнера ${container2Id} не найден, используем поиск по атрибутам`);
+              
+              // Попытка найти элемент по другим атрибутам
+              const containers = document.querySelectorAll(`[data-container-id="${container2Id}"]`);
+              if (containers.length > 0) {
+                console.log(`SplitScreenContainer: Найден контейнер по атрибуту data-container-id`);
+                document.dispatchEvent(selectReportEvent);
+              } else {
+                // Отправка события даже если элемент не найден - BaseChart должен сам найти целевой контейнер
+                console.log(`SplitScreenContainer: Элемент не найден, но всё равно отправляем событие`);
+                document.dispatchEvent(selectReportEvent);
+              }
+            }
+          }, 300);
+        }, 100);
       }
     };
     
