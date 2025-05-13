@@ -630,8 +630,6 @@ const VoltageChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDat
       // Для периода до 3 дней: ДД.ММ ЧЧ:MM
       return date.toLocaleString('ru-RU', {
         timeZone: 'Asia/Almaty',
-        day: 'numeric',
-        month: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       });

@@ -3,7 +3,7 @@ import BaseChart from './BaseChart';
 import { getAuthToken } from '../../utils/authUtils';
 import { toast } from 'react-toastify';
 import KalmanFilter from '../../utils/KalmanFilter';
-import './FuelChart.css';
+import './ChartStyles.css';
 
 // Статические параметры фильтра Калмана
 const KALMAN_PROCESS_NOISE = 0.0275;  // Q - шум процесса
@@ -221,6 +221,8 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
   }, [kalmanParams]);
   
   // Функция для обновления параметров фильтра Калмана
+  // Примечание: функция не используется в текущей реализации, но оставлена для будущих улучшений
+  // eslint-disable-next-line no-unused-vars
   const updateKalmanParams = useCallback((newParams) => {
     setKalmanParams(prevParams => {
       const updatedParams = { ...prevParams, ...newParams };
@@ -239,6 +241,8 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
   }, [chartData]);
   
   // Переключение отображения исходных/отфильтрованных данных
+  // Примечание: функция не используется в текущей реализации, но оставлена для будущих улучшений
+  // eslint-disable-next-line no-unused-vars
   const toggleFiltered = useCallback(() => {
     setShowFiltered(prev => !prev);
   }, []);
@@ -599,109 +603,70 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
     };
   };
   
-  // Компонент для панели управления параметрами фильтра Калмана
-  // const KalmanFilterControls = () => (
-  //   <div className="kalman-filter-controls">
-  //     <div className="filter-header">
-  //       <h4>Параметры фильтра Калмана</h4>
-  //       <label className="toggle-switch">
-  //         <input 
-  //           type="checkbox" 
-  //           checked={showFiltered} 
-  //           onChange={toggleFiltered} 
-  //         />
-  //         <span className="slider"></span>
-  //         <span className="toggle-label">Показать фильтрацию</span>
-  //       </label>
-  //     </div>
-  //     <div className="filter-params">
-  //       <div className="param-control">
-  //         <label>Шум процесса (Q): {kalmanParams.processNoise.toFixed(4)}</label>
-  //         <input 
-  //           type="range" 
-  //           min="0.0001" 
-  //           max="0.1" 
-  //           step="0.0001" 
-  //           value={kalmanParams.processNoise} 
-  //           onChange={(e) => updateKalmanParams({ processNoise: parseFloat(e.target.value) })} 
-  //           disabled
-  //         />
-  //       </div>
-  //       <div className="param-control">
-  //         <label>Шум измерения (R): {kalmanParams.measurementNoise.toFixed(2)}</label>
-  //         <input 
-  //           type="range" 
-  //           min="0.1" 
-  //           max="10" 
-  //           step="0.1" 
-  //           value={kalmanParams.measurementNoise} 
-  //           onChange={(e) => updateKalmanParams({ measurementNoise: parseFloat(e.target.value) })} 
-  //           disabled
-  //         />
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
+  // Настройки графика
+  const getChartOptions = () => {
+    return {
+      tooltips: {
+        mode: 'index',
+        callbacks: {
+          title: (tooltipItems) => {
+            if (tooltipItems.length > 0) {
+              const dateTime = tooltipItems[0].xLabel;
+              if (dateTime && dateTime instanceof Date) {
+                return dateTime.toLocaleString('ru-RU', {
+                  timeZone: 'Asia/Almaty',
+                  day: 'numeric',
+                  month: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                });
+              }
+            }
+            return '';
+          }
+        }
+      }
+    };
+  };
   
   return (
-    <div className="fuel-chart-container">
-      {/* <KalmanFilterControls /> */}
+    <>
+      {/* Панель управления фильтром Калмана */}
+      {/* {showFiltered && (
+        <div className="kalman-filter-controls">
+          <div className="filter-header">
+            <h4>Параметры фильтра Калмана</h4>
+            <label className="toggle-switch">
+              <input 
+                type="checkbox" 
+                checked={showFiltered} 
+                onChange={() => setShowFiltered(prev => !prev)} 
+              />
+              <span className="slider"></span>
+              <span className="toggle-label">Показать фильтрацию</span>
+            </label>
+          </div>
+        </div>
+      )} */}
       
-      <div className="fuel-chart-content">
-        {isLoading ? (
-          <div className="chart-loading">
-            <div>Загрузка данных...</div>
-          </div>
-        ) : error ? (
-          <div className="chart-error">
-            <div>{error}</div>
-            <button onClick={fetchFuelData}>Повторить загрузку</button>
-          </div>
-        ) : chartData.length === 0 ? (
-          <div className="chart-empty">
-            <div>Нет данных о топливе за выбранный период</div>
-            <button onClick={fetchFuelData}>Обновить</button>
-          </div>
-        ) : (
-          <BaseChart
-            title="Уровень топлива"
-            vehicle={vehicle}
-            startDate={startDate}
-            endDate={endDate}
-            data={getChartConfig()}
-            fetchData={fetchFuelData}
-            formatTooltipLabel={formatFuelLabel}
-            formatYAxisLabel={formatFuelLabel}
-            formatXAxisLabel={formatTimeLabel}
-            emptyDataMessage="Нет данных о топливе за выбранный период"
-            reportType="fuel"
-            options={{
-              tooltips: {
-                mode: 'index',
-                callbacks: {
-                  title: (tooltipItems) => {
-                    if (tooltipItems.length > 0) {
-                      const dateTime = tooltipItems[0].xLabel;
-                      if (dateTime && dateTime instanceof Date) {
-                        return dateTime.toLocaleString('ru-RU', {
-                          timeZone: 'Asia/Almaty',
-                          day: 'numeric',
-                          month: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit'
-                        });
-                      }
-                    }
-                    return '';
-                  }
-                }
-              }
-            }}
-          />
-        )}
-      </div>
-    </div>
+      <BaseChart
+        title="Уровень топлива"
+        vehicle={vehicle}
+        startDate={startDate}
+        endDate={endDate}
+        data={getChartConfig()}
+        fetchData={fetchFuelData}
+        formatTooltipLabel={formatFuelLabel}
+        formatYAxisLabel={formatFuelLabel}
+        formatXAxisLabel={formatTimeLabel}
+        emptyDataMessage="Нет данных о топливе за выбранный период"
+        isLoading={isLoading}
+        error={error}
+        options={getChartOptions()}
+        reportType="fuel"
+      />
+    </>
   );
 };
 
