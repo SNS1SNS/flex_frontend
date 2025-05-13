@@ -17,6 +17,7 @@ import logo from '../../images/logo.svg';
 import fuel from '../../images/fuel.png';
 import track from '../../images/road.png';
 import track2 from '../../images/tracks.png';
+import ChartDebugPanel from './ChartDebugPanel'; // Импортируем панель отладки
 
 // Временные заглушки для компонентов, которые еще не созданы
 const LiveTrack = ({ vehicle, startDate, endDate }) => (
@@ -1481,7 +1482,7 @@ const ReportsPage = () => {
   }, [selectedVehicle, dateRange, openTabs, safelyRemoveReactRoot]);
   
   return (
-    <div className="dashboard">
+    <div className={`reports-page ${isCompactMode ? 'compact-mode' : ''}`}>
       {/* Боковая панель */}
       <div className={`sidebar ${isCompactMode ? 'compact-mode' : ''}`}>
         {/* Шапка боковой панели */}
@@ -1831,6 +1832,9 @@ const ReportsPage = () => {
           Выйти из полного экрана
         </div>
       </div>
+      
+      {/* Панель отладки для графиков */}
+      <ChartDebugPanel />
     </div>
   );
 };

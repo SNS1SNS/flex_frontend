@@ -6,6 +6,7 @@ import VehicleProfile from './components/VehicleProfile';
 import DriversPage from './components/DriversPage';
 import UsersPage from './components/UsersPage';
 import ReportsPage from './components/reports/ReportsPage';
+import ChartSyncTestPage from './components/reports/ChartSyncTestPage';
 import PrivateRoute from './components/PrivateRoute';
 import AdminLayout from './components/AdminLayout';
 import Notifications from './components/common/Notifications';
@@ -39,6 +40,9 @@ function App() {
             <Routes>
               {/* Публичные маршруты */}
               <Route path="/login" element={<LoginPage />} />
+              
+              {/* Добавляем тестовую страницу */}
+              <Route path="/chart-sync-test" element={<ChartSyncTestPage />} />
               
               {/* Защищенные маршруты для обычных пользователей */}
               

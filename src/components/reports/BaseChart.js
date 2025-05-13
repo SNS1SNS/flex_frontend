@@ -3,10 +3,12 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import { Line } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSyncAlt, faDownload, faExpand, faCompress, faTruck, faColumns, faWindowRestore, faRedo, faSearchMinus, faKeyboard } from '@fortawesome/free-solid-svg-icons';
+import { faSyncAlt, faDownload, faExpand, faCompress, faTruck, faColumns, faWindowRestore, faRedo, faSearchMinus, faKeyboard, faLink, faUnlink } from '@fortawesome/free-solid-svg-icons';
 import SplitScreenContainer from '../common/SplitScreenContainer';
 import splitScreenManager, { SPLIT_MODES } from '../../utils/SplitScreenManager';
+import chartSyncManager from '../../utils/ChartSyncManager';
 import ReportChooser from './ReportChooser';
+import { toast } from 'react-toastify';
 import './ChartStyles.css';
 
 // Регистрируем необходимые компоненты ChartJS
@@ -417,6 +419,66 @@ const BaseChart = ({
     };
   }, [showReportChooser]);
 
+  // Обновляем эффект для регистрации графика в менеджере синхронизации
+  useEffect(() => {
+    // Функция для регистрации графика
+    const registerChart = () => {
+      if (chartRef.current && chartRef.current.chart) {
+        // Регистрируем график в менеджере синхронизации
+        chartSyncManager.registerChart(containerId, chartRef.current.chart);
+        
+        // Если есть сохраненный масштаб, применяем его к этому графику
+        chartSyncManager.applyCurrentZoomToChart(containerId);
+        
+        // Генерируем событие инициализации графика для других компонентов
+        document.dispatchEvent(new CustomEvent('chartInitialized', {
+          detail: {
+            chartId: containerId,
+            chartInstance: chartRef.current.chart,
+            timestamp: Date.now()
+          }
+        }));
+        
+        console.log(`BaseChart: График ${containerId} зарегистрирован в ChartSyncManager`);
+      }
+    };
+    
+    // Обработчик для отслеживания изменений состояния синхронизации
+    const handleSyncStateChanged = (event) => {
+      // Обновляем UI для отображения состояния синхронизации
+      const syncStatus = document.querySelector(`#${containerId} .sync-status`);
+      if (syncStatus) {
+        syncStatus.innerHTML = `
+          <i class="fa ${event.detail.syncEnabled ? 'fa-link' : 'fa-unlink'}"></i>
+          ${event.detail.syncEnabled ? 'Синхронизировано' : 'Несинхронизировано'}
+        `;
+      }
+    };
+    
+    // Вызываем регистрацию после монтирования и после получения данных
+    const timer = setTimeout(registerChart, 500);
+    
+    // Также повторяем регистрацию каждый раз, когда данные обновляются
+    if (chartData && chartData.labels && chartData.labels.length > 0) {
+      const updateTimer = setTimeout(registerChart, 200);
+      return () => {
+        clearTimeout(updateTimer);
+        clearTimeout(timer);
+        chartSyncManager.unregisterChart(containerId);
+      };
+    }
+    
+    // Регистрируем обработчик изменения состояния синхронизации
+    document.addEventListener('syncStateChanged', handleSyncStateChanged);
+    
+    return () => {
+      // При размонтировании удаляем график из синхронизации
+      clearTimeout(timer);
+      document.removeEventListener('syncStateChanged', handleSyncStateChanged);
+      chartSyncManager.unregisterChart(containerId);
+    };
+  }, [containerId, chartData]);
+
   // Функция загрузки данных
   const loadData = async () => {
     if (!vehicle || !startDate || !endDate) {
@@ -464,6 +526,9 @@ const BaseChart = ({
       // Сбрасываем зум и немедленно обновляем
       chartRef.current.resetZoom();
       chartRef.current.update('none'); // 'none' для мгновенного обновления
+      
+      // Синхронизируем сброс зума со всеми графиками
+      chartSyncManager.syncReset(containerId);
       
       // Восстанавливаем анимацию
       setTimeout(() => {
@@ -885,6 +950,10 @@ const BaseChart = ({
             mode: 'x', // Только по оси X
             modifierKey: 'shift', // Панорамирование при зажатом Shift
             threshold: 10, // Минимальное перемещение для активации прокрутки
+            onPan: () => {
+              // Событие будет обрабатываться в ChartSyncManager
+              // Этот обработчик может быть переопределен
+            }
           },
           zoom: {
             wheel: {
@@ -902,6 +971,10 @@ const BaseChart = ({
               borderWidth: 1
             },
             mode: 'x', // Только по оси X
+            onZoom: () => {
+              // Событие будет обрабатываться в ChartSyncManager
+              // Этот обработчик может быть переопределен
+            }
           },
           // Мгновенное обновление при сбросе зума
           resetSpeed: 0 // Мгновенное возвращение к исходному масштабу
@@ -1057,6 +1130,15 @@ const BaseChart = ({
                 <FontAwesomeIcon icon={expandedMode ? faCompress : faExpand} />
               </button>
             </div>
+            <div className="tm-control-group">
+              <button
+                className={`tm-control-button ${chartSyncManager.syncEnabled ? 'sync-active' : 'sync-inactive'}`}
+                onClick={toggleSyncMode}
+                title="Включить/выключить синхронизацию масштабирования между графиками"
+              >
+                <FontAwesomeIcon icon={chartSyncManager.syncEnabled ? faLink : faUnlink} />
+              </button>
+            </div>
           </div>
         </div>
         
@@ -1080,6 +1162,9 @@ const BaseChart = ({
             <div>Ctrl+0 - сбросить масштаб</div>
             <div>Shift+прокрутка - перемещение по графику</div>
             <div>Колесо мыши - изменение масштаба</div>
+            <div style={{marginTop: '5px', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '5px'}}>Синхронизация:</div>
+            <div>Масштабирование синхронизировано между всеми графиками</div>
+            <div>Используйте кнопку <FontAwesomeIcon icon={chartSyncManager.syncEnabled ? faLink : faUnlink} /> для включения/выключения</div>
             <div style={{marginTop: '5px', textAlign: 'center'}}>
               <button onClick={toggleKeyboardShortcuts} 
                       style={{background: 'transparent', border: '1px solid white', color: 'white', padding: '2px 5px', cursor: 'pointer'}}>
@@ -1119,6 +1204,12 @@ const BaseChart = ({
                 ref={chartRef}
                 style={{ width: '100%', height: '100%' }}
               />
+
+              {/* Индикатор статуса синхронизации */}
+              <div className="sync-status">
+                <FontAwesomeIcon icon={chartSyncManager.syncEnabled ? faLink : faUnlink} />
+                {chartSyncManager.syncEnabled ? 'Синхронизировано' : 'Несинхронизировано'}
+              </div>
             </div>
           ) : (
             <div className="chart-empty">
@@ -1128,6 +1219,18 @@ const BaseChart = ({
           )}
         </div>
       </>
+    );
+  };
+
+  // Добавляем определение функции toggleSyncMode
+  const toggleSyncMode = () => {
+    const isEnabled = chartSyncManager.toggleSync();
+    // Оповещаем пользователя о состоянии синхронизации
+    toast.info(
+      isEnabled 
+        ? 'Синхронизация масштабирования включена' 
+        : 'Синхронизация масштабирования отключена',
+      { autoClose: 1500 }
     );
   };
 

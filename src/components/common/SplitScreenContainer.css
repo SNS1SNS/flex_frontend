@@ -268,7 +268,6 @@
 /* Активный контейнер, который будет разделен */
 .split-screen-container[data-active="true"],
 .split-screen-container.active-container {
-  outline: 2px dashed rgba(75, 115, 223, 0.7);
   outline-offset: -2px;
   background-color: rgba(75, 115, 223, 0.05);
   z-index: 5; /* Повышаем z-index для активного контейнера */
