@@ -68,13 +68,6 @@ const SplitReportSelector = ({
       title: 'Обороты',
       description: 'График оборотов двигателя',
       category: 'chart'
-    },
-    {
-      id: 'engine',
-      icon: faCar,
-      title: 'Двигатель',
-      description: 'Состояние двигателя',
-      category: 'chart'
     }
   ];
 

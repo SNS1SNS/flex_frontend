@@ -130,7 +130,10 @@ const ReportMenu = ({ onClose, onSelectReport, vehicle }) => {
                 <div 
                   key={report.id} 
                   className="report-item"
-                  onClick={() => onSelectReport(report.id)}
+                  onClick={() => {
+                    onSelectReport(report.id);
+                    onClose();
+                  }}
                 >
                   <div className="report-item-icon">
                     <FontAwesomeIcon icon={report.icon} />
@@ -151,7 +154,10 @@ const ReportMenu = ({ onClose, onSelectReport, vehicle }) => {
                 <div 
                   key={report.id} 
                   className="report-item"
-                  onClick={() => onSelectReport(report.id)}
+                  onClick={() => {
+                    onSelectReport(report.id);
+                    onClose();
+                  }}
                 >
                   <div className="report-item-icon">
                     <FontAwesomeIcon icon={report.icon} />
@@ -198,7 +204,10 @@ const ReportMenu = ({ onClose, onSelectReport, vehicle }) => {
             </div>
             <button 
               className="preview-button"
-              onClick={() => onSelectReport('track')}
+              onClick={() => {
+                onSelectReport('track');
+                onClose();
+              }}
             >
               Выбрать этот отчет
             </button>

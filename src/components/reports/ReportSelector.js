@@ -72,6 +72,9 @@ const ReportSelector = ({ onSelectReport, onCancel, selectedVehicle }) => {
     }
     
     onSelectReport(reportId);
+    
+    // Закрываем окно выбора отчётов после выбора
+    onCancel();
   };
 
   return (

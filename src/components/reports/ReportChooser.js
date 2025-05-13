@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faMapMarkerAlt, faRoute, faTachometerAlt, faGasPump, 
-  faChartLine, faChartArea, faTimes, faCar
+  faChartLine, faChartArea, faTimes
 } from '@fortawesome/free-solid-svg-icons';
 import './ReportChooser.css';
 
@@ -58,15 +58,51 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
       title: 'Местоположение',
       description: 'Текущее положение ТС',
       category: 'map'
-    },
-    {
-      id: 'engine',
-      icon: faCar,
-      title: 'Двигатель',
-      description: 'Состояние двигателя',
-      category: 'chart'
     }
   ];
+
+  // Функция принудительного закрытия модального окна
+  const forceCloseModal = () => {
+    try {
+      // Находим все модальные окна и удаляем их
+      const overlays = document.querySelectorAll('.report-chooser-overlay');
+      console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
+      
+      overlays.forEach(overlay => {
+        console.log('ReportChooser: Принудительное удаление модального окна из DOM');
+        overlay.parentNode.removeChild(overlay);
+      });
+    } catch (err) {
+      console.error('ReportChooser: Ошибка при принудительном удалении:', err);
+    }
+  };
+
+  // Обработчик нажатия клавиши Escape для закрытия
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        console.log('ReportChooser: Нажата клавиша Escape, закрываем модальное окно');
+        onClose();
+        setTimeout(forceCloseModal, 100);
+      }
+    };
+    
+    // Добавляем обработчик при монтировании
+    document.addEventListener('keydown', handleKeyDown);
+    
+    // Также закроем модальное окно автоматически через 2 минуты (на всякий случай)
+    const autoCloseTimeout = setTimeout(() => {
+      console.log('ReportChooser: Автоматическое закрытие модального окна через 2 минуты');
+      onClose();
+      forceCloseModal();
+    }, 120000);
+    
+    // Удаляем обработчик при размонтировании
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(autoCloseTimeout);
+    };
+  }, [onClose]);
 
   // Обработчик выбора отчета
   const handleSelectReport = (reportType) => {
@@ -75,16 +111,139 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
       return;
     }
     
-    // Вызываем переданный обработчик
-    onSelectReport(reportType);
+    console.log('ReportChooser: Выбран отчет', reportType);
+    
+    try {
+      // Вызываем переданный обработчик
+      onSelectReport(reportType);
+      
+      // Закрываем окно выбора отчётов после выбора
+      console.log('ReportChooser: Вызываем onClose для закрытия окна выбора отчетов');
+      onClose();
+      
+      console.log('ReportChooser: onClose вызван');
+      
+      // РАДИКАЛЬНОЕ РЕШЕНИЕ: принудительное удаление модального окна из DOM
+      setTimeout(() => {
+        try {
+          // Находим все модальные окна и удаляем их
+          const overlays = document.querySelectorAll('.report-chooser-overlay');
+          console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
+          
+          overlays.forEach(overlay => {
+            console.log('ReportChooser: Принудительное удаление модального окна из DOM');
+            overlay.parentNode.removeChild(overlay);
+          });
+        } catch (err) {
+          console.error('ReportChooser: Ошибка при принудительном удалении:', err);
+        }
+      }, 100);
+    } catch (err) {
+      console.error('ReportChooser: Ошибка при обработке выбора отчета:', err);
+    }
+  };
+
+  // Обработчик предотвращения всплытия события клика
+  const handleOverlayClick = (event) => {
+    // Останавливаем всплытие события только если это клик по фону
+    if (event.target === event.currentTarget) {
+      console.log('ReportChooser: Клик по overlay, закрываем');
+      
+      try {
+        // Вызываем стандартный onClose
+        onClose();
+        
+        // РАДИКАЛЬНОЕ РЕШЕНИЕ: принудительное удаление модального окна из DOM
+        setTimeout(() => {
+          try {
+            // Находим все модальные окна и удаляем их
+            const overlays = document.querySelectorAll('.report-chooser-overlay');
+            console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
+            
+            overlays.forEach(overlay => {
+              console.log('ReportChooser: Принудительное удаление модального окна из DOM');
+              overlay.parentNode.removeChild(overlay);
+            });
+          } catch (err) {
+            console.error('ReportChooser: Ошибка при принудительном удалении:', err);
+          }
+        }, 100);
+      } catch (err) {
+        console.error('ReportChooser: Ошибка при закрытии модального окна по фону:', err);
+      }
+    }
+  };
+  
+  // Предотвращаем всплытие событий из модального окна
+  const handleModalClick = (event) => {
+    // Останавливаем всплытие события клика
+    event.stopPropagation();
+  };
+
+  // Обработчик кнопки закрытия
+  const handleCloseButtonClick = (event) => {
+    event.stopPropagation();
+    console.log('ReportChooser: Нажата кнопка закрытия');
+    
+    try {
+      // Вызываем стандартный onClose
+      onClose();
+      
+      // РАДИКАЛЬНОЕ РЕШЕНИЕ: принудительное удаление модального окна из DOM
+      setTimeout(() => {
+        try {
+          // Находим все модальные окна и удаляем их
+          const overlays = document.querySelectorAll('.report-chooser-overlay');
+          console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
+          
+          overlays.forEach(overlay => {
+            console.log('ReportChooser: Принудительное удаление модального окна из DOM');
+            overlay.parentNode.removeChild(overlay);
+          });
+        } catch (err) {
+          console.error('ReportChooser: Ошибка при принудительном удалении:', err);
+        }
+      }, 100);
+    } catch (err) {
+      console.error('ReportChooser: Ошибка при закрытии модального окна:', err);
+    }
+  };
+
+  // Обработчик кнопки отмена в футере
+  const handleCancelButtonClick = (event) => {
+    event.stopPropagation();
+    console.log('ReportChooser: Нажата кнопка Отмена в футере');
+    
+    try {
+      // Вызываем стандартный onClose
+      onClose();
+      
+      // РАДИКАЛЬНОЕ РЕШЕНИЕ: принудительное удаление модального окна из DOM
+      setTimeout(() => {
+        try {
+          // Находим все модальные окна и удаляем их
+          const overlays = document.querySelectorAll('.report-chooser-overlay');
+          console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
+          
+          overlays.forEach(overlay => {
+            console.log('ReportChooser: Принудительное удаление модального окна из DOM');
+            overlay.parentNode.removeChild(overlay);
+          });
+        } catch (err) {
+          console.error('ReportChooser: Ошибка при принудительном удалении:', err);
+        }
+      }, 100);
+    } catch (err) {
+      console.error('ReportChooser: Ошибка при закрытии модального окна кнопкой Отмена:', err);
+    }
   };
 
   return (
-    <div className="report-chooser-overlay">
-      <div className="report-chooser">
+    <div className="report-chooser-overlay" onClick={handleOverlayClick}>
+      <div className="report-chooser" onClick={handleModalClick}>
         <div className="report-chooser-header">
           <h3>Выберите отчет для разделенного экрана</h3>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={handleCloseButtonClick}>
             <FontAwesomeIcon icon={faTimes} />
           </button>
         </div>
@@ -146,7 +305,7 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
         </div>
         
         <div className="report-chooser-footer">
-          <button className="cancel-btn" onClick={onClose}>Отмена</button>
+          <button className="cancel-btn" onClick={handleCancelButtonClick}>Отмена</button>
         </div>
       </div>
     </div>

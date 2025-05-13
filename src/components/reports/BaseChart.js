@@ -232,8 +232,40 @@ const BaseChart = ({
     return () => {
       // Очистка при размонтировании компонента
       console.log(`BaseChart: Компонент с ID ${containerId} размонтирован`);
+      // Сбрасываем состояние модального окна выбора отчета
+      setShowReportChooser(false);
     };
   }, [containerId]);
+
+  // Эффект для гарантированного закрытия модального окна
+  useEffect(() => {
+    // Если модальное окно открыто, регистрируем обработчики для гарантированного закрытия
+    if (showReportChooser) {
+      console.log('BaseChart: Модальное окно открыто, регистрируем обработчики закрытия');
+      
+      // Функция для проверки и закрытия модального окна
+      const forceCloseModal = () => {
+        if (showReportChooser) {
+          console.log('BaseChart: Принудительное закрытие модального окна');
+          setShowReportChooser(false);
+          setSplitDirection(null);
+        }
+      };
+      
+      // Таймаут для закрытия окна через 10 секунд (защита от зависания)
+      const closeTimeout = setTimeout(forceCloseModal, 10000);
+      
+      return () => {
+        // Очистка таймаута при размонтировании эффекта
+        clearTimeout(closeTimeout);
+      };
+    }
+  }, [showReportChooser]);
+
+  // Вывод в консоль при изменении состояния showReportChooser
+  useEffect(() => {
+    console.log(`BaseChart: Изменилось состояние showReportChooser = ${showReportChooser}`);
+  }, [showReportChooser]);
 
   // Функция загрузки данных
   const loadData = async () => {
@@ -332,94 +364,102 @@ const BaseChart = ({
 
   // Обработчик выбора отчета для разделенного экрана
   const handleReportSelect = (selectedReportType) => {
-    // Закрываем выбор отчета
-    setShowReportChooser(false);
-    
-    // Проверяем, что направление разделения было установлено
-    if (!splitDirection) {
-      console.warn('BaseChart: Попытка разделения экрана без указания направления');
-      return;
-    }
-    
-    // Ищем контейнер с более надежной стратегией
-    let containerElement = null;
-    
-    // Стратегия 1: Поиск по ID напрямую
-    containerElement = document.getElementById(containerId);
-    
-    // Стратегия 2: Поиск через ref и его родителя
-    if (!containerElement && chartContainerRef.current) {
-      const parentContainer = chartContainerRef.current.closest('.chart-split-container');
-      if (parentContainer) {
-        console.log(`BaseChart: Найден родительский контейнер через ref: ${parentContainer.id || 'без ID'}`);
-        
-        // Устанавливаем ID, чтобы гарантировать, что он доступен
-        if (!parentContainer.id) {
-          parentContainer.id = containerId;
-          console.log(`BaseChart: Установлен ID ${containerId} на родительский контейнер`);
-        }
-        
-        containerElement = parentContainer;
-      }
-    }
-    
-    // Стратегия 3: Поиск по атрибуту data-container-id
-    if (!containerElement) {
-      const containers = document.querySelectorAll(`[data-container-id="${containerId}"]`);
-      if (containers.length > 0) {
-        console.log(`BaseChart: Найден контейнер по data-container-id: ${containerId}`);
-        containerElement = containers[0];
-      }
-    }
-    
-    // Если все стратегии не помогли найти контейнер
-    if (!containerElement) {
-      console.error(`BaseChart: Критическая ошибка - не удалось найти подходящий контейнер для разделения`);
-      setError('Не удалось разделить экран. Пожалуйста, попробуйте ещё раз или обновите страницу.');
-      return;
-    }
-    
-    // Используем ID найденного контейнера, который может отличаться от исходного containerId
-    const actualContainerId = containerElement.id;
-    console.log(`BaseChart: Разделение контейнера ${actualContainerId} по направлению ${splitDirection}`);
-    
     try {
-      // Добавляем обработчик события завершения разделения контейнера
-      const handleSplitComplete = (event) => {
-        const { containerId, container2Id } = event.detail;
-        
-        // Проверяем, что событие относится к нашему контейнеру
-        if (containerId === actualContainerId) {
-          console.log(`BaseChart: Получено событие завершения разделения для контейнера ${containerId}, второй контейнер: ${container2Id}`);
-          
-          // Ждем, чтобы DOM обновился и React отрендерил компоненты
-          // Используем функцию для ожидания второго контейнера
-          waitForSecondContainer(container2Id, selectedReportType);
-        }
-        
-        // Удаляем обработчик после использования
-        document.removeEventListener('splitContainerComplete', handleSplitComplete);
-      };
+      // Закрываем выбор отчета
+      console.log('BaseChart: handleReportSelect - закрываем окно выбора отчета');
+      setShowReportChooser(false);
       
-      // Добавляем обработчик события завершения разделения
-      document.addEventListener('splitContainerComplete', handleSplitComplete);
-      
-      // Разделяем экран через менеджер разделения
-      const success = splitScreenManager.addDynamicSplit(actualContainerId, splitDirection);
-      
-      if (!success) {
-        console.error(`BaseChart: Не удалось разделить контейнер ${actualContainerId}`);
-        setError('Не удалось разделить экран. Пожалуйста, попробуйте ещё раз.');
-        
-        // Удаляем обработчик, если разделение не удалось
-        document.removeEventListener('splitContainerComplete', handleSplitComplete);
+      // Проверяем, что направление разделения было установлено
+      if (!splitDirection) {
+        console.warn('BaseChart: Попытка разделения экрана без указания направления');
+        return;
       }
       
-      // Сброс направления разделения
+      // Ищем контейнер с более надежной стратегией
+      let containerElement = null;
+      
+      // Стратегия 1: Поиск по ID напрямую
+      containerElement = document.getElementById(containerId);
+      
+      // Стратегия 2: Поиск через ref и его родителя
+      if (!containerElement && chartContainerRef.current) {
+        const parentContainer = chartContainerRef.current.closest('.chart-split-container');
+        if (parentContainer) {
+          console.log(`BaseChart: Найден родительский контейнер через ref: ${parentContainer.id || 'без ID'}`);
+          
+          // Устанавливаем ID, чтобы гарантировать, что он доступен
+          if (!parentContainer.id) {
+            parentContainer.id = containerId;
+            console.log(`BaseChart: Установлен ID ${containerId} на родительский контейнер`);
+          }
+          
+          containerElement = parentContainer;
+        }
+      }
+      
+      // Стратегия 3: Поиск по атрибуту data-container-id
+      if (!containerElement) {
+        const containers = document.querySelectorAll(`[data-container-id="${containerId}"]`);
+        if (containers.length > 0) {
+          console.log(`BaseChart: Найден контейнер по data-container-id: ${containerId}`);
+          containerElement = containers[0];
+        }
+      }
+      
+      // Если все стратегии не помогли найти контейнер
+      if (!containerElement) {
+        console.error(`BaseChart: Критическая ошибка - не удалось найти подходящий контейнер для разделения`);
+        setError('Не удалось разделить экран. Пожалуйста, попробуйте ещё раз или обновите страницу.');
+        return;
+      }
+      
+      // Используем ID найденного контейнера, который может отличаться от исходного containerId
+      const actualContainerId = containerElement.id;
+      console.log(`BaseChart: Разделение контейнера ${actualContainerId} по направлению ${splitDirection}`);
+      
+      try {
+        // Добавляем обработчик события завершения разделения контейнера
+        const handleSplitComplete = (event) => {
+          const { containerId, container2Id } = event.detail;
+          
+          // Проверяем, что событие относится к нашему контейнеру
+          if (containerId === actualContainerId) {
+            console.log(`BaseChart: Получено событие завершения разделения для контейнера ${containerId}, второй контейнер: ${container2Id}`);
+            
+            // Ждем, чтобы DOM обновился и React отрендерил компоненты
+            // Используем функцию для ожидания второго контейнера
+            waitForSecondContainer(container2Id, selectedReportType);
+          }
+          
+          // Удаляем обработчик после использования
+          document.removeEventListener('splitContainerComplete', handleSplitComplete);
+        };
+        
+        // Добавляем обработчик события завершения разделения
+        document.addEventListener('splitContainerComplete', handleSplitComplete);
+        
+        // Разделяем экран через менеджер разделения
+        const success = splitScreenManager.addDynamicSplit(actualContainerId, splitDirection);
+        
+        if (!success) {
+          console.error(`BaseChart: Не удалось разделить контейнер ${actualContainerId}`);
+          setError('Не удалось разделить экран. Пожалуйста, попробуйте ещё раз.');
+          
+          // Удаляем обработчик, если разделение не удалось
+          document.removeEventListener('splitContainerComplete', handleSplitComplete);
+        }
+        
+        // Сброс направления разделения
+        setSplitDirection(null);
+      } catch (error) {
+        console.error(`BaseChart: Ошибка при разделении экрана:`, error);
+        setError(`Ошибка при разделении экрана: ${error.message}`);
+      }
+    } catch (outerError) {
+      console.error('BaseChart: Критическая ошибка в handleReportSelect:', outerError);
+      // Обязательно закрываем окно выбора отчета даже при ошибке
+      setShowReportChooser(false);
       setSplitDirection(null);
-    } catch (error) {
-      console.error(`BaseChart: Ошибка при разделении экрана:`, error);
-      setError(`Ошибка при разделении экрана: ${error.message}`);
     }
   };
 
@@ -487,8 +527,10 @@ const BaseChart = ({
 
   // Закрытие окна выбора отчета
   const handleReportChooserClose = () => {
+    console.log('BaseChart: Закрытие окна выбора отчета');
     setShowReportChooser(false);
     setSplitDirection(null);
+    console.log('BaseChart: Окно выбора отчета должно быть закрыто, showReportChooser =', false);
   };
 
   // Определение опций для графика
@@ -839,12 +881,15 @@ const BaseChart = ({
         
         {/* Модальное окно выбора отчета */}
         {showReportChooser && (
-          <ReportChooser 
-            onSelectReport={handleReportSelect}
-            onClose={handleReportChooserClose}
-            selectedVehicle={vehicle}
-            originalReport={reportType}
-          />
+          <>
+            {console.log('BaseChart: Рендерим окно выбора отчета, showReportChooser =', showReportChooser)}
+            <ReportChooser 
+              onSelectReport={handleReportSelect}
+              onClose={handleReportChooserClose}
+              selectedVehicle={vehicle}
+              originalReport={reportType}
+            />
+          </>
         )}
       </>
     );
@@ -860,6 +905,9 @@ const BaseChart = ({
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
+      }}
+      onClick={() => {
+        console.log('BaseChart: Клик по основному контейнеру, showReportChooser =', showReportChooser);
       }}
     >
       <SplitScreenContainer 
