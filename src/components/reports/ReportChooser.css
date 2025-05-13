@@ -1,3 +1,24 @@
+/* Контейнер для React портала */
+#modal-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0;
+  z-index: 9990;
+  pointer-events: none;
+}
+
+.report-chooser-portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9995;
+  pointer-events: all;
+}
+
 .report-chooser-overlay {
   position: fixed;
   top: 0;
@@ -27,6 +48,8 @@
   display: flex;
   flex-direction: column;
   animation: slideUp 0.3s ease;
+  position: relative;
+  z-index: 10000;
 }
 
 @keyframes slideUp {
@@ -151,20 +174,30 @@
   padding: 15px 20px;
   border-top: 1px solid #eee;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.cancel-btn {
+.footer-info {
+  color: #777;
+  font-size: 13px;
+}
+
+.btn {
   padding: 8px 16px;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
   border-radius: 4px;
-  color: #555;
   cursor: pointer;
   transition: all 0.2s;
+  font-size: 14px;
 }
 
-.cancel-btn:hover {
+.btn-cancel {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  color: #555;
+}
+
+.btn-cancel:hover {
   background-color: #eee;
 }
 
@@ -193,5 +226,12 @@
   
   .report-chooser-footer {
     padding: 12px 15px;
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+  
+  .footer-info {
+    text-align: center;
+    margin-bottom: 5px;
   }
 } 

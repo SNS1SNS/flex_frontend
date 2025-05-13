@@ -228,16 +228,6 @@ const BaseChart = ({
     }
   }, [splitDirection, containerId]);
   
-  // Эффект для сброса состояния при размонтировании
-  useEffect(() => {
-    return () => {
-      // Очистка при размонтировании компонента
-      console.log(`BaseChart: Компонент с ID ${containerId} размонтирован`);
-      // Сбрасываем состояние модального окна выбора отчета
-      setShowReportChooser(false);
-    };
-  }, [containerId]);
-
   // Эффект для гарантированного закрытия модального окна
   useEffect(() => {
     // Если модальное окно открыто, регистрируем обработчики для гарантированного закрытия
@@ -248,20 +238,63 @@ const BaseChart = ({
       const forceCloseModal = () => {
         if (showReportChooser) {
           console.log('BaseChart: Принудительное закрытие модального окна');
+          // Обрабатываем закрытие модального окна асинхронно, чтобы избежать проблем с React-циклом обновления
+          setTimeout(() => {
+            setShowReportChooser(false);
+            setSplitDirection(null);
+          }, 0);
+        }
+      };
+      
+      // Таймаут для закрытия окна через 5 секунд (защита от зависания)
+      // Уменьшаем время до 5 секунд для более быстрой реакции
+      const closeTimeout = setTimeout(forceCloseModal, 5000);
+      
+      // Обработчик для закрытия модального окна при навигации или обновлении страницы
+      const handleBeforeUnload = () => {
+        forceCloseModal();
+      };
+      
+      // Добавляем обработчик события перед выгрузкой страницы
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      
+      return () => {
+        // Очистка при размонтировании эффекта
+        clearTimeout(closeTimeout);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        
+        // Если компонент размонтируется, но модальное окно всё ещё открыто, закрываем его явно
+        if (showReportChooser) {
+          console.log('BaseChart: Закрытие модального окна при размонтировании компонента');
           setShowReportChooser(false);
           setSplitDirection(null);
         }
       };
-      
-      // Таймаут для закрытия окна через 10 секунд (защита от зависания)
-      const closeTimeout = setTimeout(forceCloseModal, 10000);
-      
-      return () => {
-        // Очистка таймаута при размонтировании эффекта
-        clearTimeout(closeTimeout);
-      };
     }
   }, [showReportChooser]);
+
+  // Эффект для сброса состояния при размонтировании
+  useEffect(() => {
+    return () => {
+      // Очистка при размонтировании компонента
+      console.log(`BaseChart: Компонент с ID ${containerId} размонтирован`);
+      
+      // Безопасно закрываем модальное окно перед размонтированием
+      if (showReportChooser) {
+        console.log(`BaseChart: Сброс состояния showReportChooser при размонтировании`);
+        // Устанавливаем значение напрямую, минуя setState, чтобы избежать ошибок рендеринга
+        // при размонтировании компонента
+        try {
+          // Это опасный паттерн, но в данном случае он поможет избежать проблем с React-циклом
+          // при размонтировании компонента
+          setShowReportChooser(false);
+        } catch (e) {
+          // Игнорируем ошибки при размонтировании
+          console.log(`BaseChart: Ошибка при сбросе состояния: ${e.message}`);
+        }
+      }
+    };
+  }, [containerId, showReportChooser]);
 
   // Вывод в консоль при изменении состояния showReportChooser
   useEffect(() => {
@@ -270,18 +303,33 @@ const BaseChart = ({
 
   // Эффект для регистрации обработчика события разделения контейнера
   useEffect(() => {
+    // Создаем переменную для отслеживания, было ли уже вызвано модальное окно
+    let modalTriggered = false;
+    
+    // Функция для сброса флага при закрытии модального окна
+    const resetModalFlag = () => {
+      modalTriggered = false;
+    };
+    
     // Функция-обработчик события завершения разделения
     const handleSplitComplete = (event) => {
       const { containerId: eventContainerId, container1Id, container2Id, direction } = event.detail;
       
-      if (eventContainerId === containerId) {
+      // Проверяем, что это событие для нашего контейнера и что модальное окно еще не было вызвано
+      if (eventContainerId === containerId && !modalTriggered) {
         console.log(`BaseChart: Получено событие завершения разделения для нашего контейнера ${containerId}`);
         console.log(`BaseChart: Новые контейнеры: ${container1Id}, ${container2Id}, направление: ${direction}`);
+        
+        // Устанавливаем флаг, что модальное окно вызвано
+        modalTriggered = true;
         
         // Открываем окно выбора отчета для второго контейнера
         // но нам нужны данные контейнера для создания отчета
         setContainerToFill(container2Id);
         setShowReportChooser(true);
+        
+        // Сбрасываем флаг при закрытии модального окна через некоторое время
+        setTimeout(resetModalFlag, 1000);
       }
     };
     
@@ -296,9 +344,26 @@ const BaseChart = ({
 
   // Эффект для регистрации обработчика события запроса выбора отчета
   useEffect(() => {
+    // Создаем переменную для отслеживания, было ли уже вызвано модальное окно
+    let modalRequested = false;
+    
+    // Функция для сброса флага блокировки
+    const resetRequestFlag = () => {
+      modalRequested = false;
+    };
+    
     // Функция-обработчик запроса выбора отчета
     const handleRequestReportSelector = (event) => {
       const { containerId, direction, activateContainer } = event.detail;
+      
+      // Проверяем, что модальное окно еще не открыто и флаг не установлен
+      if (showReportChooser || modalRequested) {
+        console.log(`BaseChart: Пропускаем повторный запрос выбора отчета, так как модальное окно уже ${showReportChooser ? 'открыто' : 'запрошено'}`);
+        return;
+      }
+      
+      // Устанавливаем флаг, что запрос обработан
+      modalRequested = true;
       
       console.log(`BaseChart: Получен запрос на открытие селектора отчетов для контейнера ${containerId}`);
       
@@ -314,15 +379,19 @@ const BaseChart = ({
           // Сначала снимаем активность со всех контейнеров
           document.querySelectorAll('.split-screen-container[data-active="true"]')
             .forEach(el => {
-              el.setAttribute('data-active', 'false');
-              el.classList.remove('active-container');
+              if (el && document.body.contains(el)) { // Проверяем, что элемент всё ещё в DOM
+                el.setAttribute('data-active', 'false');
+                el.classList.remove('active-container');
+              }
             });
           
-          // Активируем наш контейнер
-          container.setAttribute('data-active', 'true');
-          container.classList.add('active-container');
-          
-          console.log(`BaseChart: Активирован контейнер ${containerId} для выбора отчета`);
+          // Активируем наш контейнер, если он всё ещё в DOM
+          if (document.body.contains(container)) {
+            container.setAttribute('data-active', 'true');
+            container.classList.add('active-container');
+            
+            console.log(`BaseChart: Активирован контейнер ${containerId} для выбора отчета`);
+          }
         }
       }
       
@@ -335,13 +404,8 @@ const BaseChart = ({
         setSplitDirection(direction);
       }
       
-      // Проверяем, что диалог действительно открылся через небольшую задержку
-      setTimeout(() => {
-        if (!showReportChooser) {
-          console.warn('BaseChart: Диалог выбора отчета не открылся автоматически, пробуем еще раз');
-          setShowReportChooser(true);
-        }
-      }, 300);
+      // Сбрасываем флаг блокировки через некоторое время
+      setTimeout(resetRequestFlag, 1000);
     };
     
     // Добавляем обработчик события
@@ -351,7 +415,7 @@ const BaseChart = ({
     return () => {
       document.removeEventListener('requestReportSelector', handleRequestReportSelector);
     };
-  }, []);
+  }, [showReportChooser]);
 
   // Функция загрузки данных
   const loadData = async () => {
@@ -561,6 +625,19 @@ const BaseChart = ({
           startDate, 
           endDate 
         });
+        
+        // Проверяем существование контейнера в DOM перед созданием отчета
+        const targetContainer = document.getElementById(containerToFill) || 
+                        document.querySelector(`[data-container-id="${containerToFill}"]`);
+                        
+        if (!targetContainer) {
+          console.warn(`BaseChart: Целевой контейнер ${containerToFill} не найден в DOM, отмена создания отчета`);
+          if (window.showNotification) {
+            window.showNotification('warning', 'Контейнер для отчета не найден');
+          }
+          setContainerToFill(null);
+          return;
+        }
       
         // Создаем отчет через систему событий
         const createEvent = new CustomEvent('createReport', {
@@ -578,16 +655,26 @@ const BaseChart = ({
         
         // Небольшая задержка перед отправкой события для гарантии готовности DOM
         setTimeout(() => {
-          document.dispatchEvent(createEvent);
-          
-          // Добавляем визуальную обратную связь для подтверждения выбора отчета
-          if (window.showNotification) {
-            window.showNotification('success', `Отчет "${selectedReportType}" добавлен в контейнер`);
+          // Повторно проверяем, что контейнер всё ещё существует
+          if (document.getElementById(containerToFill) || 
+              document.querySelector(`[data-container-id="${containerToFill}"]`)) {
+            
+            document.dispatchEvent(createEvent);
+            
+            // Добавляем визуальную обратную связь для подтверждения выбора отчета
+            if (window.showNotification) {
+              window.showNotification('success', `Отчет "${selectedReportType}" добавлен в контейнер`);
+            }
+          } else {
+            console.warn(`BaseChart: Контейнер ${containerToFill} был удален за время создания отчета`);
+            if (window.showNotification) {
+              window.showNotification('warning', 'Не удалось добавить отчет: контейнер был удален');
+            }
           }
+          // Сбрасываем контейнер
+          setContainerToFill(null);
         }, 100);
         
-        // Сбрасываем контейнер
-        setContainerToFill(null);
         return;
       }
       
@@ -630,23 +717,59 @@ const BaseChart = ({
 
   // Эффект для обновления графика после его создания или изменения размера
   useEffect(() => {
+    // Флаг для отслеживания, смонтирован ли еще компонент
+    let isMounted = true;
+    
     const handleResize = () => {
+      // Проверяем, что компонент всё ещё смонтирован
+      if (!isMounted) return;
+      
       if (chartRef.current && chartRef.current.chart) {
         console.log(`BaseChart: Изменение размера графика ${containerId}`);
-        chartRef.current.resize();
-        chartRef.current.update();
+        
+        try {
+          // Проверяем, что DOM-элемент графика всё ещё существует
+          if (chartRef.current.canvas && document.body.contains(chartRef.current.canvas)) {
+            chartRef.current.resize();
+            chartRef.current.update();
+          }
+        } catch (error) {
+          console.warn(`BaseChart: Ошибка при обновлении размера графика: ${error.message}`);
+        }
       }
     };
     
     // Обрабатываем изменение размера окна
     window.addEventListener('resize', handleResize);
     
-    // Также вызываем обновление через некоторое время после рендеринга
-    const resizeTimeout = setTimeout(handleResize, 200);
+    // Также вызываем обновление через некоторое время после рендеринга, 
+    // но проверяем, что компонент всё ещё смонтирован
+    const resizeTimeout = setTimeout(() => {
+      if (isMounted) {
+        handleResize();
+      }
+    }, 200);
     
+    // Очистка при размонтировании
     return () => {
+      isMounted = false; // Устанавливаем флаг, что компонент размонтирован
       window.removeEventListener('resize', handleResize);
       clearTimeout(resizeTimeout);
+      
+      // Дополнительно проверяем, нет ли активных потоков обновления графика
+      if (chartRef.current && chartRef.current.chart) {
+        try {
+          // В случае если был активен таймер анимации, останавливаем его
+          if (chartRef.current.chart.animating) {
+            chartRef.current.chart.stop();
+          }
+          
+          // Уничтожаем экземпляр графика для освобождения ресурсов
+          chartRef.current.destroy();
+        } catch (e) {
+          console.warn(`BaseChart: Ошибка при уничтожении графика: ${e.message}`);
+        }
+      }
     };
   }, [containerId, chartData]);
 
@@ -1049,17 +1172,17 @@ const BaseChart = ({
       </SplitScreenContainer>
       
       {/* Модальное окно выбора отчета - выносим за пределы SplitScreenContainer */}
-      {showReportChooser && (
-        <>
-          {console.log('BaseChart: Рендерим окно выбора отчета, showReportChooser =', showReportChooser)}
-          <ReportChooser 
-            onSelectReport={handleReportSelect}
-            onClose={handleReportChooserClose}
-            selectedVehicle={vehicle}
-            originalReport={reportType}
-          />
-        </>
-      )}
+      {/* Используем порталы React для рендеринга модального окна в корне DOM, 
+          чтобы избежать проблем с вложенными контейнерами */}
+      {showReportChooser ? (
+        <ReportChooser 
+          onSelectReport={handleReportSelect}
+          onClose={handleReportChooserClose}
+          selectedVehicle={vehicle}
+          originalReport={reportType}
+          containerId={containerId}
+        />
+      ) : null}
     </div>
   );
 };

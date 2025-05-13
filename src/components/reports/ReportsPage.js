@@ -106,9 +106,9 @@ const ReportsPage = () => {
   // Добавляем ref для контейнера отчетов
   const reportsContainerRef = useRef(null);
 
-  // Эффект для обработки события создания отчета при разделении экрана
+  // Обработчик события createReport
   useEffect(() => {
-    // Обработчик события создания отчета
+    // Функция-обработчик события создания отчета
     const handleCreateReport = (event) => {
       const { reportType, container, vehicle, startDate, endDate } = event.detail;
       
@@ -119,9 +119,78 @@ const ReportsPage = () => {
     // Добавляем слушателя события
     document.addEventListener('createReport', handleCreateReport);
     
+    // Очистка порталов и модальных окон
+    const cleanupModals = () => {
+      // Находим и очищаем элемент modal-root
+      const modalRoot = document.getElementById('modal-root');
+      if (modalRoot) {
+        try {
+          console.log('ReportsPage: Очистка modal-root при размонтировании');
+          // Безопасно удаляем содержимое
+          while (modalRoot.firstChild) {
+            modalRoot.removeChild(modalRoot.firstChild);
+          }
+        } catch (e) {
+          console.error('ReportsPage: Ошибка при очистке modal-root:', e);
+        }
+      }
+      
+      // Удаляем все элементы с классом report-chooser-overlay
+      const overlays = document.querySelectorAll('.report-chooser-overlay');
+      for (const overlay of overlays) {
+        try {
+          const parent = overlay.parentNode;
+          if (parent && parent.contains(overlay)) {
+            parent.removeChild(overlay);
+          }
+        } catch (e) {
+          console.error('ReportsPage: Ошибка при удалении модального окна:', e);
+        }
+      }
+    };
+    
     // Очистка при размонтировании
     return () => {
       document.removeEventListener('createReport', handleCreateReport);
+      
+      // Очищаем все модальные окна и порталы при выходе со страницы
+      cleanupModals();
+    };
+  }, []);
+
+  // Эффект для обработки событий навигации и перед размонтированием компонента
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      console.log('ReportsPage: Обработка события beforeunload');
+      
+      // Находим и закрываем модальные окна
+      const reportChoosers = document.querySelectorAll('.report-chooser-overlay');
+      reportChoosers.forEach(element => {
+        try {
+          if (element.parentNode) {
+            element.parentNode.removeChild(element);
+          }
+        } catch (e) {
+          console.error('Ошибка при удалении модального окна перед выгрузкой:', e);
+        }
+      });
+      
+      // Очищаем modal-root
+      const modalRoot = document.getElementById('modal-root');
+      if (modalRoot) {
+        while (modalRoot.firstChild) {
+          modalRoot.removeChild(modalRoot.firstChild);
+        }
+      }
+    };
+    
+    // Добавляем обработчик
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Очистка при размонтировании
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload(); // Вызываем очистку явно при размонтировании
     };
   }, []);
 
@@ -1143,20 +1212,6 @@ const ReportsPage = () => {
     };
   }, [reactRoots]);
   
-  // Функция для определения, можно ли создавать React-корень для контейнера
-  const canCreateReactRoot = (container) => {
-    if (!container) return false;
-    
-    // Помечаем контейнер специальным атрибутом
-    if (!container.hasAttribute('data-react-managed')) {
-      container.setAttribute('data-react-managed', 'true');
-      return true;
-    }
-    
-    // Проверяем, что у контейнера нет другого React-рендера
-    return !container.querySelector('[data-reactroot]');
-  };
-  
   // Функция для безопасного удаления React-корня
   const safelyRemoveReactRoot = (containerId) => {
     const root = reactRoots.get(containerId);
@@ -1190,9 +1245,6 @@ const ReportsPage = () => {
       container.id = `chart-container-${Math.random().toString(36).substring(2, 11)}`;
       console.log(`ReportsPage: Присвоен новый ID контейнеру: ${container.id}`);
     }
-    
-    // Проверяем, не является ли контейнер частью другого React-дерева
-    const isPartOfAnotherReactTree = container.closest('[data-reactroot]') !== null;
     
     // Если контейнер уже имеет React-корень, удаляем его безопасно
     if (reactRoots.has(container.id)) {

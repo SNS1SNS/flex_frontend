@@ -578,17 +578,6 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
       labels: chartLabels,
       datasets: [
         {
-          label: 'Исходные данные',
-          data: chartData,
-          fill: false,
-          backgroundColor: 'rgba(64, 80, 255, 0.2)',
-          borderColor: 'rgb(64, 80, 255)',
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 5,
-          tension: 0,
-        },
-        {
           label: 'Фильтр Калмана',
           data: showFiltered ? filteredData : [],
           fill: false,
@@ -598,7 +587,19 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
           pointRadius: 0,
           pointHoverRadius: 5,
           tension: 0,
+        },
+        {
+          label: 'Исходные данные',
+          data: chartData,
+          fill: false,
+          backgroundColor: 'rgba(64, 80, 255, 0.2)',
+          borderColor: 'rgb(64, 80, 255)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          tension: 0,
         }
+       
       ]
     };
   };

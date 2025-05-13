@@ -100,6 +100,9 @@ const SplitScreenContainer = ({
   
   // Добавляем обработчик события запроса на разделение контейнера
   useEffect(() => {
+    // Флаг, который указывает, что событие requestReportSelector уже было отправлено
+    let reportSelectorRequested = false;
+    
     // Функция-обработчик события запроса на разделение
     const handleSplitRequest = (event) => {
       const { containerId, container1Id, container2Id, direction } = event.detail;
@@ -129,6 +132,9 @@ const SplitScreenContainer = ({
           onSplitChange({ mode: SPLIT_MODES.CUSTOM, isSplit: true, splitDirection: direction });
         }
         
+        // Сбрасываем флаг перед новым разделением
+        reportSelectorRequested = false;
+        
         // Сообщаем о завершении разделения через событие
         setTimeout(() => {
           const event = new CustomEvent('splitContainerComplete', {
@@ -141,43 +147,87 @@ const SplitScreenContainer = ({
           });
           document.dispatchEvent(event);
           
-          console.log(`SplitScreenContainer: Отправляем запрос на открытие селектора отчётов для контейнера ${container2Id}`);
-          
-          // Сразу после завершения разделения создаем событие для запроса выбора отчета
-          const selectReportEvent = new CustomEvent('requestReportSelector', {
-            detail: {
-              containerId: container2Id,
-              parentContainerId: id,
-              originalContainerId: containerId,
-              direction: direction,
-              timestamp: Date.now(),
-              // Добавляем признак активации
-              activateContainer: true
-            }
-          });
-          
-          // Даем немного времени на обновление DOM, увеличиваем задержку
-          setTimeout(() => {
-            // Проверяем, что DOM-элемент контейнера существует перед отправкой события
-            const targetContainer = document.getElementById(container2Id);
-            if (targetContainer) {
-              console.log(`SplitScreenContainer: Найден DOM-элемент контейнера ${container2Id}, отправляем событие запроса отчёта`);
-              document.dispatchEvent(selectReportEvent);
-            } else {
-              console.warn(`SplitScreenContainer: DOM-элемент контейнера ${container2Id} не найден, используем поиск по атрибутам`);
-              
-              // Попытка найти элемент по другим атрибутам
-              const containers = document.querySelectorAll(`[data-container-id="${container2Id}"]`);
-              if (containers.length > 0) {
-                console.log(`SplitScreenContainer: Найден контейнер по атрибуту data-container-id`);
-                document.dispatchEvent(selectReportEvent);
-              } else {
-                // Отправка события даже если элемент не найден - BaseChart должен сам найти целевой контейнер
-                console.log(`SplitScreenContainer: Элемент не найден, но всё равно отправляем событие`);
+          // Проверяем, что событие requestReportSelector ещё не было отправлено
+          if (!reportSelectorRequested) {
+            console.log(`SplitScreenContainer: Отправляем запрос на открытие селектора отчётов для контейнера ${container2Id}`);
+            
+            // Устанавливаем флаг, что событие будет отправлено
+            reportSelectorRequested = true;
+            
+            // Сразу после завершения разделения создаем событие для запроса выбора отчета
+            const selectReportEvent = new CustomEvent('requestReportSelector', {
+              detail: {
+                containerId: container2Id,
+                parentContainerId: id,
+                originalContainerId: containerId,
+                direction: direction,
+                timestamp: Date.now(),
+                // Добавляем признак активации
+                activateContainer: true
+              }
+            });
+            
+            // Даем немного времени на обновление DOM, увеличиваем задержку
+            setTimeout(() => {
+              // Проверяем состояние DOM и компонентов перед отправкой события
+              try {
+                // Проверяем, что DOM-элемент контейнера существует перед отправкой события
+                const targetContainer = document.getElementById(container2Id);
+                if (targetContainer) {
+                  console.log(`SplitScreenContainer: Найден DOM-элемент контейнера ${container2Id}, отправляем событие запроса отчёта`);
+                  
+                  // Проверяем, что документ и все его корневые элементы в стабильном состоянии
+                  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                    document.dispatchEvent(selectReportEvent);
+                  } else {
+                    console.log('SplitScreenContainer: Документ ещё загружается, добавляем слушатель DOMContentLoaded');
+                    // Если документ ещё не загружен полностью, ждем его загрузки
+                    window.addEventListener('DOMContentLoaded', () => {
+                      document.dispatchEvent(selectReportEvent);
+                    }, { once: true });
+                  }
+                } else {
+                  console.warn(`SplitScreenContainer: DOM-элемент контейнера ${container2Id} не найден, используем поиск по атрибутам`);
+                  
+                  // Попытка найти элемент по другим атрибутам
+                  const containers = document.querySelectorAll(`[data-container-id="${container2Id}"]`);
+                  if (containers.length > 0) {
+                    console.log(`SplitScreenContainer: Найден контейнер по атрибуту data-container-id`);
+                    document.dispatchEvent(selectReportEvent);
+                  } else {
+                    // Добавляем более надежный механизм повторных попыток
+                    let retryCount = 0;
+                    const maxRetries = 3;
+                    
+                    const retryFindContainer = () => {
+                      const container = document.getElementById(container2Id) || 
+                                       document.querySelector(`[data-container-id="${container2Id}"]`);
+                      
+                      if (container) {
+                        console.log(`SplitScreenContainer: Найден контейнер ${container2Id} на попытке ${retryCount + 1}`);
+                        document.dispatchEvent(selectReportEvent);
+                      } else if (retryCount < maxRetries) {
+                        retryCount++;
+                        console.log(`SplitScreenContainer: Попытка ${retryCount} найти контейнер ${container2Id}`);
+                        setTimeout(retryFindContainer, 100 * retryCount); // Увеличиваем задержку с каждой попыткой
+                      } else {
+                        console.warn(`SplitScreenContainer: Элемент не найден после ${maxRetries} попыток, отправляем событие в любом случае`);
+                        document.dispatchEvent(selectReportEvent);
+                      }
+                    };
+                    
+                    retryFindContainer();
+                  }
+                }
+              } catch (error) {
+                console.error('SplitScreenContainer: Ошибка при отправке события requestReportSelector:', error);
+                // В случае ошибки всё равно пытаемся отправить событие
                 document.dispatchEvent(selectReportEvent);
               }
-            }
-          }, 300);
+            }, 300);
+          } else {
+            console.log(`SplitScreenContainer: Событие requestReportSelector уже было отправлено, пропускаем повторную отправку`);
+          }
         }, 100);
       }
     };
@@ -242,20 +292,36 @@ const SplitScreenContainer = ({
     // Сначала снимаем активность со всех контейнеров
     document.querySelectorAll('.split-screen-container[data-active="true"]')
       .forEach(el => {
-        el.setAttribute('data-active', 'false');
-        // Добавляем класс, чтобы улучшить визуальное отображение неактивных контейнеров
-        el.classList.remove('active-container');
+        try {
+          // Проверяем, что элемент существует и находится в DOM
+          if (el && document.body.contains(el)) {
+            el.setAttribute('data-active', 'false');
+            // Добавляем класс, чтобы улучшить визуальное отображение неактивных контейнеров
+            el.classList.remove('active-container');
+          }
+        } catch (e) {
+          console.warn('SplitScreenContainer: Ошибка при деактивации контейнера:', e);
+        }
       });
     
     // Активируем наш контейнер с более наглядной визуальной индикацией
     if (containerRef.current) {
-      containerRef.current.setAttribute('data-active', 'true');
-      // Добавляем класс для лучшей визуальной индикации
-      containerRef.current.classList.add('active-container');
-      setIsActive(true);
-      
-      // Также добавляем лог для отладки
-      console.log(`Контейнер ${id} активирован, будет разделен при следующем запросе`);
+      try {
+        // Проверяем, что контейнер всё ещё в DOM
+        if (document.body.contains(containerRef.current)) {
+          containerRef.current.setAttribute('data-active', 'true');
+          // Добавляем класс для лучшей визуальной индикации
+          containerRef.current.classList.add('active-container');
+          setIsActive(true);
+          
+          // Также добавляем лог для отладки
+          console.log(`Контейнер ${id} активирован, будет разделен при следующем запросе`);
+        } else {
+          console.warn(`SplitScreenContainer: Контейнер ${id} не содержится в DOM, невозможно активировать`);
+        }
+      } catch (e) {
+        console.error('SplitScreenContainer: Ошибка при активации контейнера:', e);
+      }
     }
   };
   
@@ -275,9 +341,14 @@ const SplitScreenContainer = ({
           if (wrapper && wrapper.classList.contains('non-react-wrapper')) {
             console.log(`SplitScreenContainer: Удаление non-react-wrapper для контейнера ${id || 'без ID'}`);
             
-            // Пытаемся безопасно удалить wrapper
+            // Безопасное удаление wrapper только если он действительно является дочерним элементом своего родителя
             try {
-              wrapper.parentNode.removeChild(wrapper);
+              // Проверяем, существует ли wrapper в DOM
+              if (wrapper.parentNode && wrapper.parentNode.contains(wrapper)) {
+                wrapper.parentNode.removeChild(wrapper);
+              } else {
+                console.log(`SplitScreenContainer: Wrapper уже был удален из DOM или не является дочерним элементом своего родителя`);
+              }
             } catch (e) {
               console.warn(`Ошибка при удалении wrapper для контейнера ${id || 'без ID'}:`, e);
             }
