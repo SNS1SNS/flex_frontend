@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faMapMarkerAlt, faRoute, faTachometerAlt, faGasPump, 
@@ -104,6 +105,20 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
     };
   }, [onClose]);
 
+  // Обрабатываем события загрузки/выгрузки страницы
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      console.log('ReportChooser: Страница закрывается, закрываем модальное окно');
+      forceCloseModal();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
   // Обработчик выбора отчета
   const handleSelectReport = (reportType) => {
     if (!selectedVehicle) {
@@ -123,21 +138,8 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
       
       console.log('ReportChooser: onClose вызван');
       
-      // РАДИКАЛЬНОЕ РЕШЕНИЕ: принудительное удаление модального окна из DOM
-      setTimeout(() => {
-        try {
-          // Находим все модальные окна и удаляем их
-          const overlays = document.querySelectorAll('.report-chooser-overlay');
-          console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
-          
-          overlays.forEach(overlay => {
-            console.log('ReportChooser: Принудительное удаление модального окна из DOM');
-            overlay.parentNode.removeChild(overlay);
-          });
-        } catch (err) {
-          console.error('ReportChooser: Ошибка при принудительном удалении:', err);
-        }
-      }, 100);
+      // Принудительное закрытие с небольшой задержкой
+      setTimeout(forceCloseModal, 100);
     } catch (err) {
       console.error('ReportChooser: Ошибка при обработке выбора отчета:', err);
     }
@@ -153,21 +155,8 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
         // Вызываем стандартный onClose
         onClose();
         
-        // РАДИКАЛЬНОЕ РЕШЕНИЕ: принудительное удаление модального окна из DOM
-        setTimeout(() => {
-          try {
-            // Находим все модальные окна и удаляем их
-            const overlays = document.querySelectorAll('.report-chooser-overlay');
-            console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
-            
-            overlays.forEach(overlay => {
-              console.log('ReportChooser: Принудительное удаление модального окна из DOM');
-              overlay.parentNode.removeChild(overlay);
-            });
-          } catch (err) {
-            console.error('ReportChooser: Ошибка при принудительном удалении:', err);
-          }
-        }, 100);
+        // Принудительное закрытие с небольшой задержкой
+        setTimeout(forceCloseModal, 100);
       } catch (err) {
         console.error('ReportChooser: Ошибка при закрытии модального окна по фону:', err);
       }
@@ -189,21 +178,8 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
       // Вызываем стандартный onClose
       onClose();
       
-      // РАДИКАЛЬНОЕ РЕШЕНИЕ: принудительное удаление модального окна из DOM
-      setTimeout(() => {
-        try {
-          // Находим все модальные окна и удаляем их
-          const overlays = document.querySelectorAll('.report-chooser-overlay');
-          console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
-          
-          overlays.forEach(overlay => {
-            console.log('ReportChooser: Принудительное удаление модального окна из DOM');
-            overlay.parentNode.removeChild(overlay);
-          });
-        } catch (err) {
-          console.error('ReportChooser: Ошибка при принудительном удалении:', err);
-        }
-      }, 100);
+      // Принудительное закрытие с небольшой задержкой
+      setTimeout(forceCloseModal, 100);
     } catch (err) {
       console.error('ReportChooser: Ошибка при закрытии модального окна:', err);
     }
@@ -218,27 +194,15 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
       // Вызываем стандартный onClose
       onClose();
       
-      // РАДИКАЛЬНОЕ РЕШЕНИЕ: принудительное удаление модального окна из DOM
-      setTimeout(() => {
-        try {
-          // Находим все модальные окна и удаляем их
-          const overlays = document.querySelectorAll('.report-chooser-overlay');
-          console.log('ReportChooser: Найдено модальных окон для принудительного удаления:', overlays.length);
-          
-          overlays.forEach(overlay => {
-            console.log('ReportChooser: Принудительное удаление модального окна из DOM');
-            overlay.parentNode.removeChild(overlay);
-          });
-        } catch (err) {
-          console.error('ReportChooser: Ошибка при принудительном удалении:', err);
-        }
-      }, 100);
+      // Принудительное закрытие с небольшой задержкой
+      setTimeout(forceCloseModal, 100);
     } catch (err) {
       console.error('ReportChooser: Ошибка при закрытии модального окна кнопкой Отмена:', err);
     }
   };
 
-  return (
+  // Создаем элемент модального окна
+  const modalContent = (
     <div className="report-chooser-overlay" onClick={handleOverlayClick}>
       <div className="report-chooser" onClick={handleModalClick}>
         <div className="report-chooser-header">
@@ -309,6 +273,12 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
         </div>
       </div>
     </div>
+  );
+
+  // Используем React Portal для рендеринга модального окна в корне DOM
+  return ReactDOM.createPortal(
+    modalContent,
+    document.body
   );
 };
 

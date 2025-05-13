@@ -615,8 +615,6 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
               if (dateTime && dateTime instanceof Date) {
                 return dateTime.toLocaleString('ru-RU', {
                   timeZone: 'Asia/Almaty',
-                  day: 'numeric',
-                  month: 'numeric',
                   hour: '2-digit',
                   minute: '2-digit',
                   second: '2-digit'

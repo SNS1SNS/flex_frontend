@@ -12,9 +12,10 @@ export const SPLIT_MODES = {
 };
 
 // Максимальное количество разделений по направлениям
+// Для рекурсивного разделения - это глубина вложенности, а не общее количество
 const MAX_SPLITS = {
-  VERTICAL: 2,    // Максимум 2 колонки
-  HORIZONTAL: 4   // Максимум 4 строки
+  VERTICAL: 4,    // Максимум 4 уровня вертикальных разделений
+  HORIZONTAL: 4   // Максимум 4 уровня горизонтальных разделений
 };
 
 /**
@@ -43,6 +44,7 @@ class SplitScreenManager {
     this.horizontalSplitCount = 0; // Счетчик горизонтальных разделений
     this.observers = null; // Хранит наблюдателей для контейнеров
     this._pendingSplitWrappers = null; // Хранит ожидающие разделения
+    this.splitLevels = new Map(); // Хранит уровни вложенности разделения для каждого контейнера
   }
 
   /**
@@ -900,23 +902,26 @@ class SplitScreenManager {
   addDynamicSplit(containerId, direction) {
     console.log(`SplitScreenManager: Начало разделения контейнера ${containerId} по направлению ${direction}`);
     
-    // Проверяем, не превышено ли максимальное количество разделений
-    if (direction === 'vertical' && this.verticalSplitCount >= MAX_SPLITS.VERTICAL) {
-      // Показываем уведомление о максимальном количестве колонок
+    // Получаем текущий уровень вложенности для контейнера
+    let currentLevel = this.splitLevels.get(containerId) || 0;
+    
+    // Проверка уровня вложенности для рекурсивного разделения
+    if (direction === 'vertical' && currentLevel >= MAX_SPLITS.VERTICAL) {
+      // Показываем уведомление о максимальном уровне вложенности
       if (window.showNotification) {
-        window.showNotification('warning', `Достигнуто максимальное количество вертикальных разделений (${MAX_SPLITS.VERTICAL})`);
+        window.showNotification('warning', `Достигнуто максимальное количество уровней вертикальных разделений (${MAX_SPLITS.VERTICAL})`);
       } else {
-        console.warn(`Достигнуто максимальное количество вертикальных разделений (${MAX_SPLITS.VERTICAL})`);
+        console.warn(`Достигнуто максимальное количество уровней вертикальных разделений (${MAX_SPLITS.VERTICAL})`);
       }
       return false;
     }
     
-    if (direction === 'horizontal' && this.horizontalSplitCount >= MAX_SPLITS.HORIZONTAL) {
-      // Показываем уведомление о максимальном количестве строк
+    if (direction === 'horizontal' && currentLevel >= MAX_SPLITS.HORIZONTAL) {
+      // Показываем уведомление о максимальном уровне вложенности
       if (window.showNotification) {
-        window.showNotification('warning', `Достигнуто максимальное количество горизонтальных разделений (${MAX_SPLITS.HORIZONTAL})`);
+        window.showNotification('warning', `Достигнуто максимальное количество уровней горизонтальных разделений (${MAX_SPLITS.HORIZONTAL})`);
       } else {
-        console.warn(`Достигнуто максимальное количество горизонтальных разделений (${MAX_SPLITS.HORIZONTAL})`);
+        console.warn(`Достигнуто максимальное количество уровней горизонтальных разделений (${MAX_SPLITS.HORIZONTAL})`);
       }
       return false;
     }
@@ -1018,6 +1023,13 @@ class SplitScreenManager {
       this.horizontalSplitCount++;
     }
     
+    // Обновляем уровни вложенности для новых контейнеров
+    const newLevel = currentLevel + 1;
+    this.splitLevels.set(container1Id, newLevel);
+    this.splitLevels.set(container2Id, newLevel);
+    
+    console.log(`SplitScreenManager: Уровень разделения контейнеров ${container1Id}, ${container2Id}: ${newLevel}`);
+    
     // Для React-контейнеров используем событийный подход
     // Создаем событие для координации с React-компонентами
     const event = new CustomEvent('splitContainerRequested', {
@@ -1026,7 +1038,8 @@ class SplitScreenManager {
         container1Id: container1Id,
         container2Id: container2Id,
         direction: direction,
-        originalContent: originalContent ? true : false
+        originalContent: originalContent ? true : false,
+        level: newLevel // Передаем текущий уровень вложенности
       }
     });
     document.dispatchEvent(event);
@@ -1036,7 +1049,8 @@ class SplitScreenManager {
       containerId,
       direction,
       childContainers: [container1Id, container2Id],
-      isReactManaged
+      isReactManaged,
+      level: newLevel
     });
     
     // Запускаем таймер для перерисовки графиков после разделения
@@ -1050,7 +1064,8 @@ class SplitScreenManager {
           containerId: containerId,
           container1Id: container1Id,
           container2Id: container2Id,
-          direction: direction
+          direction: direction,
+          level: newLevel
         }
       });
       document.dispatchEvent(completeEvent);

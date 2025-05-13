@@ -1,10 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faColumns, 
-  faRedo, 
-  faWindowRestore
-} from '@fortawesome/free-solid-svg-icons';
 import splitScreenManager, { SPLIT_MODES } from '../../utils/SplitScreenManager';
 import './SplitScreenContainer.css';
 
@@ -34,7 +28,10 @@ const SplitScreenContainer = ({
     splitDirection: null,
     children: []
   });
+  // Используем это состояние для обработки событий мыши
   const [showSplitControls, setShowSplitControls] = useState(false);
+  // Используем отдельное состояние для отслеживания активности
+  const [isActive, setIsActive] = useState(false);
   
   // Ref для контейнера
   const containerRef = useRef(null);
@@ -81,6 +78,25 @@ const SplitScreenContainer = ({
       console.log(`SplitScreenContainer: Инициализирован контейнер с ID ${id || 'без ID'}`);
     }
   }, [id]);
+  
+  // Добавляем глобальный обработчик кликов для сброса активности всех контейнеров
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      // Если клик произошел вне нашего контейнера, деактивируем его
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsActive(false);
+        if (containerRef.current) {
+          containerRef.current.setAttribute('data-active', 'false');
+        }
+      }
+    };
+    
+    document.addEventListener('click', handleGlobalClick);
+    
+    return () => {
+      document.removeEventListener('click', handleGlobalClick);
+    };
+  }, []);
   
   // Добавляем обработчик события запроса на разделение контейнера
   useEffect(() => {
@@ -136,6 +152,74 @@ const SplitScreenContainer = ({
       document.removeEventListener('splitContainerRequested', handleSplitRequest);
     };
   }, [id, onSplitChange, children]);
+  
+  // Обновляем эффект для обработки события requestSplit, чтобы учитывать только активный контейнер
+  useEffect(() => {
+    // Функция-обработчик события запроса на разделение
+    const handleGlobalSplitRequest = (event) => {
+      const { direction, targetContainerId } = event.detail;
+      
+      // Проверка 1: событие имеет targetContainerId и это наш контейнер
+      const hasTargetId = targetContainerId && targetContainerId === id;
+      
+      // Проверка 2: событие не имеет targetContainerId, но наш контейнер активен
+      const isActiveContainer = !targetContainerId && (isActive || showSplitControls) && containerRef.current;
+      
+      // Применяем разделение, только если одно из условий истинно
+      if (hasTargetId || isActiveContainer) {
+        console.log(`SplitScreenContainer ${id}: Применяем разделение ${direction} к контейнеру`);
+        
+        // Вместо использования splitScreenManager.addDynamicSplit, создаем специфичное событие
+        const specificSplitEvent = new CustomEvent('splitContainerRequested', {
+          detail: {
+            containerId: id,
+            container1Id: `${id}-1`,
+            container2Id: `${id}-2`,
+            direction: direction
+          }
+        });
+        
+        // Отправляем событие на обработку
+        document.dispatchEvent(specificSplitEvent);
+        
+        // Останавливаем дальнейшую обработку
+        event.stopPropagation();
+        
+        // Устанавливаем флаг, что событие было обработано
+        event.detail.processed = true;
+      }
+    };
+    
+    // Добавляем обработчик события с capture=true, чтобы перехватить событие до bubbling
+    document.addEventListener('requestSplit', handleGlobalSplitRequest, true);
+    
+    // Очистка при размонтировании
+    return () => {
+      document.removeEventListener('requestSplit', handleGlobalSplitRequest, true);
+    };
+  }, [id, isActive, showSplitControls]);
+  
+  // Обработчик клика для активации контейнера - улучшаем для лучшей визуальной индикации и обновления состояния
+  const handleContainerClick = () => {
+    // Сначала снимаем активность со всех контейнеров
+    document.querySelectorAll('.split-screen-container[data-active="true"]')
+      .forEach(el => {
+        el.setAttribute('data-active', 'false');
+        // Добавляем класс, чтобы улучшить визуальное отображение неактивных контейнеров
+        el.classList.remove('active-container');
+      });
+    
+    // Активируем наш контейнер с более наглядной визуальной индикацией
+    if (containerRef.current) {
+      containerRef.current.setAttribute('data-active', 'true');
+      // Добавляем класс для лучшей визуальной индикации
+      containerRef.current.classList.add('active-container');
+      setIsActive(true);
+      
+      // Также добавляем лог для отладки
+      console.log(`Контейнер ${id} активирован, будет разделен при следующем запросе`);
+    }
+  };
   
   // Эффект для очистки перед размонтированием
   useEffect(() => {
@@ -208,64 +292,6 @@ const SplitScreenContainer = ({
     setShowSplitControls(false);
   };
   
-  // Обработчик клика по кнопке разделения по горизонтали
-  const handleHorizontalSplit = () => {
-    splitScreenManager.addDynamicSplit(id, 'horizontal');
-  };
-  
-  // Обработчик клика по кнопке разделения по вертикали
-  const handleVerticalSplit = () => {
-    splitScreenManager.addDynamicSplit(id, 'vertical');
-  };
-  
-  // Функция преобразования в обычный режим (без разделения)
-  const handleSingleMode = () => {
-    splitScreenManager.changeSplitMode(SPLIT_MODES.SINGLE);
-  };
-  
-  // Функция возврата к предыдущему режиму
-  const handleGoBack = () => {
-    splitScreenManager.goBack();
-  };
-  
-  // Рендер контролов разделения
-  const renderSplitControls = () => {
-    if (!allowSplit || !showControls || !showSplitControls) return null;
-    
-    return (
-      <div className="split-screen-controls">
-        <button 
-          className="split-control-button" 
-          onClick={handleHorizontalSplit}
-          title="Разделить по горизонтали"
-        >
-          <FontAwesomeIcon icon={faColumns} style={{ transform: 'rotate(90deg)' }} />
-        </button>
-        <button 
-          className="split-control-button" 
-          onClick={handleVerticalSplit}
-          title="Разделить по вертикали"
-        >
-          <FontAwesomeIcon icon={faColumns} />
-        </button>
-        <button 
-          className="split-control-button" 
-          onClick={handleSingleMode}
-          title="Один экран"
-        >
-          <FontAwesomeIcon icon={faWindowRestore} />
-        </button>
-        <button 
-          className="split-control-button" 
-          onClick={handleGoBack}
-          title="Назад"
-        >
-          <FontAwesomeIcon icon={faRedo} style={{ transform: 'rotate(180deg)' }} />
-        </button>
-      </div>
-    );
-  };
-  
   // Рендер разделенных контейнеров с улучшенной поддержкой содержимого
   const renderSplitContainers = () => {
     if (!containerState.isSplit) {
@@ -279,33 +305,61 @@ const SplitScreenContainer = ({
     
     const [container1Id, container2Id] = containerState.children.map(child => child.id);
     
+    // Важно: добавляем data-split-direction на контейнер для CSS-селекторов
     return (
-      <div className={`split-container ${splitClassName}`}>
-        <div className="split-pane" id={container1Id} data-container-id={container1Id}>
+      <div 
+        className={`split-container ${splitClassName}`}
+        data-split-direction={containerState.splitDirection}
+      >
+        <div 
+          className="split-pane" 
+          id={container1Id} 
+          data-container-id={container1Id}
+          data-split-parent={id}
+          data-split-index="0"
+        >
           {/* Первый разделенный контейнер - сохраняем предыдущее содержимое */}
-          <div className="split-content">
+          <SplitScreenContainer 
+            id={container1Id}
+            allowSplit={allowSplit}
+            showControls={showControls}
+            className="split-content"
+          >
             {containerState.children[0].content || 
               <span className="split-placeholder">Контейнер 1</span>}
-          </div>
+          </SplitScreenContainer>
         </div>
         <div 
           className={`resizer ${containerState.splitDirection === 'horizontal' ? 'horizontal' : 'vertical'}`}
           onMouseDown={handleResizerMouseDown}
+          data-split-parent={id}
+          data-split-direction={containerState.splitDirection}
         ></div>
-        <div className="split-pane" id={container2Id} data-container-id={container2Id}>
+        <div 
+          className="split-pane" 
+          id={container2Id} 
+          data-container-id={container2Id}
+          data-split-parent={id}
+          data-split-index="1"
+        >
           {/* Второй разделенный контейнер - для нового содержимого */}
-          <div className="split-content">
+          <SplitScreenContainer 
+            id={container2Id}
+            allowSplit={allowSplit}
+            showControls={showControls}
+            className="split-content"
+          >
             {containerState.children[1].content || 
               <span className="split-placeholder">Контейнер 2</span>}
-          </div>
+          </SplitScreenContainer>
         </div>
       </div>
     );
   };
   
   // Добавим функциональность для изменения размера разделенных частей
-  const handleResizerMouseDown = (e) => {
-    e.preventDefault();
+  const handleResizerMouseDown = (mouseDownEvent) => {
+    mouseDownEvent.preventDefault();
     
     // Определяем направление и получаем элементы
     const isHorizontal = containerState.splitDirection === 'horizontal';
@@ -319,7 +373,7 @@ const SplitScreenContainer = ({
     const pane2 = panes[1];
     
     // Начальные размеры
-    const startPos = isHorizontal ? e.clientY : e.clientX;
+    const startPos = isHorizontal ? mouseDownEvent.clientY : mouseDownEvent.clientX;
     const startSize1 = isHorizontal ? pane1.offsetHeight : pane1.offsetWidth;
     const totalSize = isHorizontal ? container.offsetHeight : container.offsetWidth;
     
@@ -372,11 +426,12 @@ const SplitScreenContainer = ({
         flexDirection: 'column'
       }}
       data-container-id={id}
+      data-active={isActive ? "true" : "false"}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={handleContainerClick}
       {...props}
     >
-      {renderSplitControls()}
       {containerState.isSplit ? renderSplitContainers() : children}
     </div>
   );

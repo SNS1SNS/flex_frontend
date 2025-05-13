@@ -238,4 +238,135 @@
     width: 28px;
     height: 28px;
   }
+}
+
+/* Стили для вложенных контейнеров графиков */
+.split-pane .chart-container {
+  width: 100%;
+  height: 100%;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+/* Обеспечиваем правильное растягивание SplitScreenContainer внутри контейнера графика */
+.split-pane .chart-split-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* Модификации для заголовка графика в режиме разделения */
+.split-pane .tm-header {
+  padding: 4px 8px;
+  min-height: 30px;
+  font-size: 90%;
+}
+
+/* Уменьшаем размер кнопок в режиме разделения */
+.split-pane .tm-control-button {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+
+/* Стили для графика в рекурсивно разделенном режиме */
+.split-pane .split-pane .chart-container {
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+}
+
+/* Адаптируем заголовок для вложенных графиков */
+.split-pane .split-pane .tm-header {
+  padding: 2px 6px;
+  min-height: 24px;
+  font-size: 85%;
+}
+
+/* Специальные стили для совместимости с SplitScreenContainer */
+.chart-split-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Правильное размещение элементов управления разделением для графика */
+.chart-container .split-screen-controls {
+  top: 35px; /* Размещаем под заголовком графика */
+}
+
+/* Улучшенная визуализация активного графика */
+.split-pane .chart-container {
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+/* Активный график получает легкое выделение */
+.split-pane .chart-container[data-active="true"],
+.split-pane .chart-split-container[data-active="true"] {
+  border-color: #4e73df;
+  box-shadow: inset 0 0 0 1px rgba(78, 115, 223, 0.5);
+}
+
+/* При наведении на контейнер показываем едва заметный бордер */
+.split-pane .chart-container:hover {
+  border-color: rgba(78, 115, 223, 0.3);
+}
+
+/* Дополнительное разделение для вложенных графиков */
+.split-pane .split-pane {
+  position: relative;
+}
+
+/* Линия разделения для вложенных контейнеров */
+.split-pane .split-pane::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 1px dashed rgba(78, 115, 223, 0.2);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Улучшенные стили для активных графиков */
+.chart-container .split-screen-container.active-container {
+  outline: 2px dashed rgba(75, 115, 223, 0.8);
+  outline-offset: -2px;
+  background-color: rgba(75, 115, 223, 0.05);
+  box-shadow: inset 0 0 8px rgba(75, 115, 223, 0.3);
+}
+
+/* Улучшенные стили для заголовка активного графика */
+.active-container .tm-header {
+  background-color: #0d3566; /* Более темный оттенок синего */
+  border-bottom: 2px solid #4e73df;
+}
+
+/* Адаптация для графиков в разделенном режиме */
+.split-pane .chart-container {
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+/* Фиксируем высоту заголовка в разделенном режиме */
+.split-pane .tm-header {
+  min-height: 40px;
+}
+
+/* Улучшаем визуализацию разделителей между графиками */
+.split-container .resizer {
+  background-color: #ebedf4;
+  border: 1px solid #d1d3e2;
+  position: absolute;
+  z-index: 100;
+  transition: background-color 0.2s ease;
+}
+
+/* Подсветка разделителя при наведении */
+.split-container .resizer:hover {
+  background-color: #4e73df;
+  border-color: #3a5ccc;
 } 

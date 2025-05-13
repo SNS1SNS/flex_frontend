@@ -11,10 +11,11 @@
 
 /* Стили для контейнера в разделенном режиме */
 .split-container {
+  position: relative;
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
   display: flex;
-  box-sizing: border-box;
 }
 
 /* Стили для горизонтально разделенного контейнера */
@@ -48,52 +49,121 @@
   box-sizing: border-box;
 }
 
-/* Стили для разделителя */
-.resizer {
-  background: #e0e0e0;
-  position: relative;
-  z-index: 10;
-  box-sizing: border-box;
-  border: 1px solid #d0d0d0;
-  box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
-  transition: background 0.2s;
-}
-
-/* Вертикальный разделитель (для вертикального разделения) */
-.resizer.vertical {
-  width: 8px;
+/* Стили для рекурсивно разделенных контейнеров */
+.split-pane .split-screen-container {
+  width: 100%;
   height: 100%;
-  cursor: col-resize;
+  border: none;
 }
 
-/* Горизонтальный разделитель (для горизонтального разделения) */
+/* Стили для разделителя между контейнерами */
+.resizer {
+  background-color: #ebedf4;
+  border: 1px solid #d1d3e2;
+  position: absolute;
+  z-index: 100;
+  transition: background-color 0.2s ease;
+}
+
+/* Горизонтальный разделитель */
 .resizer.horizontal {
   height: 8px;
   width: 100%;
   cursor: row-resize;
+  left: 0;
+  top: calc(50% - 4px);
 }
 
-/* Стили при наведении на разделитель */
+/* Вертикальный разделитель */
+.resizer.vertical {
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  top: 0;
+  left: calc(50% - 4px);
+}
+
+/* Подсветка разделителя при наведении */
 .resizer:hover {
-  background: #ccc;
+  background-color: #4e73df;
+  border-color: #3a5ccc;
 }
 
-/* Стили при перетаскивании разделителя */
-.resizer:active {
-  background: #aaa;
+/* Активный разделитель при перетаскивании */
+.resizer.active {
+  background-color: #4e73df;
+  border-color: #3a5ccc;
 }
 
-/* Стили для элемента-заполнителя */
+/* Стили для вложенных разделителей, делаем их визуально отличимыми */
+.split-pane .resizer {
+  background: #d0d0d0;
+  border-color: #c0c0c0;
+}
+
+.split-pane .split-pane .resizer {
+  background: #c0c0c0;
+  border-color: #b0b0b0;
+}
+
+.split-pane .split-pane .split-pane .resizer {
+  background: #b0b0b0;
+  border-color: #a0a0a0;
+}
+
+/* Стили для элементов управления разделением экрана */
+.split-screen-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 5px;
+  z-index: 100;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  padding: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Отображение контролов при наведении на контейнер */
+.split-screen-container:hover > .split-screen-controls {
+  opacity: 1;
+}
+
+/* Стили для кнопок управления разделением */
+.split-control-button {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  color: #666;
+}
+
+.split-control-button:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+/* Стили для заглушки пустого контейнера */
 .split-placeholder {
   display: flex;
-  justify-content: center;
   align-items: center;
-  width: 100%;
+  justify-content: center;
   height: 100%;
+  width: 100%;
+  text-align: center;
   color: #999;
   font-style: italic;
   font-size: 14px;
-  background: #f9f9f9;
 }
 
 /* Стили для панели управления разделением */
@@ -169,45 +239,6 @@
   margin: 5px;
 }
 
-/* Стили для элементов управления разделением */
-.split-screen-controls {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1000;
-  display: flex;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  padding: 4px;
-  transition: opacity 0.3s ease;
-}
-
-.split-control-btn {
-  background: none;
-  border: none;
-  color: #444;
-  cursor: pointer;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 2px;
-  padding: 0;
-  border-radius: 3px;
-  transition: background-color 0.2s ease;
-}
-
-.split-control-btn:hover {
-  background-color: #e0e0e0;
-  color: #000;
-}
-
-.split-control-btn:active {
-  background-color: #ccc;
-}
-
 /* Стили для различных режимов разделения */
 .quad-split {
   display: grid;
@@ -232,4 +263,92 @@
     width: 20px;
     height: 20px;
   }
+}
+
+/* Активный контейнер, который будет разделен */
+.split-screen-container[data-active="true"],
+.split-screen-container.active-container {
+  outline: 2px dashed rgba(75, 115, 223, 0.7);
+  outline-offset: -2px;
+  background-color: rgba(75, 115, 223, 0.05);
+  z-index: 5; /* Повышаем z-index для активного контейнера */
+}
+
+/* Улучшенная визуальная подсветка активного контейнера */
+.active-container {
+  box-shadow: inset 0 0 8px rgba(75, 115, 223, 0.3);
+}
+
+/* Контейнер под мышью */
+.split-screen-container:hover {
+  outline: 2px dashed rgba(75, 115, 223, 0.3);
+  outline-offset: -2px;
+  background-color: rgba(75, 115, 223, 0.02);
+}
+
+/* Корректируем разделители для рекурсивного разделения */
+/* Контейнеры в разделенном режиме должны иметь правильное позиционирование */
+.split-container {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+
+/* Горизонтальное разделение - панели идут сверху вниз */
+.split-container.split-horizontal {
+  flex-direction: column;
+}
+
+/* Горизонтальное разделение - панели идут слева направо */
+.split-container.split-vertical {
+  flex-direction: row;
+}
+
+/* Правильное позиционирование разделителей */
+/* Горизонтальный разделитель должен идти между панелями */
+.split-container.split-horizontal .resizer.horizontal {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 8px;
+  margin-top: -4px;
+  cursor: row-resize;
+  z-index: 100;
+}
+
+/* Вертикальный разделитель должен идти между панелями */
+.split-container.split-vertical .resizer.vertical {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  margin-left: -4px;
+  cursor: col-resize;
+  z-index: 100;
+}
+
+/* Панели в горизонтальном разделении */
+.split-container.split-horizontal > .split-pane:first-child {
+  height: calc(50% - 4px);
+  margin-bottom: 8px;
+}
+
+.split-container.split-horizontal > .split-pane:last-child {
+  height: calc(50% - 4px);
+  margin-top: 0;
+}
+
+/* Панели в вертикальном разделении */
+.split-container.split-vertical > .split-pane:first-child {
+  width: calc(50% - 4px);
+  margin-right: 8px;
+}
+
+.split-container.split-vertical > .split-pane:last-child {
+  width: calc(50% - 4px);
+  margin-left: 0;
 } 
