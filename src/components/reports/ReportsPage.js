@@ -17,9 +17,9 @@ import logo from '../../images/logo.svg';
 import fuel from '../../images/fuel.png';
 import track from '../../images/road.png';
 import track2 from '../../images/tracks.png';
-import ChartDebugPanel from './ChartDebugPanel'; // Импортируем панель отладки
+import ChartDebugPanel from './ChartDebugPanel'; 
 
-// Временные заглушки для компонентов, которые еще не созданы
+
 const LiveTrack = ({ vehicle, startDate, endDate }) => (
   <div className="component-placeholder">
     <h3>Компонент LiveTrack находится в разработке</h3>
@@ -28,25 +28,24 @@ const LiveTrack = ({ vehicle, startDate, endDate }) => (
   </div>
 );
 
-// Импортируем компоненты графиков
+
 import SpeedChart from './SpeedChart';
 import FuelChart from './FuelChart';
 import VoltageChart from './VoltageChart';
 import EngineChart from './EngineChart';
 
-// Импортируем менеджер разделения экрана и компонент выбора отчетов
-import SplitScreenManager, { SPLIT_MODES } from '../../utils/SplitScreenManager';
+
 import '../../utils/SplitScreen.css';
 import ReportSelector from './ReportSelector';
 
 const ReportsPage = () => {
   const [dateRange, setDateRange] = useState(() => {
-    // Пытаемся восстановить дату из localStorage
+    
     try {
       const savedRange = localStorage.getItem('lastDateRange');
       if (savedRange) {
         const parsed = JSON.parse(savedRange);
-        // Конвертируем строки дат в объекты Date
+        
         return {
           startDate: parsed.startDate ? new Date(parsed.startDate) : new Date(),
           endDate: parsed.endDate ? new Date(parsed.endDate) : new Date()
@@ -56,7 +55,7 @@ const ReportsPage = () => {
       console.warn('Ошибка при чтении диапазона дат из localStorage:', e);
     }
     
-    // По умолчанию - последние 24 часа
+    
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - 1);
@@ -69,102 +68,69 @@ const ReportsPage = () => {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [showReportMenu, setShowReportMenu] = useState(false);
 
-  // Состояние для предварительного просмотра отчета
+  
   const [previewReport, setPreviewReport] = useState({
     title: 'Выберите отчет',
     description: 'Наведите курсор на интересующий вас отчет, чтобы увидеть его описание.',
     image: ''
   });
 
-  // Refs
-  // eslint-disable-next-line no-unused-vars
+  
+  
   const datePickerRef = useRef(null);
   const reportMenuRef = useRef(null);
 
-  // Добавляем состояние для компактного режима сайдбара
+  
   const [isCompactMode, setIsCompactMode] = useState(false);
   
-  // Добавляем состояние для профильного меню
+  
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   
-  // Добавляем ref для профильного меню
+  
   const profileMenuRef = useRef(null);
 
-  // Режим разделения экрана
+  
   const [splitMode, setSplitMode] = useState(() => {
     const savedMode = localStorage.getItem('splitScreenMode');
-    return savedMode || 'single';  // 'single', 'split-2', 'split-4'
+    return savedMode || 'single';  
   });
 
-  // Добавляем состояния для модального окна
+  
   const [showDateModal, setShowDateModal] = useState(false);
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
 
-  // Добавляем состояние для активации режима разделения экрана
+  
   const [splitScreenActive, setSplitScreenActive] = useState(false);
   
-  // Добавляем ref для контейнера отчетов
+  
   const reportsContainerRef = useRef(null);
 
-  // Обработчик события createReport
+  
   useEffect(() => {
-    // Функция-обработчик события создания отчета
+    // Обработчик события создания отчета
     const handleCreateReport = (event) => {
       const { reportType, container, vehicle, startDate, endDate } = event.detail;
       
-      // Создаем отчет в указанном контейнере
+      // Создаем отчет для указанного контейнера
       createReportForContainer(reportType, container, vehicle, startDate, endDate);
     };
     
-    // Добавляем слушателя события
+    // Подписываемся на событие
     document.addEventListener('createReport', handleCreateReport);
     
-    // Очистка порталов и модальных окон
-    const cleanupModals = () => {
-      // Находим и очищаем элемент modal-root
-      const modalRoot = document.getElementById('modal-root');
-      if (modalRoot) {
-        try {
-          console.log('ReportsPage: Очистка modal-root при размонтировании');
-          // Безопасно удаляем содержимое
-          while (modalRoot.firstChild) {
-            modalRoot.removeChild(modalRoot.firstChild);
-          }
-        } catch (e) {
-          console.error('ReportsPage: Ошибка при очистке modal-root:', e);
-        }
-      }
-      
-      // Удаляем все элементы с классом report-chooser-overlay
-      const overlays = document.querySelectorAll('.report-chooser-overlay');
-      for (const overlay of overlays) {
-        try {
-          const parent = overlay.parentNode;
-          if (parent && parent.contains(overlay)) {
-            parent.removeChild(overlay);
-          }
-        } catch (e) {
-          console.error('ReportsPage: Ошибка при удалении модального окна:', e);
-        }
-      }
-    };
-    
-    // Очистка при размонтировании
+    // Отписываемся при размонтировании
     return () => {
       document.removeEventListener('createReport', handleCreateReport);
-      
-      // Очищаем все модальные окна и порталы при выходе со страницы
-      cleanupModals();
     };
   }, []);
 
-  // Эффект для обработки событий навигации и перед размонтированием компонента
+  
   useEffect(() => {
     const handleBeforeUnload = () => {
       console.log('ReportsPage: Обработка события beforeunload');
       
-      // Находим и закрываем модальные окна
+      
       const reportChoosers = document.querySelectorAll('.report-chooser-overlay');
       reportChoosers.forEach(element => {
         try {
@@ -176,7 +142,7 @@ const ReportsPage = () => {
         }
       });
       
-      // Очищаем modal-root
+      
       const modalRoot = document.getElementById('modal-root');
       if (modalRoot) {
         while (modalRoot.firstChild) {
@@ -185,24 +151,24 @@ const ReportsPage = () => {
       }
     };
     
-    // Добавляем обработчик
+    
     window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // Очистка при размонтировании
+    
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      handleBeforeUnload(); // Вызываем очистку явно при размонтировании
+      handleBeforeUnload(); 
     };
   }, []);
 
-  // Форматирование даты в строку ДД.ММ.ГГГГ
+  
   const formatDate = (date) => {
     if (!date) return '';
     
-    // Проверяем, является ли date строкой, и если да - преобразуем в объект Date
+    
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     
-    // Проверяем, является ли dateObj валидным объектом Date
+    
     if (!(dateObj instanceof Date) || isNaN(dateObj)) {
       console.warn('Невалидная дата для форматирования:', date);
       return '';
@@ -214,7 +180,7 @@ const ReportsPage = () => {
     return `${day}.${month}.${year}`;
   };
 
-  // Расчет диапазона дат на основе типа периода
+  
   const calculateDateRange = (baseDate, periodType) => {
     const currentDate = baseDate || new Date();
     const startDate = new Date(currentDate);
@@ -237,20 +203,20 @@ const ReportsPage = () => {
     return { startDate, endDate };
   };
 
-  // Инициализация диапазона дат при загрузке
+  
   useEffect(() => {
     const savedPeriod = localStorage.getItem('currentPeriodType') || 'day';
     setSelectedPeriod(savedPeriod);
     const { startDate, endDate } = calculateDateRange(new Date(), savedPeriod);
     setDateRange({ startDate, endDate });
     
-    // Загрузка статистики
+    
     fetchStatistics();
   }, []);
 
-  // Обновляем обработчик клика по календарю
+  
   const handleCalendarClick = () => {
-    // Инициализируем временные даты текущими значениями
+    
     const startDate = dateRange.startDate instanceof Date 
       ? dateRange.startDate.toISOString().split('T')[0] 
       : (typeof dateRange.startDate === 'string' ? dateRange.startDate : '');
@@ -261,44 +227,44 @@ const ReportsPage = () => {
     
     setTempStartDate(startDate);
     setTempEndDate(endDate);
-    // Открываем модальное окно
+    
     setShowDateModal(true);
   };
 
-  // Функция закрытия модального окна
+  
   const closeDateModal = () => {
     setShowDateModal(false);
   };
 
-  // Обработчик изменения начальной даты
+  
   const handleStartDateChange = (e) => {
     setTempStartDate(e.target.value);
   };
 
-  // Обработчик изменения конечной даты
+  
   const handleEndDateChange = (e) => {
     setTempEndDate(e.target.value);
   };
 
-  // Функция для применения выбранного диапазона дат
+  
   const applyDateRange = () => {
-    // Преобразуем строки в объекты Date
+    
     const startDate = new Date(tempStartDate);
     const endDate = new Date(tempEndDate);
     
-    // Устанавливаем время начальной даты на 00:00:00.000
+    
     startDate.setHours(0, 0, 0, 0);
     
-    // Обновляем основное состояние dateRange
+    
     setDateRange({
       startDate,
       endDate
     });
     
-    // Сохраняем дату последнего обновления для отслеживания
+    
     window.lastDateUpdateTime = new Date().getTime();
     
-    // Сохраняем в localStorage
+    
     try {
       localStorage.setItem('lastDateRange', JSON.stringify({
         startDate: startDate.toISOString(),
@@ -314,10 +280,10 @@ const ReportsPage = () => {
       console.warn('Ошибка при сохранении дат в localStorage:', error);
     }
     
-    // Закрываем модальное окно
+    
     setShowDateModal(false);
     
-    // Отправляем событие обновления дат
+    
     const dateEvent = new CustomEvent('dateRangeChanged', {
       detail: {
         startDate: formatDate(startDate),
@@ -328,7 +294,7 @@ const ReportsPage = () => {
     });
     document.dispatchEvent(dateEvent);
     
-    // Отправляем событие принудительного обновления для всех компонентов
+    
     const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
       detail: { 
         vehicle: selectedVehicle,
@@ -339,7 +305,7 @@ const ReportsPage = () => {
     });
     document.dispatchEvent(forceUpdateEvent);
     
-    // Обновляем даты в открытых вкладках
+    
     if (openTabs.length > 0) {
       setOpenTabs(prevTabs => prevTabs.map(tab => ({
         ...tab,
@@ -348,26 +314,26 @@ const ReportsPage = () => {
       })));
     }
     
-    // Обновляем статистику с новым диапазоном дат
+    
     fetchStatistics();
   };
 
-  // Обработчик смены периода (день/неделя/месяц)
+  
   const handlePeriodChange = (period) => {
     setSelectedPeriod(period);
     localStorage.setItem('currentPeriodType', period);
     
     const { startDate, endDate } = calculateDateRange(new Date(), period);
     
-    // Дополнительная гарантия, что startDate установлен на 00:00:00.000
+    
     startDate.setHours(0, 0, 0, 0);
     
     setDateRange({ startDate, endDate });
     
-    // Сохраняем дату последнего обновления для отслеживания
+    
     window.lastDateUpdateTime = new Date().getTime();
     
-    // Сохраняем в localStorage с форматированием для правильного чтения в других компонентах
+    
     try {
       localStorage.setItem('lastDateRange', JSON.stringify({
         startDate: startDate.toISOString(),
@@ -385,7 +351,7 @@ const ReportsPage = () => {
       console.warn('Ошибка при сохранении дат в localStorage:', error);
     }
     
-    // Отправка события об изменении дат
+    
     const event = new CustomEvent('dateRangeChanged', {
       detail: {
         startDate: formatDate(startDate),
@@ -397,7 +363,7 @@ const ReportsPage = () => {
     });
     document.dispatchEvent(event);
     
-    // Дополнительно отправляем событие forceUpdate для обеспечения синхронизации
+    
     const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
       detail: { 
         vehicle: selectedVehicle,
@@ -408,7 +374,7 @@ const ReportsPage = () => {
     });
     document.dispatchEvent(forceUpdateEvent);
     
-    // Обновляем даты в открытых вкладках
+    
     if (openTabs.length > 0) {
       setOpenTabs(prevTabs => prevTabs.map(tab => ({
         ...tab,
@@ -418,31 +384,31 @@ const ReportsPage = () => {
     }
   };
 
-  // Загрузка статистики
+  
   const fetchStatistics = async () => {
     try {
-      // Получаем токен авторизации с правильной структурой JWT
+      
       const getJwtToken = () => {
-        // Проверяем различные варианты хранения токена
+        
         const possibleTokenKeys = ['authToken', 'token', 'jwt', 'access_token'];
         
         for (const key of possibleTokenKeys) {
           const token = localStorage.getItem(key);
           if (token) {
-            // Проверяем, является ли токен корректным JWT (содержит 2 точки)
+            
             if (token.split('.').length === 3) {
               return token;
             }
           }
         }
         
-        // Если не нашли JWT токен, создаем тестовый
+        
         const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
         const payload = btoa(JSON.stringify({ 
           sub: 'test-user', 
           name: 'Test User', 
           role: 'ADMIN',
-          exp: Math.floor(Date.now() / 1000) + 3600 // срок действия 1 час
+          exp: Math.floor(Date.now() / 1000) + 3600 
         }));
         const signature = btoa('test-signature');
         
@@ -451,11 +417,11 @@ const ReportsPage = () => {
       
       const token = getJwtToken();
       
-      // Логируем детали запроса
+      
       console.log('Попытка загрузки статистики:');
       console.log('URL:', '/admin/statistics');
       
-      // Скрываем полный токен в логах (показываем только первую часть)
+      
       const tokenParts = token.split('.');
       const tokenForLog = tokenParts.length === 3 
                         ? `${tokenParts[0].substring(0, 10)}...` 
@@ -468,33 +434,33 @@ const ReportsPage = () => {
       
     } catch (error) {
       console.error('Ошибка при загрузке статистики:', error);
-      // При ошибке устанавливаем нулевые значения
+      
       setStats({ vehicles: 0, drivers: 0, trips: 0 });
     }
   };
 
-  // Обработчик добавления отчета
+  
   const handleAddReportClick = () => {
     setShowReportMenu(!showReportMenu);
   };
 
-  // Обработчик выбора отчета
+  
   const handleReportSelect = (reportType) => {
     if (!selectedVehicle) {
       alert('Пожалуйста, выберите транспортное средство для создания отчета');
       return;
     }
     
-    // Генерация ID для новой вкладки
+    
     const tabId = `tab-${Date.now()}`;
     
-    // Создание новой вкладки с учетом типа отчета
+    
     const newTab = {
       id: tabId,
       type: reportType,
       vehicle: selectedVehicle,
       title: getReportTitle(reportType),
-      // Добавляем даты для отчета
+      
       startDate: dateRange.startDate,
       endDate: dateRange.endDate
     };
@@ -506,13 +472,13 @@ const ReportsPage = () => {
       endDate: dateRange.endDate ? dateRange.endDate.toISOString() : 'не указана'
     });
     
-    // Добавление новой вкладки и переключение на неё
+    
     setOpenTabs(prevTabs => [...prevTabs, newTab]);
     setActiveTabId(tabId);
     setShowReportMenu(false);
   };
 
-  // Получение заголовка отчета по его типу
+  
   const getReportTitle = (reportType) => {
     switch (reportType) {
       case 'track': return 'Трек';
@@ -525,7 +491,7 @@ const ReportsPage = () => {
     }
   };
 
-  // Получение иконки отчета по его типу
+  
   const getReportIcon = (reportType) => {
     switch (reportType) {
       case 'safedrive-details': return faExclamationTriangle;
@@ -557,14 +523,14 @@ const ReportsPage = () => {
     }
   };
 
-  // Закрытие вкладки
+  
   const handleCloseTab = (tabId, e) => {
     e.stopPropagation();
     
     setOpenTabs(prevTabs => {
       const filteredTabs = prevTabs.filter(tab => tab.id !== tabId);
       
-      // Если закрываем активную вкладку, нужно активировать другую
+      
       if (activeTabId === tabId && filteredTabs.length > 0) {
         setActiveTabId(filteredTabs[filteredTabs.length - 1].id);
       } else if (filteredTabs.length === 0) {
@@ -575,14 +541,14 @@ const ReportsPage = () => {
     });
   };
 
-  // Переключение между вкладками
+  
   const handleTabChange = (tabId) => {
     setActiveTabId(tabId);
   };
 
-  // Обработчик выбора транспортного средства
+  
   const handleVehicleSelect = (vehicle) => {
-    // Если выбрано то же самое ТС, не делаем ничего
+    
     if (selectedVehicle && vehicle && selectedVehicle.id === vehicle.id) {
       console.log('Выбрано то же самое ТС, игнорируем:', vehicle?.name);
       return;
@@ -591,12 +557,12 @@ const ReportsPage = () => {
     setSelectedVehicle(vehicle);
     console.log('Выбрано транспортное средство:', vehicle);
 
-    // Сохраняем выбор в глобальной переменной для отслеживания последнего выбора
+    
     window.lastSelectedVehicleId = vehicle?.id;
     window.lastVehicleUpdateTime = new Date().getTime();
 
-    // Создаем пользовательское событие для обновления всех компонентов
-    // Добавляем текущие даты к событию для полной синхронизации
+    
+    
     const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
       detail: { 
         vehicle: vehicle,
@@ -606,10 +572,10 @@ const ReportsPage = () => {
       }
     });
 
-    // Отправляем событие для синхронизации выбора машины между компонентами
+    
     document.dispatchEvent(forceUpdateEvent);
 
-    // Обновляем все открытые вкладки с данными нового ТС
+    
     if (vehicle && openTabs.length > 0) {
       setOpenTabs(prevTabs => prevTabs.map(tab => ({
         ...tab,
@@ -618,7 +584,7 @@ const ReportsPage = () => {
     }
   };
 
-  // Отображение контента активной вкладки
+  
   const renderActiveTabContent = () => {
     const activeTab = openTabs.find(tab => tab.id === activeTabId);
     
@@ -690,11 +656,11 @@ const ReportsPage = () => {
       );
     }
     
-    // Получаем даты из вкладки или используем общие даты из состояния
+    
     const tabStartDate = activeTab.startDate || dateRange.startDate;
     const tabEndDate = activeTab.endDate || dateRange.endDate;
     
-    // Устраняем дубликаты рендера и гарантируем актуальные данные
+    
     console.log('Отображение отчета (одно сообщение):', {
       type: activeTab.type,
       vehicle: activeTab.vehicle,
@@ -702,20 +668,20 @@ const ReportsPage = () => {
       endDate: tabEndDate ? tabEndDate.toISOString() : 'не указана'
     });
     
-    // Создаем событие для принудительного обновления данных
+    
     const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
       detail: { 
         vehicle: activeTab.vehicle,
         startDate: tabStartDate,
         endDate: tabEndDate,
-        timestamp: new Date().getTime() // Добавим временную метку для гарантированного обновления
+        timestamp: new Date().getTime() 
       }
     });
     
-    // Отправляем событие через setTimeout, чтобы компонент успел обновиться
+    
     setTimeout(() => document.dispatchEvent(forceUpdateEvent), 50);
     
-    // Рендер компонента в зависимости от типа отчета
+    
     switch (activeTab.type) {
       case 'track':
         return (
@@ -778,19 +744,19 @@ const ReportsPage = () => {
     }
   };
 
-  // Функция для закрытия меню отчетов
+  
   const closeReportMenu = () => {
     setShowReportMenu(false);
   };
 
-  // Установка обработчиков при монтировании/размонтировании
+  
   useEffect(() => {
-    // Добавляем ссылку на DOM-элемент меню после его создания
+    
     const reportMenuPopup = reportMenuRef.current;
     const addReportBtn = document.querySelector('.add-report-btn');
     
     if (showReportMenu && reportMenuPopup && addReportBtn) {
-      // Таймер для предотвращения мгновенного закрытия при клике
+      
       let timeoutId = null;
       
       const handleMouseEnter = () => {
@@ -800,16 +766,16 @@ const ReportsPage = () => {
       const handleMouseLeave = () => {
         timeoutId = setTimeout(() => {
           closeReportMenu();
-        }, 300); // Задержка перед закрытием, чтобы избежать случайного закрытия
+        }, 300); 
       };
       
-      // Добавляем обработчики событий
+      
       reportMenuPopup.addEventListener('mouseenter', handleMouseEnter);
       reportMenuPopup.addEventListener('mouseleave', handleMouseLeave);
       addReportBtn.addEventListener('mouseenter', handleMouseEnter);
       addReportBtn.addEventListener('mouseleave', handleMouseLeave);
       
-      // Удаляем обработчики при размонтировании
+      
       return () => {
         reportMenuPopup.removeEventListener('mouseenter', handleMouseEnter);
         reportMenuPopup.removeEventListener('mouseleave', handleMouseLeave);
@@ -819,7 +785,7 @@ const ReportsPage = () => {
     }
   }, [showReportMenu]);
 
-  // Функция для получения описания отчета по его типу
+  
   const getReportDescription = (reportType) => {
     switch (reportType) {
       case 'safedrive-details': 
@@ -841,9 +807,9 @@ const ReportsPage = () => {
     }
   };
 
-  // Функция для получения пути к изображению по типу отчета
+  
   const getReportImagePath = (reportType) => {
-    // Поскольку у нас нет реальных изображений, используем цветной фон как заглушку
+    
     switch (reportType) {
       case 'track': return 'linear-gradient(135deg, #4e73df 0%, #224abe 100%)';
       case 'live-track': return 'linear-gradient(135deg, #36b9cc 0%, #1a8997 100%)';
@@ -856,7 +822,7 @@ const ReportsPage = () => {
     }
   };
 
-  // Обработчик наведения на пункт меню
+  
   const handleReportHover = (reportType) => {
     setPreviewReport({
       title: getReportTitle(reportType),
@@ -865,7 +831,7 @@ const ReportsPage = () => {
     });
   };
 
-  // Обновление JSX для элементов меню, добавление onMouseEnter
+  
   const renderReportItem = (reportType, Icon, label) => (
     <li 
       onClick={() => handleReportSelect(reportType)}
@@ -876,18 +842,18 @@ const ReportsPage = () => {
     </li>
   );
 
-  // Функция для переключения компактного режима
+  
   const toggleCompactMode = () => {
     setIsCompactMode(!isCompactMode);
   };
 
-  // Функция для переключения профильного меню
+  
   const toggleProfileMenu = (e) => {
     e.stopPropagation();
     setProfileMenuOpen(!profileMenuOpen);
   };
 
-  // Функция для закрытия профильного меню при клике вне его
+  
   const handleClickOutside = (event) => {
     if (
       profileMenuRef.current && 
@@ -898,13 +864,13 @@ const ReportsPage = () => {
     }
   };
 
-  // Функция для выхода из системы
+  
   const handleLogout = () => {
-    // Здесь добавьте логику выхода
+    
     window.location.href = '/login';
   };
 
-  // Установка обработчика для закрытия профильного меню
+  
   useEffect(() => {
     document.addEventListener('click', handleClickOutside);
     return () => {
@@ -912,25 +878,25 @@ const ReportsPage = () => {
     };
   }, []);
 
-  // Эффект для создания пульсации при клике на элементы меню
+  
   useEffect(() => {
     const createPulseEffect = (element) => {
-      // Удаляем предыдущие эффекты
+      
       const existingEffects = element.querySelectorAll('.pulse-effect');
       existingEffects.forEach(effect => effect.remove());
 
-      // Создаем новый эффект
+      
       const pulseEffect = document.createElement('div');
       pulseEffect.className = 'pulse-effect';
       element.appendChild(pulseEffect);
 
-      // Удаляем эффект после анимации
+      
       setTimeout(() => {
         pulseEffect.remove();
       }, 500);
     };
 
-    // Применяем обработчики клика ко всем элементам навигации
+    
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
       item.addEventListener('click', function() {
@@ -939,14 +905,14 @@ const ReportsPage = () => {
     });
 
     return () => {
-      // Очищаем обработчики при размонтировании
+      
       navItems.forEach(item => {
         item.removeEventListener('click', () => {});
       });
     };
   }, []);
 
-  // Сохраняем диапазон дат при его изменении
+  
   useEffect(() => {
     try {
       localStorage.setItem('lastDateRange', JSON.stringify({
@@ -958,19 +924,19 @@ const ReportsPage = () => {
     }
   }, [dateRange]);
   
-  // Сохраняем режим разделения экрана
+  
   useEffect(() => {
     localStorage.setItem('splitScreenMode', splitMode);
   }, [splitMode]);
 
-  // Функция для рендеринга React компонентов в контейнере
+  
   const renderReactComponent = (componentType, container, props) => {
     if (!container) return;
     
     try {
       const root = ReactDOM.createRoot(container);
       
-      // Выбираем компонент в зависимости от типа
+      
       switch (componentType) {
         case 'ReportSelector':
           root.render(<ReportSelector 
@@ -979,7 +945,7 @@ const ReportsPage = () => {
             onCancel={props.onCancel}
           />);
           break;
-        // Добавьте другие компоненты по мере необходимости
+        
         default:
           console.warn('Неизвестный тип компонента:', componentType);
       }
@@ -989,239 +955,87 @@ const ReportsPage = () => {
     }
   };
   
-  // Инициализация менеджера разделения экрана
-  useEffect(() => {
-    // Проверяем, активен ли режим разделения экрана
-    if (splitScreenActive && reportsContainerRef.current) {
-      console.log('Активация режима разделения экрана с режимом:', splitMode);
-      
-      // Определяем доступные типы отчетов
-      const availableReportTypes = [
-        'track', 'live-track', 'speed', 'fuel', 'voltage', 'rpm'
-      ];
-      
-      try {
-        // Инициализируем менеджер разделения экрана с четырьмя параметрами
-        SplitScreenManager.init(
-          reportsContainerRef.current,
-          availableReportTypes,
-          (reportType, containerId) => createReportForContainer(reportType, containerId),
-          renderReactComponent
-        );
-        
-        // Устанавливаем текущий режим разделения
-        if (splitMode === 'split-2') {
-          // Если режим разделения на 2 части, устанавливаем вертикальное разделение
-          SplitScreenManager.changeSplitMode(SPLIT_MODES.VERTICAL);
-        } else if (splitMode === 'split-4') {
-          // Если режим разделения на 4 части, устанавливаем квадратное разделение
-          SplitScreenManager.changeSplitMode(SPLIT_MODES.QUAD);
-        }
-        
-        // Добавляем обработчики событий
-        SplitScreenManager.on('splitScreenHidden', () => {
-          console.log('Событие скрытия режима разделения экрана');
-          setSplitScreenActive(false);
-          setSplitMode('single');
-          
-          // Перерисовываем отчеты в нормальном режиме
-          const activeTab = openTabs.find(tab => tab.id === activeTabId);
-          if (activeTab) {
-            const event = new CustomEvent('forceVehicleUpdate', {
-              detail: { 
-                vehicle: activeTab.vehicle,
-                startDate: activeTab.startDate || dateRange.startDate,
-                endDate: activeTab.endDate || dateRange.endDate,
-                timestamp: new Date().getTime()
-              }
-            });
-            document.dispatchEvent(event);
-          }
-        });
-        
-        // Показываем кнопку выхода из режима разделения экрана
-        const exitSplitBtn = document.getElementById('exit-split-screen');
-        if (exitSplitBtn) {
-          exitSplitBtn.style.display = 'block';
-        }
-      } catch (error) {
-        console.error('Ошибка при инициализации менеджера разделения экрана:', error);
-        setSplitScreenActive(false);
-      }
-    } else {
-      // Скрываем кнопку выхода из режима разделения экрана
-      const exitSplitBtn = document.getElementById('exit-split-screen');
-      if (exitSplitBtn) {
-        exitSplitBtn.style.display = 'none';
-      }
-    }
-    
-    return () => {
-      // Очистка при размонтировании
-      if (splitScreenActive) {
-        console.log('Очистка менеджера разделения экрана при размонтировании');
-        try {
-          SplitScreenManager.hideSplitScreen();
-        } catch (error) {
-          console.error('Ошибка при скрытии режима разделения экрана:', error);
-        }
-      }
-    };
-  }, [splitScreenActive, dateRange, openTabs, activeTabId, selectedVehicle, splitMode]);
   
-  // Создание отчета для контейнера при разделении экрана
+  
   const createReportForContainer = (reportType, containerId, vehicleObj, startDateObj, endDateObj) => {
-    // Используем переданные параметры или значения из состояния
-    const vehicle = vehicleObj || selectedVehicle;
-    const startDate = startDateObj || dateRange.startDate;
-    const endDate = endDateObj || dateRange.endDate;
+    console.log('Создание отчета:', {
+      reportType,
+      containerId,
+      vehicle: vehicleObj ? vehicleObj.name : 'не указано',
+      startDate: startDateObj,
+      endDate: endDateObj
+    });
     
-    if (!vehicle) {
-      console.warn('Не выбрано транспортное средство для создания отчета');
-      // Показываем уведомление, если доступно
-      if (window.showNotification) {
-        window.showNotification('warning', 'Пожалуйста, выберите транспортное средство для создания отчета');
-      }
-      return;
-    }
-    
-    console.log(`ReportsPage: Создание отчета типа ${reportType} в контейнере ${containerId}`);
-    
-    // Улучшенное нахождение DOM-элемента контейнера с несколькими стратегиями
-    const findContainer = () => {
-      // Стратегия 1: прямой поиск по ID
-      let container = document.getElementById(containerId);
-      if (container) {
-        console.log(`ReportsPage: Контейнер ${containerId} найден напрямую по ID`);
-        return container;
-      }
-      
-      // Стратегия 2: поиск по data-container-id
-      const containersByData = document.querySelectorAll(`[data-container-id="${containerId}"]`);
-      if (containersByData.length > 0) {
-        console.log(`ReportsPage: Контейнер ${containerId} найден по data-container-id`);
-        return containersByData[0];
-      }
-      
-      // Стратегия 3: поиск внутри split-container
-      const parts = containerId.split('-');
-      if (parts.length > 1) {
-        const parentId = parts.slice(0, -1).join('-');
-        const parentContainer = document.getElementById(parentId);
-        if (parentContainer) {
-          const childContainers = parentContainer.querySelectorAll('.report-container');
-          for (const child of childContainers) {
-            if (child.id === containerId || !child.id) {
-              console.log(`ReportsPage: Контейнер найден внутри родителя ${parentId}`);
-              // Если у контейнера нет ID, устанавливаем правильный ID
-              if (!child.id) {
-                child.id = containerId;
-                console.log(`ReportsPage: Установлен ID ${containerId} на дочерний контейнер`);
-              }
-              return child;
-            }
-          }
-        }
-      }
-      
-      // Стратегия 4: поиск контейнеров с шаблоном ID
-      const idPattern = new RegExp(`${containerId.replace(/[-]/g, '[-]')}$`);
-      const containersByPattern = Array.from(document.querySelectorAll('[id]')).filter(el => idPattern.test(el.id));
-      if (containersByPattern.length > 0) {
-        console.log(`ReportsPage: Контейнер найден по шаблону ID: ${containersByPattern[0].id}`);
-        return containersByPattern[0];
-      }
-      
-      return null;
-    };
-    
-    // Пытаемся найти контейнер с помощью нашей улучшенной функции
-    let container = findContainer();
-    
+    // Находим контейнер
+    const container = document.getElementById(containerId);
     if (!container) {
-      console.error(`Контейнер ${containerId} не найден. Пробуем с задержкой...`);
-      
-      // Получаем список всех доступных контейнеров для отладки
-      const allContainers = document.querySelectorAll('[id^="chart-container-"], [id^="initial-container"], .report-container, .chart-split-container');
-      if (allContainers.length > 0) {
-        console.log('Доступные контейнеры:', Array.from(allContainers).map(c => c.id || 'без ID'));
-      } else {
-        console.warn('Не найдено контейнеров для отчетов в DOM');
-      }
-      
-      // Увеличенная задержка для гарантии, что DOM будет обновлен после разделения
-      setTimeout(() => {
-        container = findContainer();
-        
-        if (container) {
-          console.log(`ReportsPage: Контейнер ${containerId} найден после задержки`);
-          renderReportToContainer(container, reportType, vehicle, startDate, endDate);
-        } else {
-          console.error(`Не удалось найти контейнер ${containerId} даже после задержки`);
-          
-          // Проверяем наличие похожих контейнеров
-          const similarContainers = document.querySelectorAll(`.split-container > div`);
-          console.log('Доступные разделенные контейнеры:', Array.from(similarContainers).map(c => c.id || 'без ID'));
-          
-          // Если можем найти хоть какой-то контейнер для отчета, используем его
-          if (similarContainers.length > 0) {
-            const fallbackContainer = similarContainers[similarContainers.length - 1]; // последний контейнер в списке
-            console.log(`ReportsPage: Используем запасной контейнер ${fallbackContainer.id || 'без ID'}`);
-            
-            // Устанавливаем ID контейнеру, если он отсутствует
-            if (!fallbackContainer.id) {
-              fallbackContainer.id = containerId;
-            }
-            
-            renderReportToContainer(fallbackContainer, reportType, vehicle, startDate, endDate);
-    } else {
-            // Создаем уведомление об ошибке
-            if (window.showNotification) {
-              window.showNotification('error', 'Не удалось создать отчет в разделенном экране');
-            }
-          }
-        }
-      }, 600); // Увеличенная задержка
-      
+      console.error(`Контейнер с ID ${containerId} не найден`);
       return;
     }
     
-    renderReportToContainer(container, reportType, vehicle, startDate, endDate);
+    // Очищаем контейнер перед добавлением нового отчета
+    if (container.firstChild) {
+      try {
+        container.innerHTML = '';
+      } catch (e) {
+        console.error('Ошибка при очистке контейнера:', e);
+      }
+    }
+    
+    // Создаем элемент для отчета
+    try {
+      // Создаем новый корень React
+      const root = ReactDOM.createRoot(container);
+      
+      // Получаем компонент для отчета
+      const reportElement = getReportElement(reportType, vehicleObj, startDateObj, endDateObj);
+      
+      // Рендерим компонент в контейнер
+      if (reportElement) {
+        root.render(reportElement);
+        console.log(`Отчет типа ${reportType} создан в контейнере ${containerId}`);
+      } else {
+        console.error(`Неизвестный тип отчета: ${reportType}`);
+        container.innerHTML = `<div class="error-message">Неизвестный тип отчета: ${reportType}</div>`;
+      }
+    } catch (error) {
+      console.error(`Неожиданная ошибка при обработке контейнера ${containerId}:`, error);
+    }
   };
   
-  // Хранилище для React-корней
+  
   const reactRoots = useRef(new Map()).current;
   
-  // Эффект для очистки React-корней при размонтировании
+  
   useEffect(() => {
     return () => {
-      // Очищаем все React-корни перед размонтированием компонента
+      
       console.log('ReportsPage: Очистка всех React-корней при размонтировании');
       
       reactRoots.forEach((root, id) => {
         try {
           console.log(`ReportsPage: Размонтирование React-корня для контейнера ${id}`);
-          // Рендерим null в контейнер, чтобы размонтировать React-дерево
+          
           root.render(null);
         } catch (e) {
           console.error(`Ошибка при очистке React-корня для контейнера ${id}:`, e);
         }
       });
       
-      // Очищаем Map с корнями
+      
       reactRoots.clear();
     };
   }, [reactRoots]);
   
-  // Функция для безопасного удаления React-корня
+  
   const safelyRemoveReactRoot = (containerId) => {
     const root = reactRoots.get(containerId);
     if (root) {
       try {
         console.log(`ReportsPage: Безопасное удаление React-корня для контейнера ${containerId}`);
-        // Рендерим null вместо компонента для размонтирования
+        
         root.render(null);
-        // Удаляем корень из Map
+        
         reactRoots.delete(containerId);
         return true;
       } catch (e) {
@@ -1232,7 +1046,7 @@ const ReportsPage = () => {
     return false;
   };
   
-  // Вспомогательная функция для рендеринга отчета в контейнер
+  
   const renderReportToContainer = (container, reportType, vehicle, startDate, endDate) => {
     if (!container) {
       console.error('ReportsPage: Невозможно отрендерить отчет - контейнер не найден');
@@ -1241,22 +1055,22 @@ const ReportsPage = () => {
     
     console.log(`ReportsPage: Начинаем рендеринг отчета типа ${reportType} в контейнер ${container.id || 'без ID'}`);
     
-    // Создаем уникальный ключ для этого контейнера, если у него нет ID
+    
     if (!container.id) {
       container.id = `chart-container-${Math.random().toString(36).substring(2, 11)}`;
       console.log(`ReportsPage: Присвоен новый ID контейнеру: ${container.id}`);
     }
     
-    // Если контейнер уже имеет React-корень, удаляем его безопасно
+    
     if (reactRoots.has(container.id)) {
       const existingRoot = reactRoots.get(container.id);
       try {
         console.log(`ReportsPage: Удаление существующего React-корня для ${container.id}`);
-        existingRoot.render(null); // Размонтируем компоненты
+        existingRoot.render(null); 
         
-        // Добавляем небольшую задержку перед удалением из Map
+        
         setTimeout(() => {
-          reactRoots.delete(container.id); // Удаляем корень из Map
+          reactRoots.delete(container.id); 
           console.log(`ReportsPage: React-корень для ${container.id} удален из Map`);
         }, 50);
       } catch (e) {
@@ -1264,19 +1078,19 @@ const ReportsPage = () => {
       }
     }
     
-    // Ожидаем небольшую задержку для завершения операций удаления
+    
     setTimeout(() => {
       try {
-        // Проверяем, является ли контейнер частью DOM
+        
         if (!document.body.contains(container)) {
           console.error(`ReportsPage: Контейнер ${container.id} больше не присутствует в DOM`);
           return;
         }
         
-        // Маркируем контейнер как управляемый React
+        
         container.setAttribute('data-react-managed', 'true');
         
-        // Получаем элемент отчета соответствующего типа
+        
         const reportElement = getReportElement(reportType, vehicle, startDate, endDate);
         
         if (!reportElement) {
@@ -1290,29 +1104,29 @@ const ReportsPage = () => {
           return;
         }
         
-        // Создаем новый корневой элемент для React
+        
         console.log(`ReportsPage: Создание нового React-корня для контейнера ${container.id}`);
         try {
           const root = ReactDOM.createRoot(container);
           
-          // Сохраняем корень в Map
+          
           reactRoots.set(container.id, root);
           
-          // Рендерим компонент в контейнер
+          
           root.render(reportElement);
           
           console.log(`Отчет типа ${reportType} успешно создан в контейнере ${container.id}`);
         } catch (error) {
           console.error(`Ошибка при рендеринге отчета в контейнер ${container.id}:`, error);
           
-          // Если произошла ошибка с React, пробуем очистить контейнер и показать сообщение об ошибке
+          
           try {
-            // Безопасная очистка контейнера
+            
             while (container.firstChild) {
               container.removeChild(container.firstChild);
             }
             
-            // Показываем сообщение об ошибке
+            
             const errorDiv = document.createElement('div');
             errorDiv.innerHTML = `
               <div style="padding: 20px; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
@@ -1329,69 +1143,22 @@ const ReportsPage = () => {
       } catch (error) {
         console.error(`Неожиданная ошибка при обработке контейнера ${container.id}:`, error);
       }
-    }, 100); // Небольшая задержка для завершения предыдущих операций React
+    }, 100); 
   };
   
-  // Обновленная функция для изменения режима разделения экрана
+  
   const handleSplitModeChange = (mode) => {
     console.log('Изменение режима разделения экрана на:', mode);
-    
-    // Устанавливаем режим разделения в состоянии компонента
     setSplitMode(mode);
-    
-    // Если выбран любой режим разделения, активируем менеджер разделения экрана
-    if (mode !== 'single') {
-      setSplitScreenActive(true);
-      
-      // Если SplitScreenManager уже инициализирован, меняем режим
-      if (SplitScreenManager.rootContainer) {
-        try {
-          // Определяем режим в терминах SPLIT_MODES
-          let splitScreenMode;
-          switch (mode) {
-            case 'split-2':
-              splitScreenMode = SPLIT_MODES.VERTICAL;
-              break;
-            case 'split-4':
-              splitScreenMode = SPLIT_MODES.QUAD;
-              break;
-            default:
-              splitScreenMode = SPLIT_MODES.SINGLE;
-          }
-          
-          // Применяем выбранный режим
-          SplitScreenManager.changeSplitMode(splitScreenMode);
-        } catch (error) {
-          console.error('Ошибка при изменении режима разделения экрана:', error);
-        }
-      }
-    } else {
-      // Деактивируем режим разделения экрана
-      if (SplitScreenManager.rootContainer) {
-        try {
-          SplitScreenManager.changeSplitMode(SPLIT_MODES.SINGLE);
-          SplitScreenManager.hideSplitScreen();
-        } catch (error) {
-          console.error('Ошибка при отключении режима разделения экрана:', error);
-        }
-      }
-      setSplitScreenActive(false);
-    }
   };
-  
-  // eslint-disable-next-line
+
   useEffect(() => {
-    // При инициализации, если есть необходимость, устанавливаем начальный режим разделения
     if (splitMode !== 'single' && !splitScreenActive) {
-      // Применим настройки разделения при загрузке компонента
       handleSplitModeChange(splitMode);
     }
-  }, []);
-  
-  // Эти функции могут использоваться в будущем, поэтому добавляем eslint-disable-next-line
-  // eslint-disable-next-line
+  }, [splitMode, splitScreenActive]);
+
   const handleDateChange = (start, end) => {
-    // Устанавливаем время начальной даты на 00:00:00.000
     if (start instanceof Date) {
       start.setHours(0, 0, 0, 0);
     }
@@ -1401,7 +1168,6 @@ const ReportsPage = () => {
       endDate: end
     });
     
-    // Сохраняем в localStorage
     try {
       if (start instanceof Date && end instanceof Date) {
         localStorage.setItem('lastDateRange', JSON.stringify({
@@ -1419,7 +1185,6 @@ const ReportsPage = () => {
       console.warn('Ошибка при сохранении дат в localStorage:', error);
     }
     
-    // Обновляем даты в открытых вкладках
     if (openTabs.length > 0) {
       setOpenTabs(prevTabs => prevTabs.map(tab => ({
         ...tab,
@@ -1433,8 +1198,7 @@ const ReportsPage = () => {
       });
     }
   };
-  
-  // Функция для получения React-элемента отчета по его типу
+
   const getReportElement = (reportType, vehicle, startDate, endDate) => {
     const reportProps = {
       key: `split-${reportType}-${vehicle?.id || 'no-vehicle'}-${Date.now()}`,
@@ -1461,16 +1225,12 @@ const ReportsPage = () => {
         return null;
     }
   };
-  
-  // Эффект для очистки React-корней при изменении ключевых параметров
+
   useEffect(() => {
-    // Если изменяется транспортное средство или даты, нужно обновить все корни React
     if (selectedVehicle || dateRange.startDate || dateRange.endDate) {
       console.log('ReportsPage: Ключевые параметры изменились, обновляем React-корни');
       
-      // Для всех открытых вкладок обновляем соответствующие React-корни
       openTabs.forEach(tab => {
-        // Если у вкладки есть контейнер с React-корнем, безопасно удаляем его
         const containerId = tab.id;
         if (containerId) {
           if (safelyRemoveReactRoot(containerId)) {
@@ -1480,18 +1240,15 @@ const ReportsPage = () => {
       });
     }
   }, [selectedVehicle, dateRange, openTabs, safelyRemoveReactRoot]);
-  
+
   return (
     <div className={`reports-page ${isCompactMode ? 'compact-mode' : ''}`}>
-      {/* Боковая панель */}
       <div className={`sidebar ${isCompactMode ? 'compact-mode' : ''}`}>
-        {/* Шапка боковой панели */}
         <div 
                 className="sidebar-header" 
                 id="sidebarHeader" 
                 onClick={toggleProfileMenu}
             >
-                {/* Проверяем путь к изображению и используем импорт для SVG или абсолютный путь */}
                 <img 
                   src = {logo} 
                   alt="Контроль Техники" 
@@ -1500,7 +1257,6 @@ const ReportsPage = () => {
                 <h1 className="logo-text">Контроль Техники</h1>
             </div>
 
-        {/* Профильное меню */}
         {profileMenuOpen && (
           <div 
           className={`profile-menu ${profileMenuOpen ? 'active' : 'hidden'}`} 
@@ -1537,7 +1293,6 @@ const ReportsPage = () => {
       </div>
         )}
 
-        {/* Секция с датой */}
         <div className="sidebar-date-section">
           <div className="date-display">
             <div className="date-label">Период:</div>
@@ -1548,7 +1303,6 @@ const ReportsPage = () => {
             </div>
           </div>
           
-          {/* Вкладки периодов */}
           <div className="period-tabs">
             <div 
               className={`period-tab ${selectedPeriod === 'day' ? 'active' : ''}`}
@@ -1570,7 +1324,6 @@ const ReportsPage = () => {
             </div>
           </div>
 
-          {/* Поиск транспортных средств */}
           <div className="sidebar-search-box">
             <FontAwesomeIcon icon={faSearch} className="sidebar-search-icon" />
             <input 
@@ -1582,7 +1335,6 @@ const ReportsPage = () => {
           </div>
         </div>
 
-        {/* Модальное окно выбора даты */}
         {showDateModal && (
           <div className="date-picker-modal">
             <div className="date-picker-content">
@@ -1621,7 +1373,6 @@ const ReportsPage = () => {
           </div>
         )}
 
-        {/* Секция статистики */}
         <div className="stats-container">
           <div className="stats-header">Статистика</div>
           <div className="stats-grid">
@@ -1649,7 +1400,6 @@ const ReportsPage = () => {
           </div>
         </div>
 
-        {/* Секция фильтров */}
         <div className="filters-container">
           <div className="filters-header">Статусы</div>
           <div className="filters-grid">
@@ -1671,7 +1421,6 @@ const ReportsPage = () => {
           </div>
         </div>
 
-        {/* Навигация по папкам и ТС */}
         <div className="sidebar-nav">
           <div className="nav-group">
             <div className="nav-group-title">Транспортные средства</div>
@@ -1681,13 +1430,11 @@ const ReportsPage = () => {
           </div>
         </div>
 
-        {/* Кнопка переключения компактного режима */}
         <div className="sidebar-toggle" onClick={toggleCompactMode}>
           <FontAwesomeIcon icon={isCompactMode ? faAngleRight : faAngleLeft} />
         </div>
       </div>
       
-      {/* Основной контент */}
       <div className="main-content">
         <div className="top-bar">
           <div className="report-menu-container">
@@ -1696,7 +1443,6 @@ const ReportsPage = () => {
               <span>Добавить отчет</span>
             </div>
             
-            {/* Меню выбора отчета */}
             {showReportMenu && (
               <div className="report-menu-popup" ref={reportMenuRef}>
                 <div className="report-menu-columns">
@@ -1762,7 +1508,6 @@ const ReportsPage = () => {
             )}
           </div>
           
-          {/* Вкладки отчетов */}
           <div className="report-tabs">
             {openTabs.map(tab => (
               <div 
@@ -1797,14 +1542,10 @@ const ReportsPage = () => {
             <div className="action-button" title="Помощь">
               <FontAwesomeIcon icon={faQuestionCircle} />
             </div>
-            <div className="user-menu">
-              <button id="logout-button">Выход</button>
-            </div>
           </div>
           
         </div>
         
-        {/* Контейнер для отчетов */}
         <div 
           className={`reports-container ${splitScreenActive ? 'split-screen-mode' : ''}`} 
           ref={reportsContainerRef}
@@ -1812,7 +1553,6 @@ const ReportsPage = () => {
           {!splitScreenActive && renderActiveTabContent()}
         </div>
         
-        {/* Аварийная кнопка выхода из полноэкранного режима */}
         <div 
           id="emergency-exit-fullscreen" 
           style={{ 
@@ -1833,10 +1573,9 @@ const ReportsPage = () => {
         </div>
       </div>
       
-      {/* Панель отладки для графиков */}
       <ChartDebugPanel />
     </div>
   );
 };
 
-export default ReportsPage; 
+export default ReportsPage;

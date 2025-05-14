@@ -1653,14 +1653,14 @@ const TrackMap = ({
       <div className="tm-control-group">
           <button
                 className="tm-control-button"
-                onClick={() => changeSplitMode('horizontal')}
+                onClick={handleHorizontalSplit}
                 title="Разделить по горизонтали"
               >
                 <FontAwesomeIcon icon={faColumns} style={{ transform: 'rotate(90deg)' }} />
               </button>
               <button
                 className="tm-control-button"
-                onClick={() => changeSplitMode('vertical')}
+                onClick={handleVerticalSplit}
                 title="Разделить по вертикали"
               >
                 <FontAwesomeIcon icon={faColumns} />
@@ -1695,7 +1695,7 @@ const TrackMap = ({
   
   // Получение классов для контейнера карты в зависимости от режима разделения
   const getMapContainerClasses = () => {
-    let classes = 'tm-container';
+    let classes = 'tm-container split-screen-container';
     
     if (expandedMode) {
       classes += ' tm-expanded';
@@ -2511,9 +2511,69 @@ const TrackMap = ({
     return deg * (Math.PI/180);
   };
   
+  // Функция для горизонтального разделения экрана
+  const handleHorizontalSplit = () => {
+    // Используем прямой вызов splitScreenManager вместо генерации события
+    console.log(`TrackMap: Разделяем контейнер ${containerId} горизонтально`);
+    
+    try {
+      // Напрямую вызываем метод addDynamicSplit
+      const success = splitScreenManager.addDynamicSplit(containerId, 'horizontal');
+      
+      if (!success) {
+        console.warn('TrackMap: Не удалось создать горизонтальное разделение');
+      } else {
+        // Обновляем состояние компонента после успешного разделения
+        setSplitType('horizontal');
+        setIsSplitView(true);
+        
+        // Сохраняем в localStorage
+        localStorage.setItem('splitScreenMode', 'horizontal');
+      }
+      
+      // Перерисовываем карту при изменении режима
+      setTimeout(() => refreshMapView(), 300);
+    } catch (error) {
+      console.error('TrackMap: Ошибка при создании горизонтального разделения:', error);
+    }
+  };
+  
+  // Функция для вертикального разделения экрана
+  const handleVerticalSplit = () => {
+    // Используем прямой вызов splitScreenManager вместо генерации события
+    console.log(`TrackMap: Разделяем контейнер ${containerId} вертикально`);
+    
+    try {
+      // Напрямую вызываем метод addDynamicSplit
+      const success = splitScreenManager.addDynamicSplit(containerId, 'vertical');
+      
+      if (!success) {
+        console.warn('TrackMap: Не удалось создать вертикальное разделение');
+      } else {
+        // Обновляем состояние компонента после успешного разделения
+        setSplitType('vertical');
+        setIsSplitView(true);
+        
+        // Сохраняем в localStorage
+        localStorage.setItem('splitScreenMode', 'vertical');
+      }
+      
+      // Перерисовываем карту при изменении режима
+      setTimeout(() => refreshMapView(), 300);
+    } catch (error) {
+      console.error('TrackMap: Ошибка при создании вертикального разделения:', error);
+    }
+  };
+  
   // Главный метод рендеринга компонента
   return (
-    <div className={getMapContainerClasses()}>
+    <div 
+      className={getMapContainerClasses()} 
+      id={containerId}
+      data-container-id={containerId}
+      data-component-type="trackMap"
+      data-splitscreen="true"
+    >
       {isLoading && renderLoading()}
       
       <div className="tm-header">

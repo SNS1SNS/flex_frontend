@@ -1205,11 +1205,7 @@ const BaseChart = ({
                 style={{ width: '100%', height: '100%' }}
               />
 
-              {/* Индикатор статуса синхронизации */}
-              <div className="sync-status">
-                <FontAwesomeIcon icon={chartSyncManager.syncEnabled ? faLink : faUnlink} />
-                {chartSyncManager.syncEnabled ? 'Синхронизировано' : 'Несинхронизировано'}
-              </div>
+              
             </div>
           ) : (
             <div className="chart-empty">
