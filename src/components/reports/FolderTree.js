@@ -8,21 +8,41 @@ const FolderTreeItem = ({ folder, onVehicleSelect, onDeleteFolder, loadVehiclesF
   const [folderVehicles, setFolderVehicles] = useState([]);
   const [loading, setLoading] = useState(false);
   
-  const toggleFolder = async () => {
+  const toggleFolder = async (e) => {
+    // Предотвращаем всплытие события, если оно пришло из дочерних элементов
+    if (e) {
+      e.stopPropagation();
+      
+      // Если клик произошел на checkbox или кнопке удаления, не переключаем папку
+      if (
+        e.target.closest('.folder-checkbox') || 
+        e.target.closest('.folder-delete-btn')
+      ) {
+        return;
+      }
+    }
+    
+    // Если папка не развернута и данные еще не загружены, загружаем их
     if (!expanded && folderVehicles.length === 0) {
       setLoading(true);
       const vehicles = await loadVehiclesForFolder(folder.id);
       setFolderVehicles(vehicles);
       setLoading(false);
     }
+    
+    // Переключаем состояние развернутости папки
     setExpanded(!expanded);
   };
   
   return (
-    <div className={`folder-item ${folder.type}-folder`} data-folder-id={folder.id}>
+    <div className={`folder-item ${folder.type}-folder ${expanded ? 'folder-expanded' : ''}`} data-folder-id={folder.id}>
       <div className="folder-header" onClick={toggleFolder}>
         <div className="folder-checkbox">
-          <input type="checkbox" id={`folder-${folder.id}-check`} onClick={e => e.stopPropagation()} />
+          <input 
+            type="checkbox" 
+            id={`folder-${folder.id}-check`} 
+            onClick={e => e.stopPropagation()} 
+          />
         </div>
         <div className="folder-icon">
           <FontAwesomeIcon icon={faFolder} />
@@ -33,48 +53,64 @@ const FolderTreeItem = ({ folder, onVehicleSelect, onDeleteFolder, loadVehiclesF
           <FontAwesomeIcon icon={expanded ? faChevronDown : faChevronRight} />
         </div>
         <div className="folder-actions">
-          <button className="folder-delete-btn" onClick={(e) => {
-            e.stopPropagation();
-            if (window.confirm('Вы уверены, что хотите удалить эту папку?')) {
-              onDeleteFolder(folder.id);
-            }
-          }}>
+          <button 
+            className="folder-delete-btn" 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm('Вы уверены, что хотите удалить эту папку?')) {
+                onDeleteFolder(folder.id);
+              }
+            }}
+          >
             <FontAwesomeIcon icon={faTrash} />
           </button>
         </div>
       </div>
       
-      {expanded && (
-        <div className="subfolder-container" style={{ display: expanded ? 'block' : 'none' }}>
-          {loading ? (
-            <div className="loading-message">Загрузка...</div>
-          ) : folderVehicles.length > 0 ? (
-            folderVehicles.map(vehicle => (
-              <div 
-                className="folder-item vehicle-item" 
-                key={vehicle.id} 
-                data-vehicle-id={vehicle.id}
-                onClick={() => onVehicleSelect(vehicle)}
-              >
-                <div className="folder-header">
-                  <div className="folder-checkbox">
-                    <input type="checkbox" id={`vehicle-${vehicle.id}-check`} onClick={e => e.stopPropagation()} />
-                  </div>
-                  <div className="folder-icon">
-                    <FontAwesomeIcon icon={faTruck} />
-                  </div>
-                  <div className="folder-name">
-                    {vehicle.name} ({vehicle.license_plate || vehicle.number || 'б/н'})
-                  </div>
-                  <div className={`folder-status ${vehicle.status || 'unknown'}`}></div>
+      <div 
+        className="subfolder-container" 
+        style={{ 
+          display: expanded ? 'block' : 'none',
+          maxHeight: expanded ? '1000px' : '0',
+          overflow: 'hidden',
+          transition: 'max-height 0.3s ease'
+        }}
+      >
+        {loading ? (
+          <div className="loading-message">Загрузка...</div>
+        ) : folderVehicles.length > 0 ? (
+          folderVehicles.map(vehicle => (
+            <div 
+              className="folder-item vehicle-item" 
+              key={vehicle.id} 
+              data-vehicle-id={vehicle.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                onVehicleSelect(vehicle);
+              }}
+            >
+              <div className="folder-header">
+                <div className="folder-checkbox">
+                  <input 
+                    type="checkbox" 
+                    id={`vehicle-${vehicle.id}-check`} 
+                    onClick={e => e.stopPropagation()} 
+                  />
                 </div>
+                <div className="folder-icon">
+                  <FontAwesomeIcon icon={faTruck} />
+                </div>
+                <div className="folder-name">
+                  {vehicle.name} ({vehicle.license_plate || vehicle.number || 'б/н'})
+                </div>
+                <div className={`folder-status ${vehicle.status || 'unknown'}`}></div>
               </div>
-            ))
-          ) : (
-            <div className="empty-folder-message">В этой папке нет транспортных средств</div>
-          )}
-        </div>
-      )}
+            </div>
+          ))
+        ) : (
+          <div className="empty-folder-message">В этой папке нет транспортных средств</div>
+        )}
+      </div>
     </div>
   );
 };

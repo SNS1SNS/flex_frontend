@@ -859,7 +859,12 @@ const FolderList = ({ onVehicleSelect }) => {
   };
 
   // Функция для переключения видимости папки
-  const toggleFolder = (folderId) => {
+  const toggleFolder = (folderId, event) => {
+    // Если передан event, предотвращаем всплытие события
+    if (event) {
+      event.stopPropagation();
+    }
+    
     setExpandedFolders(prev => ({
       ...prev,
       [folderId]: !prev[folderId]
@@ -1227,7 +1232,7 @@ const FolderList = ({ onVehicleSelect }) => {
       <div className={folderClasses} key={folder.id}>
         <div 
           className={`folder-header ${isSelected ? 'active' : ''}`}
-          onClick={() => toggleFolder(folder.id)}
+          onClick={(e) => toggleFolder(folder.id, e)}
           onContextMenu={(e) => handleShowContextMenu(e, folder)}
         >
           <div className="folder-toggle">
@@ -1251,7 +1256,6 @@ const FolderList = ({ onVehicleSelect }) => {
             }}
           >
             {folder.name}
-            
           </div>
           {(hasChildren || hasVehicles) && (
             <div className="folder-count" title={`${hasVehicles ? folder.vehicles.length : 0} транспортных средств`}>

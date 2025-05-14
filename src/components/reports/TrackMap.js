@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faExpand, faCompress, faSyncAlt, 
-  faRoute, faColumns, faRedo, faWindowRestore
+  faRoute, faColumns, faRedo, faWindowRestore, faTachometerAlt, faGasPump, faList
 } from '@fortawesome/free-solid-svg-icons';
 import splitScreenManager, { SPLIT_MODES } from '../../utils/SplitScreenManager';
 
@@ -1733,67 +1733,309 @@ const TrackMap = ({
   // Изменение режима разделения экрана
   const changeSplitMode = (mode) => {
     try {
+      console.log(`TrackMap: Изменение режима разделения на ${mode}`);
+      
       if (mode === 'single') {
         // Сбрасываем все разделения
-        splitScreenManager.changeSplitMode(SPLIT_MODES.SINGLE);
-        setSplitType('single');
-        setIsSplitView(false);
-      } else if (mode === 'horizontal' || mode === 'vertical') {
-        // Получаем текущее состояние разделения экрана
-        const currentState = splitScreenManager.getCurrentState();
+        const success = splitScreenManager.changeSplitMode(SPLIT_MODES.SINGLE);
         
-        // Проверяем текущее количество горизонтальных и вертикальных разделений
-        let horizontalSplits = 0;
-        let verticalSplits = 0;
-        
-        // Подсчитываем текущие разделения на основе структуры состояния
-        if (currentState && currentState.splitTree) {
-          const countSplits = (node) => {
-            if (!node) return;
-            
-            if (node.type === 'horizontal') horizontalSplits++;
-            if (node.type === 'vertical') verticalSplits++;
-            
-            if (node.children) {
-              node.children.forEach(child => countSplits(child));
-            }
-          };
+        if (success) {
+          setSplitType('single');
+          setIsSplitView(false);
+          console.log('TrackMap: Режим разделения успешно изменен на single');
           
-          countSplits(currentState.splitTree);
+          // Создаем и отправляем событие о смене режима разделения
+          const event = new CustomEvent('splitModeChanged', {
+            detail: { mode }
+          });
+          document.dispatchEvent(event);
+        } else {
+          console.warn('TrackMap: Не удалось изменить режим разделения на single');
         }
-        
-        // Проверяем ограничения
-        if (mode === 'horizontal' && horizontalSplits >= 4) {
-          console.warn('Достигнуто максимальное количество горизонтальных разделений (4)');
-          alert('Достигнуто максимальное количество горизонтальных разделений (4)');
-          return;
+      } else if (mode === 'horizontal' || mode === 'vertical') {
+        // Вызываем соответствующие обработчики для разделения
+        if (mode === 'horizontal') {
+          handleHorizontalSplit();
+        } else {
+          handleVerticalSplit();
         }
-        
-        if (mode === 'vertical' && verticalSplits >= 2) {
-          console.warn('Достигнуто максимальное количество вертикальных разделений (2)');
-          alert('Достигнуто максимальное количество вертикальных разделений (2)');
-          return;
-        }
-        
-        // Добавляем новое разделение
-        splitScreenManager.addDynamicSplit(containerId, mode);
-        setSplitType(mode);
-        setIsSplitView(true);
       }
       
       // Сохраняем в localStorage
       localStorage.setItem('splitScreenMode', mode);
       
-      // Создаем и отправляем событие о смене режима разделения
-      const event = new CustomEvent('splitModeChanged', {
-        detail: { mode }
-      });
-      document.dispatchEvent(event);
+      // Перерисовываем карту при изменении режима через небольшую задержку
+      setTimeout(() => refreshMapView(), 300);
+    } catch (error) {
+      console.error('TrackMap: Ошибка при изменении режима разделения:', error);
+    }
+  };
+  
+  // Функция для добавления специфического отчета, как в графиках
+  const addSpecificReport = (reportType) => {
+    try {
+      console.log(`TrackMap: Добавление отчета типа ${reportType}`);
+      
+      // Создаем новое разделение для отчета
+      const splitDirection = reportType === 'tripsList' ? 'vertical' : 'horizontal';
+      
+      // Создаем уникальный ID для новой панели
+      const panelId = `report-panel-${Date.now()}`;
+      
+      // Добавляем новое разделение напрямую через splitScreenManager
+      console.log(`TrackMap: Вызов splitScreenManager.addDynamicSplit для ${containerId} в направлении ${splitDirection}`);
+      const success = splitScreenManager.addDynamicSplit(containerId, splitDirection, panelId);
+      
+      if (!success) {
+        console.warn(`TrackMap: Не удалось создать ${splitDirection} разделение для отчета ${reportType}`);
+        return;
+      }
+      
+      // Обновляем состояние компонента после успешного разделения
+      setSplitType(splitDirection);
+      setIsSplitView(true);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem('splitScreenMode', splitDirection);
+      
+      // Находим созданную панель и добавляем в нее нужный отчет
+      setTimeout(() => {
+        const panelElement = document.getElementById(panelId);
+        if (panelElement) {
+          // Определяем компонент для загрузки
+          let componentFunction;
+          let title;
+          
+          switch (reportType) {
+            case 'speedChart':
+              componentFunction = createSpeedChartComponent;
+              title = 'График скорости';
+              break;
+            case 'fuelChart':
+              componentFunction = createFuelChartComponent;
+              title = 'График топлива';
+              break;
+            case 'tripsList':
+              componentFunction = createTripsListComponent;
+              title = 'Список поездок';
+              break;
+            case 'trackMap':
+            default:
+              componentFunction = createTrackMapComponent;
+              title = 'Карта трека';
+          }
+          
+          // Добавляем необходимые атрибуты к панели для правильной работы разделения
+          panelElement.setAttribute('data-component-type', reportType);
+          panelElement.setAttribute('data-splitscreen', 'true');
+          
+          // Создаем заголовок панели с кнопками управления
+          const header = document.createElement('div');
+          header.className = 'panel-header';
+          header.innerHTML = `
+            <h3>${title}</h3>
+            <div class="panel-header-controls">
+              <button class="panel-control refresh-button" title="Обновить данные">
+                <i class="fa fa-sync-alt"></i>
+              </button>
+              <button class="panel-control close-button" title="Закрыть панель">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+          `;
+          
+          // Добавляем обработчики для кнопок в заголовке
+          const refreshButton = header.querySelector('.refresh-button');
+          if (refreshButton) {
+            refreshButton.addEventListener('click', () => {
+              // Обновляем данные в панели
+              contentContainer.innerHTML = '';
+              componentFunction(contentContainer, {
+                vehicle: currentVehicle,
+                startDate: currentDateRange.startDate,
+                endDate: currentDateRange.endDate
+              });
+            });
+          }
+          
+          const closeButton = header.querySelector('.close-button');
+          if (closeButton) {
+            closeButton.addEventListener('click', () => {
+              // Закрываем панель напрямую через splitScreenManager
+              splitScreenManager.removeSplit(panelId);
+            });
+          }
+          
+          panelElement.innerHTML = '';
+          panelElement.appendChild(header);
+          
+          // Создаем контейнер для содержимого
+          const contentContainer = document.createElement('div');
+          contentContainer.className = 'panel-content';
+          panelElement.appendChild(contentContainer);
+          
+          // Загружаем выбранный компонент
+          componentFunction(contentContainer, {
+            vehicle: currentVehicle,
+            startDate: currentDateRange.startDate,
+            endDate: currentDateRange.endDate
+          });
+        } else {
+          console.error(`TrackMap: Не найдена созданная панель с ID ${panelId}`);
+        }
+      }, 300);
       
       // Перерисовываем карту при изменении режима
-      refreshMapView();
+      setTimeout(() => refreshMapView(), 400);
     } catch (error) {
-      console.error('Ошибка при изменении режима разделения:', error);
+      console.error('TrackMap: Ошибка при добавлении отчета:', error);
+    }
+  };
+  
+  // Функция для загрузки компонента в созданную панель (улучшенная версия)
+  const loadComponentIntoPanel = (panelId) => {
+    try {
+      const panelElement = document.getElementById(panelId);
+      if (!panelElement) {
+        console.warn(`TrackMap: Панель с ID ${panelId} не найдена`);
+        return;
+      }
+      
+      // Очищаем содержимое панели
+      panelElement.innerHTML = '';
+      
+      // Определяем, какой отчет загрузить в панель
+      const reportOptions = [
+        { 
+          type: 'trackMap', 
+          title: 'Карта трека',
+          icon: 'fa-route',
+          description: 'Показывает маршрут транспорта на карте',
+          component: createTrackMapComponent
+        },
+        { 
+          type: 'speedChart', 
+          title: 'График скорости',
+          icon: 'fa-tachometer-alt',
+          description: 'Показывает изменение скорости транспорта',
+          component: createSpeedChartComponent
+        },
+        { 
+          type: 'fuelChart', 
+          title: 'График топлива',
+          icon: 'fa-gas-pump',
+          description: 'Показывает изменение уровня топлива',
+          component: createFuelChartComponent 
+        },
+        { 
+          type: 'tripsList', 
+          title: 'Список поездок',
+          icon: 'fa-list',
+          description: 'Отображает список поездок и их параметры',
+          component: createTripsListComponent 
+        }
+      ];
+      
+      // Создаем панель выбора отчета
+      const selectorPanel = document.createElement('div');
+      selectorPanel.className = 'report-selector-panel';
+      selectorPanel.innerHTML = `
+        <div class="report-selector-header">
+          <h3>Выберите тип отчета для панели</h3>
+        </div>
+        <div class="report-selector-options"></div>
+      `;
+      
+      const optionsContainer = selectorPanel.querySelector('.report-selector-options');
+      
+      // Добавляем опции выбора отчета
+      reportOptions.forEach(report => {
+        const option = document.createElement('div');
+        option.className = 'report-option';
+        option.innerHTML = `
+          <div class="report-option-icon">
+            <i class="fa ${report.icon}"></i>
+          </div>
+          <div class="report-option-content">
+            <div class="report-option-title">${report.title}</div>
+            <div class="report-option-description">${report.description}</div>
+          </div>
+        `;
+        
+        // Добавляем обработчик клика для выбора отчета
+        option.addEventListener('click', () => {
+          // Удаляем панель выбора
+          selectorPanel.remove();
+          
+          // Добавляем атрибуты для правильной работы разделения
+          panelElement.setAttribute('data-component-type', report.type);
+          panelElement.setAttribute('data-splitscreen', 'true');
+          
+          // Создаем заголовок панели с кнопками управления
+          const header = document.createElement('div');
+          header.className = 'panel-header';
+          header.innerHTML = `
+            <h3><i class="fa ${report.icon}"></i> ${report.title}</h3>
+            <div class="panel-header-controls">
+              <button class="panel-control refresh-button" title="Обновить данные">
+                <i class="fa fa-sync-alt"></i>
+              </button>
+              <button class="panel-control close-button" title="Закрыть панель">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+          `;
+          
+          // Добавляем обработчики для кнопок в заголовке
+          const refreshButton = header.querySelector('.refresh-button');
+          if (refreshButton) {
+            refreshButton.addEventListener('click', () => {
+              // Обновляем данные в панели
+              contentContainer.innerHTML = '';
+              report.component(contentContainer, {
+                vehicle: currentVehicle,
+                startDate: currentDateRange.startDate,
+                endDate: currentDateRange.endDate
+              });
+            });
+          }
+          
+          const closeButton = header.querySelector('.close-button');
+          if (closeButton) {
+            closeButton.addEventListener('click', () => {
+              // Закрываем панель через splitScreenManager
+              splitScreenManager.removeSplit(panelId);
+            });
+          }
+          
+          panelElement.appendChild(header);
+          
+          // Создаем контейнер для содержимого
+          const contentContainer = document.createElement('div');
+          contentContainer.className = 'panel-content';
+          panelElement.appendChild(contentContainer);
+          
+          // Загружаем выбранный компонент
+          report.component(contentContainer, {
+            vehicle: currentVehicle,
+            startDate: currentDateRange.startDate,
+            endDate: currentDateRange.endDate
+          });
+        });
+        
+        optionsContainer.appendChild(option);
+      });
+      
+      // Добавляем панель выбора в контейнер
+      panelElement.appendChild(selectorPanel);
+      
+    } catch (error) {
+      console.error('TrackMap: Ошибка при загрузке компонента в панель:', error);
+      
+      const panelElement = document.getElementById(panelId);
+      if (panelElement) {
+        panelElement.innerHTML = `<div class="error-message">Ошибка при загрузке компонента: ${error.message}</div>`;
+      }
     }
   };
   
@@ -2104,381 +2346,177 @@ const TrackMap = ({
     };
   }, [currentVehicle, currentDateRange]);
   
-  // Функция для загрузки компонента в созданную панель
-  const loadComponentIntoPanel = (panelId, splitType) => {
+  // Функция для создания компонента карты трека
+  const createTrackMapComponent = (container, props) => {
     try {
-      const panelElement = document.getElementById(panelId);
-      if (!panelElement) {
-        console.warn(`Панель с ID ${panelId} не найдена`);
+      console.log('Создание компонента карты трека в панели');
+      
+      if (!container) {
+        console.error('Контейнер для карты трека не найден');
         return;
       }
       
-      // Очищаем содержимое панели
-      panelElement.innerHTML = '';
+      const { vehicle, startDate, endDate } = props || {};
       
-      // Определяем, какой отчет загрузить в панель
-      // Можно использовать случайный выбор, конфигурацию или предопределенный порядок
-      const reportOptions = [
-        { 
-          type: 'trackMap', 
-          title: 'Карта трека',
-          component: createTrackMapComponent
-        },
-        { 
-          type: 'speedChart', 
-          title: 'График скорости', 
-          component: createSpeedChartComponent
-        },
-        { 
-          type: 'fuelChart', 
-          title: 'График топлива', 
-          component: createFuelChartComponent 
-        },
-        { 
-          type: 'tripsList', 
-          title: 'Список поездок', 
-          component: createTripsListComponent 
+      // Создаем мини-версию карты трека
+      const mapContainer = document.createElement('div');
+      mapContainer.className = 'mini-map-container';
+      mapContainer.style.width = '100%';
+      mapContainer.style.height = '100%';
+      container.appendChild(mapContainer);
+      
+      // Инициализируем Leaflet карту
+      const miniMap = L.map(mapContainer, {
+        center: [55.7558, 37.6173], // Москва по умолчанию
+        zoom: 10,
+        zoomControl: true,
+        attributionControl: true
+      });
+      
+      // Добавляем базовый слой карты
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(miniMap);
+      
+      // Добавляем загрузку данных трека
+      const fetchMiniTrackData = async () => {
+        const loadingMessage = document.createElement('div');
+        loadingMessage.className = 'mini-loading-message';
+        loadingMessage.innerText = 'Загрузка данных трека...';
+        container.appendChild(loadingMessage);
+        
+        try {
+          if (!vehicle || !vehicle.id) {
+            throw new Error('Транспорт не выбран');
+          }
+          
+          if (!startDate || !endDate) {
+            throw new Error('Даты не указаны');
+          }
+          
+          // Здесь будет API запрос для получения данных трека
+          // Для примера, используем имитацию данных
+          setTimeout(() => {
+            const fakeTrackData = generateFakeTrackData(vehicle.id);
+            
+            if (fakeTrackData.length === 0) {
+              container.innerHTML = `
+                <div class="no-data-message">
+                  <i class="fa fa-route fa-3x" style="margin-bottom: 15px; color: #dde2e8;"></i>
+                  <p>Нет данных трека за указанный период</p>
+                </div>
+              `;
+              return;
+            }
+            
+            renderMiniTrack(fakeTrackData, miniMap);
+            container.removeChild(loadingMessage);
+          }, 1000);
+          
+        } catch (error) {
+          console.error('Ошибка при загрузке данных трека:', error);
+          container.innerHTML = `
+            <div class="error-message">
+              Ошибка при загрузке данных трека: ${error.message}
+            </div>
+          `;
         }
-      ];
+      };
       
-      // Выбираем компонент на основе типа разделения или других факторов
-      let selectedReport;
+      // Вызываем функцию загрузки данных
+      fetchMiniTrackData();
       
-      // Пример логики выбора компонента
-      if (splitType === 'horizontal') {
-        // Для горизонтального разделения предпочитаем графики
-        selectedReport = reportOptions.filter(r => 
-          r.type === 'speedChart' || r.type === 'fuelChart'
-        )[Math.floor(Math.random() * 2)];
-      } else if (splitType === 'vertical') {
-        // Для вертикального разделения предпочитаем список или карту
-        selectedReport = reportOptions.filter(r => 
-          r.type === 'trackMap' || r.type === 'tripsList'
-        )[Math.floor(Math.random() * 2)];
-      } else {
-        // Случайный выбор для других случаев
-        selectedReport = reportOptions[Math.floor(Math.random() * reportOptions.length)];
-      }
-      
-      console.log(`Загрузка компонента ${selectedReport.title} в панель ${panelId}`);
-      
-      // Создаем заголовок панели
-      const header = document.createElement('div');
-      header.className = 'panel-header';
-      header.innerHTML = `<h3>${selectedReport.title}</h3>`;
-      panelElement.appendChild(header);
-      
-      // Создаем контейнер для содержимого
-      const contentContainer = document.createElement('div');
-      contentContainer.className = 'panel-content';
-      panelElement.appendChild(contentContainer);
-      
-      // Загружаем выбранный компонент
-      selectedReport.component(contentContainer, {
-        vehicle: currentVehicle,
-        startDate: currentDateRange.startDate,
-        endDate: currentDateRange.endDate
+      // Добавляем обработчик для изменения размера карты
+      window.addEventListener('resize', () => {
+        if (miniMap) {
+          miniMap.invalidateSize();
+        }
       });
       
     } catch (error) {
-      console.error('Ошибка при загрузке компонента в панель:', error);
+      console.error('Ошибка при создании компонента карты трека:', error);
+      container.innerHTML = `
+        <div class="error-message">
+          Ошибка при создании компонента карты трека: ${error.message}
+        </div>
+      `;
     }
   };
   
-  // Функция для создания компонента карты трека
-  const createTrackMapComponent = (container) => {
+  // Функция для создания компонента графика скорости
+  const createSpeedChartComponent = (container, props) => {
     try {
-      if (!container) return;
+      console.log('Создание компонента графика скорости в панели');
       
-      // Создаем уникальный ID для карты
-      const mapId = `embedded-map-${Date.now()}`;
-      container.innerHTML = `<div id="${mapId}" style="width:100%;height:100%;"></div>`;
+      if (!container) {
+        console.error('Контейнер для графика скорости не найден');
+        return;
+      }
       
-      // Инициализируем карту
+      const { vehicle, startDate, endDate } = props || {};
+      
+      // Создаем сообщение о загрузке
+      const loadingMessage = document.createElement('div');
+      loadingMessage.className = 'chart-loading-message';
+      loadingMessage.innerText = 'Загрузка данных графика скорости...';
+      container.appendChild(loadingMessage);
+      
+      // Загрузка данных графика
       setTimeout(() => {
-        if(!window.L) {
-          console.error('Leaflet не загружен');
-          container.innerHTML = '<div class="error-message">Ошибка: библиотека карт не загружена</div>';
+        container.removeChild(loadingMessage);
+        
+        // Проверяем наличие необходимых данных
+        if (!vehicle || !vehicle.id) {
+          container.innerHTML = `
+            <div class="error-message">
+              Транспорт не выбран
+            </div>
+          `;
           return;
         }
         
-        const map = L.map(mapId, {
-          center: [43.238949, 76.889709], // Центр Алматы по умолчанию
-          zoom: 13,
-          layers: [
-            L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-              attribution: '© Google',
-              maxZoom: 20
-            })
-          ],
-          fadeAnimation: false,
-          zoomAnimation: false
-        });
-        
-        // Если есть данные трека, отображаем их
-        if (trackData && trackData.length > 0) {
-          const routePoints = trackData.map(point => [point.latitude, point.longitude]);
-          const routePath = L.polyline(routePoints, {
-            color: '#4e73df',
-            weight: 4,
-            opacity: 0.8,
-            lineJoin: 'round'
-          }).addTo(map);
-          
-          // Центрируем карту по маршруту
-          map.fitBounds(routePath.getBounds(), {
-            padding: [30, 30],
-            maxZoom: 15,
-            animate: false
-          });
+        if (!startDate || !endDate) {
+          container.innerHTML = `
+            <div class="error-message">
+              Даты не указаны
+            </div>
+          `;
+          return;
         }
-      }, 300);
-    } catch (error) {
-      console.error('Ошибка при создании компонента карты:', error);
-      container.innerHTML = '<div class="error-message">Ошибка при создании карты</div>';
-    }
-  };
-  
-  // Функция для создания графика скорости
-  const createSpeedChartComponent = (container) => {
-    try {
-      if (!container) return;
-      
-      // Если нет данных трека
-      if (!trackData || trackData.length === 0) {
-        container.innerHTML = '<div class="no-data-message">Нет данных для отображения</div>';
-        return;
-      }
-      
-      // Подготавливаем данные для графика
-      const speedData = trackData.map(point => ({
-        time: point.timestamp,
-        speed: point.speed
-      }));
-      
-      // Создаем простой canvas для графика
-      container.innerHTML = `<canvas id="speed-chart-${Date.now()}" style="width:100%;height:100%;"></canvas>`;
-      
-      // Здесь можно использовать любую библиотеку для построения графиков
-      // Например, Chart.js, Highcharts, или простой canvas API
-      
-      // Пример простой визуализации
-      const canvas = container.querySelector('canvas');
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Рисуем оси
-        ctx.beginPath();
-        ctx.moveTo(40, 20);
-        ctx.lineTo(40, canvas.height - 40);
-        ctx.lineTo(canvas.width - 20, canvas.height - 40);
-        ctx.stroke();
+        // Генерируем тестовые данные для графика
+        const fakeSpeedData = generateFakeSpeedData();
         
-        // Рисуем подписи
-        ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
-        ctx.fillText('Скорость (км/ч)', 10, 10);
-        ctx.fillText('Время', canvas.width - 50, canvas.height - 10);
-        
-        // Рисуем график скорости
-        if (speedData.length > 0) {
-          const maxSpeed = Math.max(...speedData.map(d => d.speed));
-          const minTime = speedData[0].time;
-          const maxTime = speedData[speedData.length - 1].time;
-          
-          ctx.beginPath();
-          ctx.strokeStyle = '#4e73df';
-          ctx.lineWidth = 2;
-          
-          for (let i = 0; i < speedData.length; i++) {
-            const x = 40 + (speedData[i].time - minTime) / (maxTime - minTime) * (canvas.width - 60);
-            const y = canvas.height - 40 - (speedData[i].speed / maxSpeed) * (canvas.height - 60);
-            
-            if (i === 0) {
-              ctx.moveTo(x, y);
-            } else {
-              ctx.lineTo(x, y);
-            }
-          }
-          
-          ctx.stroke();
+        if (fakeSpeedData.length === 0) {
+          container.innerHTML = `
+            <div class="no-data-message">
+              <i class="fa fa-tachometer-alt fa-3x" style="margin-bottom: 15px; color: #dde2e8;"></i>
+              <p>Нет данных о скорости за указанный период</p>
+            </div>
+          `;
+          return;
         }
-      }
+        
+        // Создаем контейнер для графика
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'speed-chart-container';
+        chartContainer.style.width = '100%';
+        chartContainer.style.height = '100%';
+        container.appendChild(chartContainer);
+        
+        // Здесь будет создание графика на основе данных
+        // Для демонстрации, создаем простой HTML-график
+        renderSimpleSpeedChart(chartContainer, fakeSpeedData);
+        
+      }, 800);
+      
     } catch (error) {
-      console.error('Ошибка при создании графика скорости:', error);
-      container.innerHTML = '<div class="error-message">Ошибка при создании графика</div>';
-    }
-  };
-  
-  // Функция для создания графика топлива
-  const createFuelChartComponent = (container) => {
-    try {
-      if (!container) return;
-      
-      // Если нет данных трека
-      if (!trackData || trackData.length === 0) {
-        container.innerHTML = '<div class="no-data-message">Нет данных для отображения</div>';
-        return;
-      }
-      
-      // Подготавливаем данные для графика
-      const fuelData = trackData.map(point => ({
-        time: point.timestamp,
-        fuel: point.fuel
-      }));
-      
-      // Создаем простой canvas для графика
-      container.innerHTML = `<canvas id="fuel-chart-${Date.now()}" style="width:100%;height:100%;"></canvas>`;
-      
-      // Пример простой визуализации
-      const canvas = container.querySelector('canvas');
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Рисуем оси
-        ctx.beginPath();
-        ctx.moveTo(40, 20);
-        ctx.lineTo(40, canvas.height - 40);
-        ctx.lineTo(canvas.width - 20, canvas.height - 40);
-        ctx.stroke();
-        
-        // Рисуем подписи
-        ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
-        ctx.fillText('Уровень топлива (%)', 10, 10);
-        ctx.fillText('Время', canvas.width - 50, canvas.height - 10);
-        
-        // Рисуем график топлива
-        if (fuelData.length > 0) {
-          const maxFuel = 100; // Предполагаем, что уровень топлива в процентах от 0 до 100
-          const minTime = fuelData[0].time;
-          const maxTime = fuelData[fuelData.length - 1].time;
-          
-          ctx.beginPath();
-          ctx.strokeStyle = '#1cc88a';
-          ctx.lineWidth = 2;
-          
-          for (let i = 0; i < fuelData.length; i++) {
-            const x = 40 + (fuelData[i].time - minTime) / (maxTime - minTime) * (canvas.width - 60);
-            const y = canvas.height - 40 - (fuelData[i].fuel / maxFuel) * (canvas.height - 60);
-            
-            if (i === 0) {
-              ctx.moveTo(x, y);
-            } else {
-              ctx.lineTo(x, y);
-            }
-          }
-          
-          ctx.stroke();
-        }
-      }
-    } catch (error) {
-      console.error('Ошибка при создании графика топлива:', error);
-      container.innerHTML = '<div class="error-message">Ошибка при создании графика</div>';
-    }
-  };
-  
-  // Функция для создания списка поездок
-  const createTripsListComponent = (container) => {
-    try {
-      if (!container) return;
-      
-      // Если нет данных трека
-      if (!trackData || trackData.length === 0) {
-        container.innerHTML = '<div class="no-data-message">Нет данных для отображения</div>';
-        return;
-      }
-      
-      // Создаем список поездок
-      // В реальном проекте здесь может быть логика определения отдельных поездок
-      
-      // Пример: разбиваем трек на "поездки" по изменению скорости (если скорость была 0 более 5 минут)
-      const trips = [];
-      let currentTrip = { points: [trackData[0]], startTime: trackData[0].timestamp };
-      
-      for (let i = 1; i < trackData.length; i++) {
-        const point = trackData[i];
-        const prevPoint = trackData[i-1];
-        const timeDiff = (point.timestamp - prevPoint.timestamp) / (1000 * 60); // в минутах
-        
-        // Если прошло более 5 минут и скорость была 0, считаем это новой поездкой
-        if (timeDiff > 5 && prevPoint.speed === 0) {
-          // Завершаем текущую поездку
-          currentTrip.endTime = prevPoint.timestamp;
-          currentTrip.distance = calculateTripDistance(currentTrip.points);
-          currentTrip.duration = (currentTrip.endTime - currentTrip.startTime) / (1000 * 60); // в минутах
-          currentTrip.maxSpeed = Math.max(...currentTrip.points.map(p => p.speed));
-          currentTrip.avgSpeed = currentTrip.points.reduce((sum, p) => sum + p.speed, 0) / currentTrip.points.length;
-          
-          trips.push(currentTrip);
-          
-          // Начинаем новую поездку
-          currentTrip = { points: [point], startTime: point.timestamp };
-        } else {
-          // Добавляем точку к текущей поездке
-          currentTrip.points.push(point);
-        }
-      }
-      
-      // Завершаем последнюю поездку
-      if (currentTrip.points.length > 0) {
-        const lastPoint = currentTrip.points[currentTrip.points.length - 1];
-        currentTrip.endTime = lastPoint.timestamp;
-        currentTrip.distance = calculateTripDistance(currentTrip.points);
-        currentTrip.duration = (currentTrip.endTime - currentTrip.startTime) / (1000 * 60); // в минутах
-        currentTrip.maxSpeed = Math.max(...currentTrip.points.map(p => p.speed));
-        currentTrip.avgSpeed = currentTrip.points.reduce((sum, p) => sum + p.speed, 0) / currentTrip.points.length;
-        
-        trips.push(currentTrip);
-      }
-      
-      // Создаем HTML для списка поездок
-      let html = '<div class="trips-list" style="height:100%;overflow-y:auto;padding:10px;">';
-      
-      if (trips.length === 0) {
-        html += '<div class="no-trips">Поездки не обнаружены</div>';
-      } else {
-        html += '<table style="width:100%;border-collapse:collapse;">';
-        html += '<thead><tr style="background-color:#f2f2f2;">';
-        html += '<th style="padding:8px;text-align:left;border:1px solid #ddd;">№</th>';
-        html += '<th style="padding:8px;text-align:left;border:1px solid #ddd;">Начало</th>';
-        html += '<th style="padding:8px;text-align:left;border:1px solid #ddd;">Конец</th>';
-        html += '<th style="padding:8px;text-align:left;border:1px solid #ddd;">Расстояние</th>';
-        html += '<th style="padding:8px;text-align:left;border:1px solid #ddd;">Длительность</th>';
-        html += '<th style="padding:8px;text-align:left;border:1px solid #ddd;">Ср. скорость</th>';
-        html += '</tr></thead>';
-        html += '<tbody>';
-        
-        trips.forEach((trip, index) => {
-          html += `<tr style="cursor:pointer;" onclick="highlightTrip(${index})">`;
-          html += `<td style="padding:8px;text-align:left;border:1px solid #ddd;">${index + 1}</td>`;
-          html += `<td style="padding:8px;text-align:left;border:1px solid #ddd;">${formatDate(trip.startTime)}</td>`;
-          html += `<td style="padding:8px;text-align:left;border:1px solid #ddd;">${formatDate(trip.endTime)}</td>`;
-          html += `<td style="padding:8px;text-align:left;border:1px solid #ddd;">${trip.distance.toFixed(2)} км</td>`;
-          html += `<td style="padding:8px;text-align:left;border:1px solid #ddd;">${Math.round(trip.duration)} мин</td>`;
-          html += `<td style="padding:8px;text-align:left;border:1px solid #ddd;">${Math.round(trip.avgSpeed)} км/ч</td>`;
-          html += '</tr>';
-        });
-        
-        html += '</tbody></table>';
-      }
-      
-      html += '</div>';
-      
-      container.innerHTML = html;
-      
-      // Определяем функцию для выделения поездки
-      window.highlightTrip = function(index) {
-        console.log(`Выделена поездка ${index + 1}`);
-        // Здесь можно добавить логику для выделения поездки на карте
-      };
-    } catch (error) {
-      console.error('Ошибка при создании списка поездок:', error);
-      container.innerHTML = '<div class="error-message">Ошибка при создании списка поездок</div>';
+      console.error('Ошибка при создании компонента графика скорости:', error);
+      container.innerHTML = `
+        <div class="error-message">
+          Ошибка при создании компонента графика скорости: ${error.message}
+        </div>
+      `;
     }
   };
   

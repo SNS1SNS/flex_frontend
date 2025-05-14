@@ -10,6 +10,7 @@
 .report-tabs {
   display: flex;
   overflow-x: auto;
+  z-index: 10;
   flex: 1;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */

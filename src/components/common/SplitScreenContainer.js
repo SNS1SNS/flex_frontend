@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import splitScreenManager, { SPLIT_MODES } from '../../utils/SplitScreenManager';
 import './SplitScreenContainer.css';
 
@@ -10,17 +10,19 @@ import './SplitScreenContainer.css';
  * @param {Boolean} props.allowSplit - разрешать разделение (по умолчанию true)
  * @param {Boolean} props.showControls - показывать элементы управления разделением
  * @param {Function} props.onSplitChange - обработчик изменения режима разделения
+ * @param {Boolean} props.syncSelection - синхронизировать выделение между разделенными экранами (по умолчанию true)
  */
-const SplitScreenContainer = ({ 
+const SplitScreenContainer = forwardRef(({ 
   id,
   children,
   allowSplit = true,
   className,
   showControls = true,
   onSplitChange,
+  syncSelection = true,
   style = {},
   ...props
-}) => {
+}, ref) => {
   // Состояния компонента
   const [containerState, setContainerState] = useState({
     mode: SPLIT_MODES.SINGLE,
@@ -32,9 +34,29 @@ const SplitScreenContainer = ({
   const [showSplitControls, setShowSplitControls] = useState(false);
   // Используем отдельное состояние для отслеживания активности
   const [isActive, setIsActive] = useState(false);
+  // Состояние для хранения текущего выделения
+  const [currentSelection, setCurrentSelection] = useState(null);
+  // ID группы синхронизации для связанных контейнеров
+  const [syncGroupId, setSyncGroupId] = useState(`sync-${id || Math.random().toString(36).substr(2, 9)}`);
   
   // Ref для контейнера
   const containerRef = useRef(null);
+  
+  // Экспортируем API через ref
+  useImperativeHandle(ref, () => ({
+    // Метод для оповещения о выделении в этом контейнере
+    notifySelectionChanged: (selectionData) => {
+      handleLocalSelectionChange(selectionData);
+    },
+    // Метод для программного применения выделения
+    applySelection: (selectionData) => {
+      applySelectionToGraphs(selectionData);
+    },
+    // Получить текущее выделение
+    getCurrentSelection: () => currentSelection,
+    // Получить ID группы синхронизации
+    getSyncGroupId: () => syncGroupId
+  }));
   
   // Инициализация при монтировании
   useEffect(() => {
@@ -69,15 +91,18 @@ const SplitScreenContainer = ({
         containerRef.current.id = id;
       }
       
+      // Устанавливаем атрибут группы синхронизации
+      containerRef.current.setAttribute('data-sync-group', syncGroupId);
+      
       // Создаем пользовательское событие для сообщения об инициализации
       const event = new CustomEvent('splitContainerInitialized', {
-        detail: { id, element: containerRef.current }
+        detail: { id, element: containerRef.current, syncGroupId }
       });
       document.dispatchEvent(event);
       
-      console.log(`SplitScreenContainer: Инициализирован контейнер с ID ${id || 'без ID'}`);
+      console.log(`SplitScreenContainer: Инициализирован контейнер с ID ${id || 'без ID'}, группа синхронизации: ${syncGroupId}`);
     }
-  }, [id]);
+  }, [id, syncGroupId]);
   
   // Добавляем глобальный обработчик кликов для сброса активности всех контейнеров
   useEffect(() => {
@@ -97,6 +122,98 @@ const SplitScreenContainer = ({
       document.removeEventListener('click', handleGlobalClick);
     };
   }, []);
+  
+  // Добавляем обработчик события для синхронизации выделения между контейнерами
+  useEffect(() => {
+    const handleSelectionSyncEvent = (event) => {
+      if (!syncSelection) return;
+      
+      const { sourceContainerId, selectionData, syncGroupId: eventSyncGroupId } = event.detail;
+      
+      // Проверяем, относится ли наш контейнер к группе синхронизации
+      // и что он не является источником события (чтобы избежать циклической обработки)
+      if (
+        containerRef.current && 
+        eventSyncGroupId === syncGroupId && 
+        id !== sourceContainerId
+      ) {
+        console.log(`SplitScreenContainer ${id}: Получено событие синхронизации выделения от контейнера ${sourceContainerId}`);
+        
+        // Обновляем состояние выделения
+        setCurrentSelection(selectionData);
+        
+        // Применяем выделение к графикам в контейнере
+        applySelectionToGraphs(selectionData);
+      }
+    };
+    
+    // Добавляем обработчик события
+    document.addEventListener('graphSelectionChanged', handleSelectionSyncEvent);
+    
+    // Очистка при размонтировании
+    return () => {
+      document.removeEventListener('graphSelectionChanged', handleSelectionSyncEvent);
+    };
+  }, [id, syncSelection, syncGroupId]);
+  
+  // Функция для обработки локального изменения выделения в этом контейнере
+  const handleLocalSelectionChange = (selectionData) => {
+    if (!syncSelection) return;
+    
+    // Обновляем состояние выделения
+    setCurrentSelection(selectionData);
+    
+    // Создаем и отправляем событие для синхронизации с другими контейнерами
+    const event = new CustomEvent('graphSelectionChanged', {
+      detail: {
+        sourceContainerId: id,
+        selectionData,
+        syncGroupId
+      }
+    });
+    
+    console.log(`SplitScreenContainer ${id}: Отправляем событие выделения для группы ${syncGroupId}`, selectionData);
+    document.dispatchEvent(event);
+  };
+  
+  // Функция для применения выделения к графикам в контейнере
+  const applySelectionToGraphs = (selectionData) => {
+    if (!containerRef.current || !selectionData) return;
+    
+    console.log(`SplitScreenContainer ${id}: Применяем выделение:`, selectionData);
+    
+    // Находим все графики внутри контейнера
+    const graphs = containerRef.current.querySelectorAll('[data-graph]');
+    
+    // Применяем выделение к каждому графику
+    graphs.forEach(graph => {
+      // Проверяем, имеет ли график API для установки выделения
+      if (graph.__chartInstance && typeof graph.__chartInstance.setSelection === 'function') {
+        graph.__chartInstance.setSelection(selectionData);
+      } else if (graph.__reactInstance && graph.__reactInstance.setSelection) {
+        graph.__reactInstance.setSelection(selectionData);
+      } else {
+        // Отправляем событие для графика, который может обрабатывать его самостоятельно
+        const graphSelectionEvent = new CustomEvent('applyGraphSelection', {
+          detail: { selectionData }
+        });
+        graph.dispatchEvent(graphSelectionEvent);
+      }
+    });
+    
+    // Если контейнер разделен, также отправляем событие datesRangeChanged
+    // Это помогает синхронизировать временные диапазоны на графиках
+    if (selectionData.startDate && selectionData.endDate) {
+      const rangeEvent = new CustomEvent('datesRangeChanged', {
+        detail: {
+          startDate: selectionData.startDate,
+          endDate: selectionData.endDate,
+          sourceContainerId: id
+        }
+      });
+      document.dispatchEvent(rangeEvent);
+    }
+  };
   
   // Добавляем обработчик события запроса на разделение контейнера
   useEffect(() => {
@@ -142,7 +259,8 @@ const SplitScreenContainer = ({
               containerId,
               container1Id,
               container2Id,
-              direction
+              direction,
+              syncGroupId // Добавляем syncGroupId, чтобы дочерние контейнеры могли унаследовать его
             }
           });
           document.dispatchEvent(event);
@@ -162,8 +280,9 @@ const SplitScreenContainer = ({
                 originalContainerId: containerId,
                 direction: direction,
                 timestamp: Date.now(),
-                // Добавляем признак активации
-                activateContainer: true
+                // Добавляем признак активации и syncGroupId
+                activateContainer: true,
+                syncGroupId
               }
             });
             
@@ -239,7 +358,7 @@ const SplitScreenContainer = ({
     return () => {
       document.removeEventListener('splitContainerRequested', handleSplitRequest);
     };
-  }, [id, onSplitChange, children]);
+  }, [id, onSplitChange, children, syncGroupId]);
   
   // Обновляем эффект для обработки события requestSplit, чтобы учитывать только активный контейнер
   useEffect(() => {
@@ -263,7 +382,8 @@ const SplitScreenContainer = ({
             containerId: id,
             container1Id: `${id}-1`,
             container2Id: `${id}-2`,
-            direction: direction
+            direction: direction,
+            syncGroupId // Передаем syncGroupId для наследования дочерними контейнерами
           }
         });
         
@@ -285,7 +405,36 @@ const SplitScreenContainer = ({
     return () => {
       document.removeEventListener('requestSplit', handleGlobalSplitRequest, true);
     };
-  }, [id, isActive, showSplitControls]);
+  }, [id, isActive, showSplitControls, syncGroupId]);
+  
+  // Эффект для наследования группы синхронизации от родительского контейнера
+  useEffect(() => {
+    const handleSplitComplete = (event) => {
+      const { container1Id, container2Id, syncGroupId: parentSyncGroupId } = event.detail;
+      
+      // Проверяем, относится ли событие к нашему контейнеру
+      if (id === container1Id || id === container2Id) {
+        // Наследуем группу синхронизации от родительского контейнера
+        if (parentSyncGroupId && parentSyncGroupId !== syncGroupId) {
+          console.log(`SplitScreenContainer ${id}: Наследуем группу синхронизации ${parentSyncGroupId} от родительского контейнера`);
+          setSyncGroupId(parentSyncGroupId);
+          
+          // Обновляем атрибут в DOM
+          if (containerRef.current) {
+            containerRef.current.setAttribute('data-sync-group', parentSyncGroupId);
+          }
+        }
+      }
+    };
+    
+    // Добавляем обработчик события
+    document.addEventListener('splitContainerComplete', handleSplitComplete);
+    
+    // Очистка при размонтировании
+    return () => {
+      document.removeEventListener('splitContainerComplete', handleSplitComplete);
+    };
+  }, [id, syncGroupId]);
   
   // Обработчик клика для активации контейнера - улучшаем для лучшей визуальной индикации и обновления состояния
   const handleContainerClick = () => {
@@ -414,11 +563,12 @@ const SplitScreenContainer = ({
     
     const [container1Id, container2Id] = containerState.children.map(child => child.id);
     
-    // Важно: добавляем data-split-direction на контейнер для CSS-селекторов
+    // Важно: добавляем data-split-direction и data-sync-group на контейнер для CSS-селекторов
     return (
       <div 
         className={`split-container ${splitClassName}`}
         data-split-direction={containerState.splitDirection}
+        data-sync-group={syncGroupId}
       >
         <div 
           className="split-pane" 
@@ -426,6 +576,7 @@ const SplitScreenContainer = ({
           data-container-id={container1Id}
           data-split-parent={id}
           data-split-index="0"
+          data-sync-group={syncGroupId}
         >
           {/* Первый разделенный контейнер - сохраняем предыдущее содержимое */}
           <SplitScreenContainer 
@@ -433,6 +584,13 @@ const SplitScreenContainer = ({
             allowSplit={allowSplit}
             showControls={showControls}
             className="split-content"
+            syncSelection={syncSelection}
+            ref={childRef => {
+              // При получении ref от дочернего контейнера, можем применить текущее выделение
+              if (childRef && currentSelection) {
+                childRef.applySelection(currentSelection);
+              }
+            }}
           >
             {containerState.children[0].content || 
               <span className="split-placeholder">Контейнер 1</span>}
@@ -450,6 +608,7 @@ const SplitScreenContainer = ({
           data-container-id={container2Id}
           data-split-parent={id}
           data-split-index="1"
+          data-sync-group={syncGroupId}
         >
           {/* Второй разделенный контейнер - для нового содержимого */}
           <SplitScreenContainer 
@@ -457,6 +616,13 @@ const SplitScreenContainer = ({
             allowSplit={allowSplit}
             showControls={showControls}
             className="split-content"
+            syncSelection={syncSelection}
+            ref={childRef => {
+              // При получении ref от дочернего контейнера, можем применить текущее выделение
+              if (childRef && currentSelection) {
+                childRef.applySelection(currentSelection);
+              }
+            }}
           >
             {containerState.children[1].content || 
               <span className="split-placeholder">Контейнер 2</span>}
@@ -536,6 +702,7 @@ const SplitScreenContainer = ({
       }}
       data-container-id={id}
       data-active={isActive ? "true" : "false"}
+      data-sync-group={syncGroupId}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleContainerClick}
@@ -544,6 +711,9 @@ const SplitScreenContainer = ({
       {containerState.isSplit ? renderSplitContainers() : children}
     </div>
   );
-};
+});
+
+// Добавляем displayName для компонента
+SplitScreenContainer.displayName = 'SplitScreenContainer';
 
 export default SplitScreenContainer; 

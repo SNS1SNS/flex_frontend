@@ -1,4 +1,3 @@
-
 /* Основные стили для компонента TrackMap */
 
 .tm-container {
@@ -35,6 +34,7 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  z-index: 10;
   position: relative;
 }
 
@@ -42,6 +42,7 @@
   flex: 1;
   position: relative;
   min-height: 300px;
+
 }
 
 .tm-map-instance {
@@ -93,7 +94,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 10;
 }
 
 .tm-loading-spinner {
@@ -269,7 +270,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
+  z-index: 100;
   border: none;
   border-radius: 0;
   height: 100vh !important;
@@ -307,5 +308,166 @@
   .tm-split-quad .tm-map-wrapper {
     width: 100%;
     height: 100%;
+  }
+}
+
+/* Стили для панели выбора отчетов */
+.report-selector-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: #f7f9fc;
+  padding: 15px;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.report-selector-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.report-selector-header h3 {
+  font-size: 18px;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.report-selector-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+}
+
+.report-option {
+  display: flex;
+  align-items: center;
+  width: calc(50% - 15px);
+  min-width: 200px;
+  padding: 15px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.report-option:hover {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  border-left: 3px solid #4a90e2;
+}
+
+.report-option-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f4f8;
+  border-radius: 8px;
+  margin-right: 15px;
+  color: #4a90e2;
+  font-size: 18px;
+}
+
+.report-option-content {
+  flex: 1;
+}
+
+.report-option-title {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #2c3e50;
+}
+
+.report-option-description {
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+/* Стили для заголовка панели отчетов */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: #f0f4f8;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+}
+
+.panel-header h3 i {
+  margin-right: 8px;
+  color: #4a90e2;
+}
+
+.panel-header-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.panel-control {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  color: #7f8c8d;
+  transition: color 0.2s ease;
+}
+
+.panel-control:hover {
+  color: #2c3e50;
+}
+
+.panel-content {
+  height: calc(100% - 40px);
+  overflow: auto;
+}
+
+/* Стили для группы кнопок отчетов */
+.tm-report-buttons {
+  border-left: 1px solid #e1e5e9;
+  padding-left: 10px;
+  margin-left: 10px;
+}
+
+/* Стили для сообщений об ошибках */
+.error-message {
+  padding: 15px;
+  background-color: #ffe9e9;
+  color: #d73a3a;
+  border-radius: 5px;
+  margin: 10px;
+}
+
+.no-data-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  color: #7f8c8d;
+  text-align: center;
+  height: 100%;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+  .report-option {
+    width: 100%;
+  }
+  
+  .report-selector-options {
+    flex-direction: column;
   }
 } 

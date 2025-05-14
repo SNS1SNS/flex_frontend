@@ -61,7 +61,7 @@
   background-color: #ebedf4;
   border: 1px solid #d1d3e2;
   position: absolute;
-  z-index: 100;
+  z-index: 10;
   transition: background-color 0.2s ease;
 }
 
@@ -71,6 +71,7 @@
   width: 100%;
   cursor: row-resize;
   left: 0;
+  z-index: 10;
   top: calc(50% - 4px);
 }
 
@@ -80,6 +81,7 @@
   height: 100%;
   cursor: col-resize;
   top: 0;
+  z-index: 10;
   left: calc(50% - 4px);
 }
 

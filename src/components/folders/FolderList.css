@@ -29,24 +29,38 @@
     align-items: center;
     padding: 8px 5px;
     transition: background-color 0.2s;
+    position: relative;
+    border-radius: 4px;
 }
 
 .folder-header:hover {
     background-color: rgba(0, 0, 255, 0.05);
 }
 
+/* Активное состояние для folder-header */
+.folder-header.active {
+    background-color: rgba(0, 100, 255, 0.1);
+}
+
 .folder-toggle {
     width: 20px;
     text-align: center;
     margin-right: 5px;
+    cursor: pointer;
 }
 
 .folder-toggle-icon {
     transition: transform 0.2s ease;
 }
 
-.folder-expanded .folder-toggle-icon {
+/* Важно для анимации открытия/закрытия */
+.folder-expanded > .folder-header .folder-toggle-icon {
     transform: rotate(0deg);
+}
+
+/* Не развернутая папка */
+.folder-item:not(.folder-expanded) > .folder-header .folder-toggle-icon {
+    transform: rotate(-90deg);
 }
 
 .folder-toggle-placeholder {
@@ -105,14 +119,33 @@
 
 /* Стили для содержимого папки */
 .folder-contents {
-    overflow: visible;
-    max-height: none;
-    transition: none;
+    padding-left: 25px;
+    overflow: hidden;
+    max-height: 1000px; /* Достаточно большое значение */
+    transition: max-height 0.3s ease;
 }
 
-.folder-expanded .folder-contents {
-    max-height: none;
-    transition: none;
+/* Закрытый вид содержимого папки */
+.folder-item:not(.folder-expanded) > .folder-contents {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* Открытый вид содержимого папки */
+.folder-expanded > .folder-contents {
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+/* Добавляем визуальную индикацию кликабельности */
+.folder-header:hover .folder-toggle,
+.folder-header:hover .folder-icon {
+    opacity: 0.8;
+}
+
+.folder-header:active {
+    background-color: rgba(0, 80, 255, 0.15);
 }
 
 /* Стили для транспортных средств */

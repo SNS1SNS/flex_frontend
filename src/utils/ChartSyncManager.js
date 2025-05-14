@@ -1,6 +1,6 @@
 /**
  * ChartSyncManager - модуль для синхронизации масштабирования между графиками
- * Позволяет синхронизировать зум и панорамирование во всех графиках
+ * Позволяет синхронизировать зум, панорамирование и выделение во всех графиках
  */
 
 class ChartSyncManager {
@@ -12,10 +12,14 @@ class ChartSyncManager {
     this.lastPanRange = null; // Последний диапазон панорамирования
     this.lastSelectionRange = null; // Последний диапазон выделения
     this.syncSelectionEnabled = true; // Флаг включения/выключения синхронизации выделений
+    this.syncGroups = new Map(); // Карта групп синхронизации для разделенных контейнеров
     
-    // Регистрируем глобальный обработчик для отслеживания новых графиков после разделения экрана
+    // Регистрируем глобальные обработчики событий
     document.addEventListener('splitContainerComplete', this.handleSplitComplete.bind(this));
     document.addEventListener('chartInitialized', this.handleChartInitialized.bind(this));
+    // Слушаем события от SplitScreenContainer
+    document.addEventListener('graphSelectionChanged', this.handleSplitContainerSelection.bind(this));
+    document.addEventListener('splitContainerInitialized', this.handleSplitContainerInitialized.bind(this));
     
     // Добавляем интервал для периодической проверки новых графиков
     this.scanInterval = setInterval(this.scanForNewCharts.bind(this), 2000);
@@ -1079,6 +1083,392 @@ class ChartSyncManager {
     }));
     
     return true;
+  }
+
+  /**
+   * Обработчик события инициализации разделенного контейнера
+   * @param {Event} event - Событие с данными контейнера
+   */
+  handleSplitContainerInitialized(event) {
+    const { id, syncGroupId, element } = event.detail;
+    if (id && element) {
+      console.log(`ChartSyncManager: Инициализирован разделенный контейнер ${id}, группа синхронизации: ${syncGroupId || 'не указана'}`);
+      
+      // Если указана группа синхронизации, добавляем контейнер в группу
+      if (syncGroupId) {
+        // Получаем или создаем группу
+        let group = this.syncGroups.get(syncGroupId);
+        if (!group) {
+          group = new Set();
+          this.syncGroups.set(syncGroupId, group);
+        }
+        
+        // Добавляем ID контейнера в группу
+        group.add(id);
+        console.log(`ChartSyncManager: Контейнер ${id} добавлен в группу синхронизации ${syncGroupId}`);
+        
+        // Если есть сохраненное выделение для этой группы, применяем его
+        const lastSelection = this.getLastSelectionForGroup(syncGroupId);
+        if (lastSelection && this.syncSelectionEnabled) {
+          console.log(`ChartSyncManager: Применяем сохраненное выделение к новому контейнеру ${id}`);
+          
+          // Находим график в контейнере и применяем выделение
+          const chart = this.findChartByContainerId(id);
+          if (chart) {
+            this.applySelectionToChart(chart, id, lastSelection);
+          } else {
+            console.log(`ChartSyncManager: График в контейнере ${id} пока не найден, выделение будет применено позже`);
+            // Сохраняем выделение для отложенного применения
+            this.lastSelectionRange = lastSelection;
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Обработчик события выделения от компонента SplitScreenContainer
+   * @param {Event} event - Событие с данными о выделении
+   */
+  handleSplitContainerSelection(event) {
+    const { sourceContainerId, selectionData, syncGroupId } = event.detail;
+    
+    if (!this.syncSelectionEnabled) {
+      console.log(`ChartSyncManager: Синхронизация выделений отключена, пропускаем событие от ${sourceContainerId}`);
+      return;
+    }
+    
+    console.log(`ChartSyncManager: Получено событие выделения от контейнера ${sourceContainerId}, группа: ${syncGroupId}`, selectionData);
+    
+    // Сохраняем выделение для группы синхронизации
+    this.saveSelectionForGroup(syncGroupId, selectionData);
+    
+    // Если нет syncGroupId, обрабатываем как обычное выделение
+    if (!syncGroupId) {
+      console.log(`ChartSyncManager: Не указана группа синхронизации, используем стандартную синхронизацию`);
+      this.lastSelectionRange = selectionData;
+      // Также нужно установить lastZoomRange для совместимости
+      if (selectionData.startDate && selectionData.endDate) {
+        this.lastZoomRange = {
+          min: new Date(selectionData.startDate).getTime(),
+          max: new Date(selectionData.endDate).getTime()
+        };
+      }
+      this.syncSelection(sourceContainerId, selectionData);
+      return;
+    }
+    
+    // Получаем группу синхронизации
+    const group = this.syncGroups.get(syncGroupId);
+    if (!group) {
+      console.log(`ChartSyncManager: Группа синхронизации ${syncGroupId} не найдена, создаем новую`);
+      
+      // Создаем новую группу и добавляем исходный контейнер
+      const newGroup = new Set([sourceContainerId]);
+      this.syncGroups.set(syncGroupId, newGroup);
+      
+      // Ищем все контейнеры с этой группой синхронизации
+      document.querySelectorAll(`[data-sync-group="${syncGroupId}"]`).forEach(el => {
+        const id = el.id || el.getAttribute('data-container-id');
+        if (id && id !== sourceContainerId) {
+          console.log(`ChartSyncManager: Добавляем контейнер ${id} в группу ${syncGroupId}`);
+          newGroup.add(id);
+        }
+      });
+      
+      // Если группа осталась пустой (только исходный контейнер), используем стандартную синхронизацию
+      if (newGroup.size <= 1) {
+        console.log(`ChartSyncManager: В группе ${syncGroupId} только один контейнер, используем стандартную синхронизацию`);
+        this.syncSelection(sourceContainerId, selectionData);
+        return;
+      }
+    }
+    
+    // Получаем обновленную группу
+    const updatedGroup = this.syncGroups.get(syncGroupId);
+    
+    // Устанавливаем флаг подавления циклических вызовов
+    this.suppressEvents = true;
+    
+    try {
+      console.log(`ChartSyncManager: Применяем выделение ко всем контейнерам в группе ${syncGroupId} (${updatedGroup.size} контейнеров)`);
+      
+      // Применяем выделение ко всем графикам в группе
+      updatedGroup.forEach(containerId => {
+        if (containerId !== sourceContainerId) {
+          console.log(`ChartSyncManager: Синхронизируем выделение с контейнером ${containerId}`);
+          
+          // Находим график в контейнере и применяем выделение
+          const chart = this.findChartByContainerId(containerId);
+          if (chart) {
+            console.log(`ChartSyncManager: Найден график для контейнера ${containerId}, применяем выделение`);
+            this.applySelectionToChart(chart, containerId, selectionData);
+          } else {
+            console.log(`ChartSyncManager: График для контейнера ${containerId} не найден, отправляем событие напрямую контейнеру`);
+          }
+          
+          // Также отправляем событие для обновления контейнера напрямую
+          this.notifySplitContainer(containerId, selectionData);
+        }
+      });
+      
+      // Также проверяем стандартную синхронизацию для всех других графиков
+      if (this.charts.size > updatedGroup.size) {
+        console.log(`ChartSyncManager: Проверяем необходимость синхронизации с другими графиками (всего ${this.charts.size}, в группе ${updatedGroup.size})`);
+        
+        // Синхронизируем с графиками, не входящими в текущую группу
+        this.charts.forEach((chart, chartId) => {
+          if (!updatedGroup.has(chartId)) {
+            // Проверяем, есть ли у графика уже указанная группа синхронизации
+            const container = document.getElementById(chartId) || 
+                             document.querySelector(`[data-container-id="${chartId}"]`);
+            
+            const containerSyncGroup = container ? container.getAttribute('data-sync-group') : null;
+            if (!containerSyncGroup || containerSyncGroup === syncGroupId) {
+              console.log(`ChartSyncManager: Синхронизируем с графиком ${chartId} (вне группы ${syncGroupId})`);
+              this.applySelectionToChart(chart, chartId, selectionData);
+            }
+          }
+        });
+      }
+    } finally {
+      // Сбрасываем флаг подавления циклических вызовов
+      this.suppressEvents = false;
+    }
+    
+    // Отправляем событие о завершении синхронизации выделения
+    document.dispatchEvent(new CustomEvent('selectionSynchronized', {
+      detail: {
+        sourceId: sourceContainerId,
+        syncGroupId,
+        selectionData,
+        timestamp: Date.now()
+      }
+    }));
+  }
+
+  /**
+   * Находит график по ID контейнера
+   * @param {string} containerId - ID контейнера
+   * @returns {object|null} - Экземпляр графика или null
+   */
+  findChartByContainerId(containerId) {
+    // Проверяем, зарегистрирован ли график напрямую
+    if (this.charts.has(containerId)) {
+      console.log(`ChartSyncManager: Найден напрямую зарегистрированный график для контейнера ${containerId}`);
+      return this.charts.get(containerId);
+    }
+    
+    // Проверяем разделенные контейнеры (container-1, container-2)
+    if (containerId.includes('-')) {
+      const baseContainerId = containerId.split('-')[0];
+      if (this.charts.has(baseContainerId)) {
+        console.log(`ChartSyncManager: Найден родительский график для разделенного контейнера ${containerId} (baseId: ${baseContainerId})`);
+        return this.charts.get(baseContainerId);
+      }
+    }
+    
+    // Ищем в DOM по ID или атрибуту
+    const container = document.getElementById(containerId) || 
+                     document.querySelector(`[data-container-id="${containerId}"]`);
+    
+    if (!container) {
+      console.log(`ChartSyncManager: Не найден DOM-элемент для контейнера ${containerId}`);
+      return null;
+    }
+    
+    // Ищем canvas внутри контейнера
+    const canvas = container.querySelector('canvas');
+    if (!canvas) {
+      console.log(`ChartSyncManager: Не найден canvas в контейнере ${containerId}`);
+      return null;
+    }
+    
+    if (!canvas.__chartjs__) {
+      // Проверяем наличие __chartInstance
+      if (canvas.__chartInstance) {
+        console.log(`ChartSyncManager: Найден __chartInstance для контейнера ${containerId}`);
+        return canvas.__chartInstance;
+      }
+      console.log(`ChartSyncManager: Не найден __chartjs__ в canvas контейнера ${containerId}`);
+      return null;
+    }
+    
+    console.log(`ChartSyncManager: Найден график через DOM для контейнера ${containerId}`);
+    return canvas.__chartjs__;
+  }
+
+  /**
+   * Отправляет уведомление о выделении контейнеру напрямую
+   * @param {string} containerId - ID контейнера
+   * @param {object} selectionData - Данные о выделении
+   */
+  notifySplitContainer(containerId, selectionData) {
+    // Избегаем циклических вызовов
+    if (this.suppressEvents) return;
+    
+    console.log(`ChartSyncManager: Отправка уведомления в контейнер ${containerId}`, selectionData);
+    
+    const container = document.getElementById(containerId) || 
+                     document.querySelector(`[data-container-id="${containerId}"]`);
+    
+    if (!container) {
+      console.log(`ChartSyncManager: Контейнер ${containerId} не найден в DOM, пробуем найти в группе синхронизации`);
+      
+      // Если контейнер не найден напрямую, пробуем найти его в группе синхронизации
+      // через родительский атрибут data-split-parent
+      const relatedContainers = document.querySelectorAll(`[data-split-parent="${containerId.split('-')[0]}"]`);
+      if (relatedContainers.length > 0) {
+        console.log(`ChartSyncManager: Найдены связанные контейнеры (${relatedContainers.length}) через data-split-parent`);
+        relatedContainers.forEach(relatedContainer => {
+          if (relatedContainer.id !== containerId) {
+            console.log(`ChartSyncManager: Отправка уведомления в связанный контейнер ${relatedContainer.id}`);
+            this.applySplitContainerSelection(relatedContainer, selectionData);
+          }
+        });
+      }
+      return;
+    }
+    
+    this.applySplitContainerSelection(container, selectionData);
+  }
+  
+  /**
+   * Применяет выделение к контейнеру
+   * @param {HTMLElement} container - DOM-элемент контейнера
+   * @param {object} selectionData - Данные о выделении
+   */
+  applySplitContainerSelection(container, selectionData) {
+    // Проверяем наличие API для контейнера через __reactInstance
+    if (container.__reactInstance && container.__reactInstance.applySelection) {
+      console.log(`ChartSyncManager: Напрямую вызываем applySelection для контейнера ${container.id || container.getAttribute('data-container-id')}`);
+      container.__reactInstance.applySelection(selectionData);
+      return;
+    }
+    
+    // Альтернативный метод - отправляем событие для контейнера
+    const containerId = container.id || container.getAttribute('data-container-id');
+    console.log(`ChartSyncManager: Отправляем событие applyGraphSelection для контейнера ${containerId}`);
+    
+    // Отправляем оба события - и локальное для контейнера, и глобальное
+    const event = new CustomEvent('applyGraphSelection', {
+      detail: { 
+        selectionData,
+        targetContainerId: containerId
+      }
+    });
+    
+    // Сначала пробуем отправить событие напрямую контейнеру
+    container.dispatchEvent(event);
+    
+    // Ищем canvas с графиком внутри контейнера и применяем выделение напрямую
+    const canvas = container.querySelector('canvas');
+    if (canvas && (canvas.__chartjs__ || canvas.__chartInstance)) {
+      const chart = canvas.__chartjs__ || canvas.__chartInstance;
+      if (chart) {
+        console.log(`ChartSyncManager: Применяем выделение напрямую к графику в контейнере ${containerId}`);
+        this.applySelectionToChart(chart, containerId, selectionData);
+      }
+    }
+    
+    // Дополнительно отправляем глобальное событие, специфичное для контейнера
+    document.dispatchEvent(new CustomEvent('applySelectionToContainer', {
+      detail: {
+        containerId,
+        selectionData
+      }
+    }));
+  }
+
+  /**
+   * Применяет выделение к графику
+   * @param {object} chart - Экземпляр графика
+   * @param {string} chartId - ID графика
+   * @param {object} selectionData - Данные о выделении
+   */
+  applySelectionToChart(chart, chartId, selectionData) {
+    if (!chart || !selectionData) {
+      console.log(`ChartSyncManager: Не удалось применить выделение к графику ${chartId} - недостаточно данных`);
+      return;
+    }
+    
+    console.log(`ChartSyncManager: Применение выделения к графику ${chartId}`, selectionData);
+    
+    try {
+      // Пытаемся применить выделение через API графика
+      if (chart.scales && chart.scales.x) {
+        if (selectionData.startDate && selectionData.endDate) {
+          const startTime = new Date(selectionData.startDate).getTime();
+          const endTime = new Date(selectionData.endDate).getTime();
+          
+          console.log(`ChartSyncManager: Устанавливаем временные границы ${startTime} - ${endTime} для графика ${chartId}`);
+          
+          // Настраиваем zoom и применяем
+          const zoomOptions = {
+            x: {
+              min: startTime,
+              max: endTime
+            }
+          };
+          
+          // Применяем zoom с помощью API Chart.js
+          if (chart.zoom && typeof chart.zoom.zoomScale === 'function') {
+            console.log(`ChartSyncManager: Применяем zoom.zoomScale для графика ${chartId}`);
+            chart.zoom.zoomScale('x', zoomOptions.x);
+          } else if (chart.scales.x.options) {
+            console.log(`ChartSyncManager: Устанавливаем min/max напрямую для графика ${chartId}`);
+            chart.scales.x.options.min = zoomOptions.x.min;
+            chart.scales.x.options.max = zoomOptions.x.max;
+            
+            // Важно: Не используем анимацию для согласованного обновления
+            chart.update('none');
+          } else {
+            console.log(`ChartSyncManager: Не найден подходящий метод для применения выделения к графику ${chartId}`);
+          }
+          
+          // Нужно также сохранить выделение как последнее для синхронизации
+          this.lastZoomRange = zoomOptions.x;
+          this.lastSelectionRange = selectionData;
+          
+          console.log(`ChartSyncManager: Выделение успешно применено к графику ${chartId}`);
+        } else {
+          console.log(`ChartSyncManager: Данные выделения не содержат startDate/endDate для графика ${chartId}`);
+        }
+      } else {
+        console.log(`ChartSyncManager: У графика ${chartId} отсутствует шкала X для применения выделения`);
+      }
+    } catch (error) {
+      console.error(`ChartSyncManager: Ошибка при применении выделения к графику ${chartId}:`, error);
+    }
+  }
+
+  /**
+   * Сохраняет выделение для определенной группы синхронизации
+   * @param {string} groupId - ID группы синхронизации
+   * @param {object} selectionData - Данные о выделении
+   */
+  saveSelectionForGroup(groupId, selectionData) {
+    if (!groupId) return;
+    
+    // Создаем объект для хранения выделений по группам, если его еще нет
+    if (!this.groupSelections) {
+      this.groupSelections = new Map();
+    }
+    
+    // Сохраняем выделение для группы
+    this.groupSelections.set(groupId, { ...selectionData, timestamp: Date.now() });
+    console.log(`ChartSyncManager: Сохранено выделение для группы ${groupId}`, selectionData);
+  }
+
+  /**
+   * Получает последнее выделение для определенной группы синхронизации
+   * @param {string} groupId - ID группы синхронизации
+   * @returns {object|null} - Данные о выделении или null
+   */
+  getLastSelectionForGroup(groupId) {
+    if (!groupId || !this.groupSelections) return null;
+    
+    return this.groupSelections.get(groupId) || null;
   }
 }
 

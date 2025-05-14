@@ -619,6 +619,9 @@ const ReportsPage = () => {
                     <img src={fuel} alt="Заправки и сливы" />
                   </div>
                 </div>
+
+                
+
               </div>
             </div>
             
@@ -1458,6 +1461,7 @@ const ReportsPage = () => {
                       {renderReportItem('movement', faCarAlt, 'Движение')}
                       {renderReportItem('journal', faFileAlt, 'Журнал')}
                       {renderReportItem('fuel-events', faGasPump, 'Заправки и сливы')}
+                      {renderReportItem('statistics', faChartBar, 'Статистика')}
                     </ul>
                   </div>
 

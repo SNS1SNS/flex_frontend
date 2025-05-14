@@ -479,6 +479,453 @@ const BaseChart = ({
     };
   }, [containerId, chartData]);
 
+  // Ефект для добавления data-graph атрибута и интеграции с системой синхронизации выделения
+  useEffect(() => {
+    // Добавляем маркер для графиков, чтобы их можно было найти при синхронизации выделения
+    if (chartRef.current) {
+      const chartCanvas = chartRef.current.canvas;
+      if (chartCanvas) {
+        // Добавляем атрибут data-graph для идентификации графика
+        chartCanvas.setAttribute('data-graph', 'true');
+        // Сохраняем экземпляр графика в DOM-элементе для доступа из SplitScreenContainer
+        chartCanvas.__chartInstance = chartRef.current;
+        
+        console.log(`BaseChart: Добавлен атрибут data-graph к canvas графика ${containerId}`);
+      }
+    }
+    
+    // Добавляем обработчик события выделения от SplitScreenContainer
+    const handleApplyGraphSelection = (event) => {
+      const { selectionData, targetContainerId } = event.detail;
+      
+      // Проверяем, предназначено ли событие для нашего контейнера
+      const isForThisContainer = !targetContainerId || targetContainerId === containerId;
+      
+      if (isForThisContainer && chartRef.current && selectionData) {
+        console.log(`BaseChart: Применяем выделение к графику ${containerId}`);
+        applySelectionToChart(selectionData);
+      }
+    };
+    
+    // Также слушаем глобальное событие для контейнера
+    const handleApplySelectionToContainer = (event) => {
+      const { containerId: targetId, selectionData } = event.detail;
+      
+      if (targetId === containerId && chartRef.current && selectionData) {
+        console.log(`BaseChart: Получено глобальное событие выделения для контейнера ${containerId}`);
+        applySelectionToChart(selectionData);
+      }
+    };
+    
+    // Регистрируем обработчики
+    document.addEventListener('applyGraphSelection', handleApplyGraphSelection);
+    document.addEventListener('applySelectionToContainer', handleApplySelectionToContainer);
+    
+    return () => {
+      document.removeEventListener('applyGraphSelection', handleApplyGraphSelection);
+      document.removeEventListener('applySelectionToContainer', handleApplySelectionToContainer);
+    };
+  }, [containerId]);
+  
+  // Функция для применения выделения к графику
+  const applySelectionToChart = (selectionData) => {
+    if (!chartRef.current || !selectionData) {
+      console.log(`BaseChart: Не удалось применить выделение к графику ${containerId} - отсутствует chartRef или данные выделения`);
+      return;
+    }
+    
+    try {
+      console.log(`BaseChart: Применяем выделение к графику ${containerId}:`, selectionData);
+      const chart = chartRef.current;
+      
+      // Для выделения по диапазону времени
+      if (selectionData.startDate && selectionData.endDate) {
+        const startTime = new Date(selectionData.startDate).getTime();
+        const endTime = new Date(selectionData.endDate).getTime();
+        
+        console.log(`BaseChart: Диапазон времени для выделения ${new Date(startTime).toISOString()} - ${new Date(endTime).toISOString()}`);
+        
+        // Если у нас есть plugin zoom, используем его для выделения
+        if (chart.scales && chart.scales.x) {
+          // Теперь применим выделение напрямую, используя API графика Chart.js
+          
+          // Вариант 1: Используем Chart.js zoom plugin (предпочтительно)
+          if (chart.zoom && typeof chart.zoom.zoomScale === 'function') {
+            console.log(`BaseChart: Применяем zoom.zoomScale для графика ${containerId}`);
+            
+            // Настраиваем опции зума по временному диапазону
+            const zoomOptions = {
+              min: startTime,
+              max: endTime
+            };
+            
+            // Убедимся, что анимация отключена для мгновенного применения
+            const originalAnimation = chart.options.animation;
+            chart.options.animation = false;
+            
+            // Применяем зум
+            chart.zoom.zoomScale('x', zoomOptions);
+            
+            // Восстанавливаем настройки анимации
+            setTimeout(() => {
+              chart.options.animation = originalAnimation;
+            }, 100);
+            
+            console.log(`BaseChart: Выделение успешно применено через zoom.zoomScale`);
+          }
+          // Вариант 2: Устанавливаем min/max напрямую
+          else if (chart.scales.x.options) {
+            console.log(`BaseChart: Применяем выделение через scales.x.options для графика ${containerId}`);
+            
+            // Сохраняем текущие границы для отладки
+            const currentMin = chart.scales.x.min;
+            const currentMax = chart.scales.x.max;
+            console.log(`BaseChart: Текущие границы графика: ${currentMin} - ${currentMax}`);
+            
+            // Устанавливаем новые границы
+            chart.scales.x.options.min = startTime;
+            chart.scales.x.options.max = endTime;
+            
+            // Принудительное обновление без анимации для мгновенного эффекта
+            chart.update('none');
+            
+            console.log(`BaseChart: Новые границы графика: ${chart.scales.x.min} - ${chart.scales.x.max}`);
+          }
+          // Вариант 3: Временные метки - если предыдущие методы не сработали
+          else {
+            console.log(`BaseChart: Ищем индексы для временного диапазона (особый случай)`);
+            
+            // Получаем текущие данные меток времени
+            const timeLabels = chart.data.labels;
+            
+            // Если метки времени это даты, ищем ближайшие индексы к выделению
+            if (timeLabels && timeLabels.length > 0) {
+              let startIndex = -1;
+              let endIndex = -1;
+              
+              // Преобразуем все метки в даты, если они еще не являются датами
+              const labelTimes = timeLabels.map(label => {
+                if (label instanceof Date) {
+                  return label.getTime();
+                }
+                // Пробуем преобразовать строки в даты
+                try {
+                  return new Date(label).getTime();
+                } catch (e) {
+                  return null;
+                }
+              });
+              
+              // Ищем индексы меток, соответствующие начальному и конечному времени
+              for (let i = 0; i < labelTimes.length; i++) {
+                const labelTime = labelTimes[i];
+                if (labelTime === null) continue;
+                
+                if (startIndex === -1 && labelTime >= startTime) {
+                  startIndex = i;
+                }
+                
+                if (labelTime <= endTime) {
+                  endIndex = i;
+                }
+              }
+              
+              // Если нашли оба индекса, применяем выделение
+              if (startIndex !== -1 && endIndex !== -1 && startIndex <= endIndex) {
+                console.log(`BaseChart: Найдены индексы для выделения: ${startIndex} - ${endIndex}`);
+                
+                // Настраиваем границы масштабирования
+                if (chart.scales.x.time && chart.scales.x.time.parser) {
+                  // Для временной шкалы с парсером
+                  chart.options.scales.x.min = startTime;
+                  chart.options.scales.x.max = endTime;
+                } else {
+                  // Для категориальной шкалы
+                  chart.options.scales.x.min = startIndex;
+                  chart.options.scales.x.max = endIndex;
+                }
+                
+                // Обновляем график без анимации
+                chart.update('none');
+                console.log(`BaseChart: Выделение по индексам успешно применено`);
+              } else {
+                console.log(`BaseChart: Не удалось найти подходящие индексы для временного диапазона: ${startIndex} - ${endIndex}`);
+              }
+            }
+          }
+          
+          // Сохраняем диапазон выделения в атрибуты для отладки
+          chart.canvas.setAttribute('data-selection-start', selectionData.startDate);
+          chart.canvas.setAttribute('data-selection-end', selectionData.endDate);
+          chart.canvas.setAttribute('data-selection-applied', 'true');
+          
+          // Добавляем визуальное выделение (опционально)
+          if (chart.options.plugins && chart.options.plugins.highlight) {
+            chart.options.plugins.highlight.ranges = [{
+              start: selectionData.startDate,
+              end: selectionData.endDate,
+              color: 'rgba(255, 255, 0, 0.2)'
+            }];
+            chart.update();
+          }
+          
+          console.log(`BaseChart: Выделение успешно применено к графику ${containerId}`);
+        } else {
+          console.log(`BaseChart: У графика нет шкалы X для применения выделения`);
+        }
+      }
+      // Для выделения по индексам
+      else if (selectionData.startIndex !== undefined && selectionData.endIndex !== undefined) {
+        console.log(`BaseChart: Применяем выделение по индексам ${selectionData.startIndex} - ${selectionData.endIndex}`);
+        
+        if (chart.scales && chart.scales.x) {
+          // Применяем выделение по индексам
+          chart.options.scales.x.min = selectionData.startIndex;
+          chart.options.scales.x.max = selectionData.endIndex;
+          
+          // Обновляем график без анимации
+          chart.update('none');
+          
+          // Сохраняем индексы выделения в атрибуты
+          chart.canvas.setAttribute('data-selection-start-index', selectionData.startIndex);
+          chart.canvas.setAttribute('data-selection-end-index', selectionData.endIndex);
+          chart.canvas.setAttribute('data-selection-applied', 'true');
+          
+          console.log(`BaseChart: Выделение по индексам успешно применено к графику ${containerId}`);
+        }
+      }
+      
+      // Отправляем событие о том, что выделение было применено
+      const event = new CustomEvent('chartSelectionApplied', {
+        detail: {
+          containerId,
+          selectionData,
+          success: true,
+          timestamp: Date.now()
+        }
+      });
+      document.dispatchEvent(event);
+      
+    } catch (error) {
+      console.error('BaseChart: Ошибка при применении выделения к графику:', error);
+      
+      // Отправляем событие о неудачном применении выделения
+      const event = new CustomEvent('chartSelectionApplied', {
+        detail: {
+          containerId,
+          selectionData,
+          success: false,
+          error: error.message,
+          timestamp: Date.now()
+        }
+      });
+      document.dispatchEvent(event);
+    }
+  };
+
+  // Обработчик клика на графике с поддержкой выделения и активации контейнера
+  const handleChartClick = (event) => {
+    // Проверяем, что у нас есть ссылка на график и его данные
+    if (!chartRef.current || !chartRef.current.data || !chartRef.current.data.labels) {
+      console.log('BaseChart: График не инициализирован или отсутствуют данные');
+      return;
+    }
+    
+    console.log(`BaseChart: Обработка клика на графике ${containerId}`);
+    
+    // Получаем родительский контейнер графика и активируем его
+    const container = chartContainerRef.current?.closest('.split-screen-container');
+    
+    if (container) {
+      // Сначала снимаем активность со всех контейнеров
+      document.querySelectorAll('.split-screen-container[data-active="true"]')
+        .forEach(el => {
+          el.setAttribute('data-active', 'false');
+          el.classList.remove('active-container');
+        });
+      
+      // Активируем наш контейнер
+      container.setAttribute('data-active', 'true');
+      container.classList.add('active-container');
+      
+      console.log(`BaseChart: Активирован контейнер ${container.id || container.getAttribute('data-container-id')}`);
+    }
+
+    // Логика выделения на графике
+    // Если пользователь кликнул с нажатой клавишей Shift, выделяем до этой точки
+    if (event.nativeEvent.shiftKey && chartRef.current.lastClickIndex !== undefined) {
+      console.log(`BaseChart: Обнаружен Shift-клик, создаем выделение от ${chartRef.current.lastClickIndex}`);
+      
+      // Получаем текущий индекс элемента
+      const elements = chartRef.current.getElementsAtEventForMode(
+        event.nativeEvent, 
+        'nearest', 
+        { intersect: true }, 
+        false
+      );
+      
+      // Если есть элемент под курсором
+      if (elements.length > 0) {
+        const currentIndex = elements[0].index;
+        
+        console.log(`BaseChart: Текущий индекс клика: ${currentIndex}, предыдущий: ${chartRef.current.lastClickIndex}`);
+        
+        // Определяем начальный и конечный индексы
+        const startIndex = Math.min(chartRef.current.lastClickIndex, currentIndex);
+        const endIndex = Math.max(chartRef.current.lastClickIndex, currentIndex);
+        
+        // Проверяем, что у нас есть диапазон выделения
+        if (startIndex !== endIndex) {
+          // Получаем метки времени для выделенного диапазона
+          const labels = chartRef.current.data.labels;
+          
+          // Проверяем, что метки существуют
+          if (labels && labels.length > 0) {
+            // Берем начальную и конечную метки
+            const startLabel = labels[startIndex];
+            const endLabel = labels[endIndex];
+            
+            // Преобразуем метки в даты
+            const startDate = startLabel instanceof Date ? startLabel : new Date(startLabel);
+            const endDate = endLabel instanceof Date ? endLabel : new Date(endLabel);
+            
+            // Проверяем, что обе метки успешно преобразованы в даты
+            if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+              console.log(`BaseChart: Создано выделение от ${startDate.toISOString()} до ${endDate.toISOString()}`);
+              
+              // Создаем объект с данными выделения
+              const selectionData = {
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+                startIndex,
+                endIndex
+              };
+              
+              // Применяем выделение к текущему графику
+              applySelectionToChart(selectionData);
+              
+              // Отправляем событие в SplitScreenContainer
+              notifySelectionChanged(selectionData);
+              return;
+            } else {
+              console.log(`BaseChart: Не удалось преобразовать метки в даты: ${startLabel}, ${endLabel}`);
+              
+              // Если метки не даты, просто используем индексы
+              const selectionData = {
+                startIndex,
+                endIndex
+              };
+              
+              // Применяем выделение к текущему графику
+              applySelectionToChart(selectionData);
+              
+              // Отправляем событие в SplitScreenContainer
+              notifySelectionChanged(selectionData);
+              return;
+            }
+          } else {
+            console.log(`BaseChart: Нет меток для выделения`);
+          }
+        } else {
+          console.log(`BaseChart: Совпадающие индексы, выделение не создано`);
+        }
+      }
+    } 
+    // Обычный клик без Shift - запоминаем индекс для будущего выделения
+    else {
+      const elements = chartRef.current.getElementsAtEventForMode(
+        event.nativeEvent, 
+        'nearest', 
+        { intersect: true }, 
+        false
+      );
+      
+      if (elements.length > 0) {
+        const elementIndex = elements[0].index;
+        chartRef.current.lastClickIndex = elementIndex;
+        console.log(`BaseChart: Сохранен индекс ${elementIndex} для будущего выделения`);
+        
+        // Сбрасываем текущее выделение если оно есть
+        if (chartRef.current.canvas.hasAttribute('data-selection-applied')) {
+          console.log(`BaseChart: Сброс текущего выделения`);
+          resetZoom();
+        }
+      } else {
+        console.log(`BaseChart: Клик не попал в данные, индекс не сохранен`);
+      }
+    }
+  };
+
+  // Функция для отправки события выделения в SplitScreenContainer
+  const notifySelectionChanged = (selectionData) => {
+    // Получаем контейнер с графиком
+    const container = chartContainerRef.current?.closest('.split-screen-container');
+    if (!container) {
+      console.warn(`BaseChart: Не удалось найти контейнер для уведомления о выделении`);
+      return;
+    }
+    
+    const syncGroupId = container.getAttribute('data-sync-group');
+    console.log(`BaseChart: Отправка уведомления о выделении, syncGroupId: ${syncGroupId || 'нет'}`);
+    
+    // Проверяем, есть ли у контейнера атрибут data-sync-selection
+    const shouldSync = container.getAttribute('data-sync-selection') !== 'false';
+    if (!shouldSync) {
+      console.log(`BaseChart: Синхронизация выделений отключена для контейнера ${containerId}`);
+      return;
+    }
+    
+    // Если есть API через __reactInstance, используем его
+    if (container.__reactInstance && container.__reactInstance.notifySelectionChanged) {
+      console.log(`BaseChart: Уведомляем SplitScreenContainer о выделении через API`);
+      container.__reactInstance.notifySelectionChanged(selectionData);
+      
+      // Также отправляем DOM-событие для обработки другими компонентами
+      const containerEvent = new CustomEvent('selectionChanged', {
+        detail: {
+          selectionData,
+          containerId: container.id || container.getAttribute('data-container-id')
+        }
+      });
+      container.dispatchEvent(containerEvent);
+      return;
+    }
+    
+    // Если нет прямого API, отправляем событие
+    console.log(`BaseChart: Уведомляем о выделении через событие graphSelectionChanged`);
+    const event = new CustomEvent('graphSelectionChanged', {
+      detail: {
+        sourceContainerId: containerId,
+        selectionData,
+        syncGroupId,
+        timestamp: Date.now()
+      }
+    });
+    document.dispatchEvent(event);
+    
+    // Дополнительно, отправляем специальное событие для локальной обработки в контейнере
+    const containerEvent = new CustomEvent('selectionChanged', {
+      detail: {
+        selectionData,
+        containerId: container.id || container.getAttribute('data-container-id')
+      }
+    });
+    container.dispatchEvent(containerEvent);
+    
+    // Отображаем подсказку пользователю о выделении (если функция доступна)
+    if (window.showNotification) {
+      let message = 'Выделение применено';
+      if (selectionData.startDate && selectionData.endDate) {
+        // Форматируем даты для отображения
+        const startDate = new Date(selectionData.startDate);
+        const endDate = new Date(selectionData.endDate);
+        const options = { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' };
+        message = `Выделено: ${startDate.toLocaleString('ru-RU', options)} - ${endDate.toLocaleString('ru-RU', options)}`;
+      }
+      window.showNotification('info', message, { autoClose: 1500 });
+    }
+  };
+
   // Функция загрузки данных
   const loadData = async () => {
     if (!vehicle || !startDate || !endDate) {
@@ -552,29 +999,6 @@ const BaseChart = ({
   // Переключение отображения подсказок по клавиатурным сокращениям
   const toggleKeyboardShortcuts = () => {
     setShowKeyboardShortcuts(!showKeyboardShortcuts);
-  };
-
-  // Обработчик клика по графику для активации контейнера
-  const handleChartClick = () => {
-    // Получаем родительский контейнер графика
-    const container = chartContainerRef.current?.closest('.split-screen-container');
-    
-    if (container) {
-      // Сначала снимаем активность со всех контейнеров
-      document.querySelectorAll('.split-screen-container[data-active="true"]')
-        .forEach(el => {
-          el.setAttribute('data-active', 'false');
-          el.classList.remove('active-container');
-        });
-      
-      // Активируем наш контейнер
-      container.setAttribute('data-active', 'true');
-      container.classList.add('active-container');
-      
-      console.log(`BaseChart: Активирован контейнер ${container.id}`);
-    }
-    
-    // Не останавливаем распространение события
   };
 
   // Функция для разделения экрана по горизонтали
