@@ -49,7 +49,7 @@
   flex-direction: column;
   animation: slideUp 0.3s ease;
   position: relative;
-  z-index: 10000;
+  z-index: 9998;
 }
 
 @keyframes slideUp {

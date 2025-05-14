@@ -15,6 +15,7 @@ const ChartDebugPanel = () => {
   const [syncSelectionEnabled, setSyncSelectionEnabled] = useState(chartSyncManager.syncSelectionEnabled);
   const [registeredCharts, setRegisteredCharts] = useState([]);
   const [lastSelectionRange, setLastSelectionRange] = useState(null);
+  const [scanCounter, setScanCounter] = useState(0); // Счетчик сканирований
 
   // Эффект для обновления списка зарегистрированных графиков
   useEffect(() => {
@@ -24,7 +25,14 @@ const ChartDebugPanel = () => {
       setRegisteredCharts(chartIds);
       setSyncEnabled(chartSyncManager.syncEnabled);
       setSyncSelectionEnabled(chartSyncManager.syncSelectionEnabled);
-      setLastSelectionRange(chartSyncManager.lastSelectionRange);
+      
+      // Обновляем информацию о выделении
+      const currentSelection = chartSyncManager.lastSelectionRange;
+      if (currentSelection && (!lastSelectionRange || 
+          currentSelection.min !== lastSelectionRange.min || 
+          currentSelection.max !== lastSelectionRange.max)) {
+        setLastSelectionRange(currentSelection);
+      }
     };
 
     // Обновляем список при инициализации
@@ -74,7 +82,7 @@ const ChartDebugPanel = () => {
       document.removeEventListener('savedSelectionApplied', handleSavedSelectionApplied);
       clearInterval(interval);
     };
-  }, []);
+  }, [lastSelectionRange]);
 
   // Функция для переключения состояния синхронизации
   const toggleSync = () => {
@@ -146,6 +154,9 @@ const ChartDebugPanel = () => {
   const syncSplitReports = () => {
     console.log('ChartDebugPanel: Запуск специальной синхронизации для разделенных отчетов');
     
+    // Увеличиваем счетчик сканирований
+    setScanCounter(prev => prev + 1);
+    
     // Выполняем повторное сканирование DOM с агрессивным поиском
     console.log('ChartDebugPanel: Запуск расширенного сканирования DOM для разделенных отчетов');
     chartSyncManager.scanForNewCharts(true); // Включаем агрессивный поиск
@@ -165,6 +176,16 @@ const ChartDebugPanel = () => {
         if (chartSyncManager.lastSelectionRange) {
           console.log('ChartDebugPanel: Применяем сохраненное выделение к разделенным отчетам');
           chartSyncManager.applySavedSelectionToAll();
+        } else {
+          // Если нет сохраненного выделения, пробуем загрузить из хранилища
+          console.log('ChartDebugPanel: Пробуем загрузить выделение из хранилища');
+          if (chartSyncManager.loadSelectionFromStorage()) {
+            console.log('ChartDebugPanel: Выделение загружено из хранилища, применяем');
+            setLastSelectionRange(chartSyncManager.lastSelectionRange);
+            chartSyncManager.applySavedSelectionToAll();
+          } else {
+            console.log('ChartDebugPanel: Выделение не найдено в хранилище');
+          }
         }
       } else {
         console.warn(`ChartDebugPanel: Найдено только ${chartCount} графиков в разделенных отчетах`);
@@ -176,15 +197,8 @@ const ChartDebugPanel = () => {
         if (canvasElements.length > 0 && chartCount < 2) {
           console.log('ChartDebugPanel: Canvas-элементы присутствуют, но графики не обнаружены. Попытка глубокого сканирования...');
           
-          // Попробуем более агрессивный подход для регистрации всех графиков
-          canvasElements.forEach(canvas => {
-            if (canvas.__chartjs__) {
-              // Создаем уникальный ID для каждого canvas
-              const containerId = `chart-forced-${Math.random().toString(36).substring(2, 9)}`;
-              console.log(`ChartDebugPanel: Принудительная регистрация графика с ID ${containerId}`);
-              chartSyncManager.registerChart(containerId, canvas.__chartjs__);
-            }
-          });
+          // Попробуем более агрессивный подход - принудительная регистрация ВСЕХ canvas
+          forceRegisterAllCanvases(canvasElements);
           
           // Проверяем результат принудительной регистрации
           const updatedChartCount = chartSyncManager.charts.size;
@@ -193,15 +207,40 @@ const ChartDebugPanel = () => {
             const result = chartSyncManager.forceSyncAllCharts();
             console.log('ChartDebugPanel: Выполнена синхронизация после принудительной регистрации:', result);
             setRegisteredCharts(Array.from(chartSyncManager.charts.keys()));
+            
+            // Применяем выделение
+            if (chartSyncManager.lastSelectionRange) {
+              chartSyncManager.applySavedSelectionToAll();
+            } else if (chartSyncManager.loadSelectionFromStorage()) {
+              setLastSelectionRange(chartSyncManager.lastSelectionRange);
+              chartSyncManager.applySavedSelectionToAll();
+            }
           }
         }
       }
     }, 200);
     
+    // Если это не первое сканирование, не выполняем повторные попытки
+    // Это помогает избежать лишних сканирований и дублирования графиков
+    if (scanCounter > 0) {
+      console.log('ChartDebugPanel: Пропускаем повторные сканирования (уже была выполнена попытка)');
+      return;
+    }
+    
     // Для полной уверенности повторяем через 1 секунду с другим подходом
     setTimeout(() => {
       console.log('ChartDebugPanel: Повторное сканирование через 1 секунду');
       chartSyncManager.scanForNewCharts(true);
+      
+      // Если все еще мало графиков, применяем прямую регистрацию
+      if (chartSyncManager.charts.size < 2) {
+        const canvasElements = document.querySelectorAll('canvas');
+        console.log(`ChartDebugPanel: Финальная попытка, найдено ${canvasElements.length} canvas-элементов`);
+        
+        if (canvasElements.length > 0) {
+          forceRegisterAllCanvases(canvasElements);
+        }
+      }
       
       if (chartSyncManager.charts.size >= 2) {
         console.log(`ChartDebugPanel: После повторного сканирования найдено ${chartSyncManager.charts.size} графиков`);
@@ -211,8 +250,115 @@ const ChartDebugPanel = () => {
         if (chartSyncManager.charts.size > registeredCharts.length) {
           setRegisteredCharts(Array.from(chartSyncManager.charts.keys()));
         }
+        
+        // Применяем выделение, если оно есть
+        if (chartSyncManager.lastSelectionRange) {
+          chartSyncManager.applySavedSelectionToAll();
+        }
       }
     }, 1000);
+  };
+  
+  // Вспомогательная функция для принудительной регистрации ВСЕХ canvas-элементов
+  const forceRegisterAllCanvases = (canvasElements) => {
+    console.log(`ChartDebugPanel: Принудительная регистрация ${canvasElements.length} canvas-элементов`);
+    
+    // Создаем общее хранилище для ID созданных графиков,
+    // чтобы избежать дублирования при множественных вызовах
+    const registeredIds = new Set();
+    
+    canvasElements.forEach((canvas, index) => {
+      // Если canvas уже имеет ID, используем его как основу
+      const baseId = canvas.id || `chart-force-reg-${index}`;
+      
+      // Проверяем, не зарегистрирован ли уже этот canvas
+      if (canvas.__chartSynced) {
+        console.log(`ChartDebugPanel: Canvas #${index} уже синхронизирован`);
+        return;
+      }
+      
+      // Создаем стабильный ID на основе атрибутов canvas
+      const hashParts = [
+        canvas.width || 0,
+        canvas.height || 0,
+        canvas.id || '',
+        canvas.className || '',
+        canvas.getAttribute('data-id') || '',
+        canvas.parentElement?.id || '',
+        canvas.parentElement?.className || ''
+      ];
+      const canvasHash = hashParts.join('-');
+      
+      // Создаем уникальный ID для каждого canvas, используя существующий ID canvas или хеш
+      let containerId = canvas.id ? 
+        `chart-force-reg-${baseId}` : 
+        `chart-force-reg-${canvasHash}`;
+      
+      // Если такой ID уже есть, добавляем индекс
+      if (registeredIds.has(containerId)) {
+        containerId = `${containerId}-${index}`;
+      }
+      
+      registeredIds.add(containerId);
+      
+      // Создаем имитацию графика с более полной поддержкой Chart.js API
+      const syntheticChart = {
+        canvas: canvas,
+        ctx: canvas.getContext('2d'),
+        scales: {
+          x: {
+            min: 0,
+            max: 100,
+            options: { min: 0, max: 100 }
+          }
+        },
+        update: function(mode) {
+          console.log(`ChartDebugPanel: Обновление синтетического графика #${index} (${mode || 'none'})`);
+          try {
+            canvas.dispatchEvent(new Event('update'));
+          } catch (e) {
+            console.log('ChartDebugPanel: Ошибка при обновлении синтетического графика', e);
+          }
+        },
+        resetZoom: function() {
+          console.log(`ChartDebugPanel: Сброс масштаба синтетического графика #${index}`);
+          // Сбрасываем значения масштаба
+          if (this.scales.x) {
+            this.scales.x.min = 0;
+            this.scales.x.max = 100;
+            if (this.scales.x.options) {
+              this.scales.x.options.min = 0;
+              this.scales.x.options.max = 100;
+            }
+          }
+          // Вызываем обновление графика
+          try {
+            this.update('none');
+          } catch (e) {
+            console.warn('ChartDebugPanel: Ошибка при обновлении после сброса масштаба', e);
+          }
+        },
+        options: {
+          plugins: {
+            zoom: {
+              zoom: {
+                enabled: true
+              },
+              pan: {
+                enabled: true
+              }
+            }
+          }
+        }
+      };
+      
+      console.log(`ChartDebugPanel: Регистрация синтетического графика ${containerId}`);
+      chartSyncManager.registerChart(containerId, syntheticChart);
+      
+      // Добавляем метаданные к canvas
+      canvas.__chartSynced = true;
+      canvas.__chartId = containerId;
+    });
   };
   
   // Функция для сохранения текущего выделения
@@ -222,12 +368,53 @@ const ChartDebugPanel = () => {
       if (result) {
         setLastSelectionRange(chartSyncManager.lastSelectionRange);
         console.log('ChartDebugPanel: Сохранено текущее выделение');
+        return true;
       } else {
         console.warn('ChartDebugPanel: Не удалось сохранить выделение');
+        
+        // Если нет графиков, но есть canvas-элементы, попробуем прямую регистрацию
+        const canvasElements = document.querySelectorAll('canvas');
+        if (canvasElements.length > 0) {
+          console.log(`ChartDebugPanel: Найдено ${canvasElements.length} canvas-элементов, пробуем регистрацию для сохранения выделения`);
+          forceRegisterAllCanvases(canvasElements);
+          
+          if (chartSyncManager.charts.size > 0) {
+            const firstChartId = Array.from(chartSyncManager.charts.keys())[0];
+            if (chartSyncManager.saveSelectionFromChart(firstChartId)) {
+              setLastSelectionRange(chartSyncManager.lastSelectionRange);
+              console.log('ChartDebugPanel: Сохранено выделение после принудительной регистрации');
+              return true;
+            }
+          }
+        }
       }
     } else {
       console.warn('ChartDebugPanel: Нет графиков для сохранения выделения');
+      
+      // Проверяем, есть ли canvas-элементы
+      const canvasElements = document.querySelectorAll('canvas');
+      if (canvasElements.length > 0) {
+        console.log(`ChartDebugPanel: Найдено ${canvasElements.length} canvas-элементов, пробуем регистрацию`);
+        forceRegisterAllCanvases(canvasElements);
+        
+        if (chartSyncManager.charts.size > 0) {
+          const firstChartId = Array.from(chartSyncManager.charts.keys())[0];
+          if (chartSyncManager.saveSelectionFromChart(firstChartId)) {
+            setLastSelectionRange(chartSyncManager.lastSelectionRange);
+            console.log('ChartDebugPanel: Сохранено выделение после регистрации canvas-элементов');
+            return true;
+          }
+        }
+      }
+      
+      // Попробуем загрузить из хранилища, если возможно
+      if (chartSyncManager.loadSelectionFromStorage()) {
+        setLastSelectionRange(chartSyncManager.lastSelectionRange);
+        console.log('ChartDebugPanel: Восстановлено выделение из локального хранилища');
+        return true;
+      }
     }
+    return false;
   };
   
   // Функция для применения сохраненного выделения
@@ -235,8 +422,19 @@ const ChartDebugPanel = () => {
     if (lastSelectionRange) {
       const result = chartSyncManager.applySavedSelectionToAll();
       console.log('ChartDebugPanel: Применено сохраненное выделение:', result);
+      return true;
     } else {
       console.warn('ChartDebugPanel: Нет сохраненного выделения для применения');
+      
+      // Пробуем загрузить из хранилища
+      if (chartSyncManager.loadSelectionFromStorage()) {
+        setLastSelectionRange(chartSyncManager.lastSelectionRange);
+        const result = chartSyncManager.applySavedSelectionToAll();
+        console.log('ChartDebugPanel: Загружено и применено выделение из хранилища:', result);
+        return true;
+      }
+      
+      return false;
     }
   };
   
@@ -244,7 +442,7 @@ const ChartDebugPanel = () => {
   const forceSyncSelection = () => {
     // Сначала сканируем DOM для обнаружения графиков
     console.log('ChartDebugPanel: Сканирование DOM для поиска графиков перед синхронизацией выделений');
-    chartSyncManager.scanForNewCharts();
+    chartSyncManager.scanForNewCharts(true); // Используем агрессивный режим для надежности
     
     // Задержка для обработки найденных графиков
     setTimeout(() => {
@@ -254,10 +452,17 @@ const ChartDebugPanel = () => {
         console.log(`ChartDebugPanel: Найдено ${actualChartCount} графиков для синхронизации выделений`);
         
         // Проверяем, есть ли сохраненное выделение
-        if (!chartSyncManager.lastSelectionRange && chartSyncManager.lastZoomRange) {
-          // Если нет выделения, но есть масштаб, используем его в качестве выделения
-          console.log('ChartDebugPanel: Используем последний диапазон масштабирования как выделение');
-          chartSyncManager.lastSelectionRange = chartSyncManager.lastZoomRange;
+        if (!chartSyncManager.lastSelectionRange) {
+          // Если нет выделения, попробуем загрузить из хранилища
+          if (chartSyncManager.loadSelectionFromStorage()) {
+            setLastSelectionRange(chartSyncManager.lastSelectionRange);
+            console.log('ChartDebugPanel: Выделение загружено из хранилища');
+          } else if (chartSyncManager.lastZoomRange) {
+            // Если нет выделения, но есть масштаб, используем его в качестве выделения
+            console.log('ChartDebugPanel: Используем последний диапазон масштабирования как выделение');
+            chartSyncManager.lastSelectionRange = chartSyncManager.lastZoomRange;
+            setLastSelectionRange(chartSyncManager.lastSelectionRange);
+          }
         }
         
         const result = chartSyncManager.forceSyncSelection();
@@ -283,6 +488,26 @@ const ChartDebugPanel = () => {
         setRegisteredCharts(Array.from(chartSyncManager.charts.keys()));
       } else {
         console.warn('ChartDebugPanel: Не найдено графиков для синхронизации выделений');
+        
+        // Пробуем принудительную регистрацию всех canvas, если их нет
+        const canvasElements = document.querySelectorAll('canvas');
+        if (canvasElements.length > 0) {
+          console.log(`ChartDebugPanel: Найдено ${canvasElements.length} canvas-элементов, пробуем принудительную регистрацию`);
+          forceRegisterAllCanvases(canvasElements);
+          
+          // Проверяем результат
+          if (chartSyncManager.charts.size > 0) {
+            console.log(`ChartDebugPanel: После регистрации найдено ${chartSyncManager.charts.size} графиков`);
+            
+            // Пробуем синхронизировать выделения повторно
+            const result = chartSyncManager.forceSyncSelection();
+            console.log('ChartDebugPanel: Синхронизация выделений после регистрации:', result);
+            
+            if (result) {
+              setRegisteredCharts(Array.from(chartSyncManager.charts.keys()));
+            }
+          }
+        }
       }
     }, 100);
   };

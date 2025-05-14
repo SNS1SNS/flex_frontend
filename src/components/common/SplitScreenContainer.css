@@ -315,7 +315,7 @@
   height: 8px;
   margin-top: -4px;
   cursor: row-resize;
-  z-index: 100;
+  z-index: 10;
 }
 
 /* Вертикальный разделитель должен идти между панелями */

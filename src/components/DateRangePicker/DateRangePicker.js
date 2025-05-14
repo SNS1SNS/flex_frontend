@@ -49,23 +49,19 @@ const DateRangePicker = ({ onDateChange, initialDates }) => {
     switch (periodType) {
       case 'today':
         startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
         break;
       case 'yesterday':
         startDate.setDate(startDate.getDate() - 1);
         startDate.setHours(0, 0, 0, 0);
         endDate.setDate(endDate.getDate() - 1);
-        endDate.setHours(23, 59, 59, 999);
         break;
       case 'week':
         startDate.setDate(startDate.getDate() - 7);
         startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
         break;
       case 'month':
         startDate.setDate(startDate.getDate() - 30);
         startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
         break;
       default:
         // Оставляем текущие даты

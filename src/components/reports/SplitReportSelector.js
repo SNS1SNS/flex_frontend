@@ -68,7 +68,7 @@ const SplitReportSelector = ({
       title: 'Обороты',
       description: 'График оборотов двигателя',
       category: 'chart'
-    }
+    } 
   ];
 
   // Обработчик клика вне компонента для закрытия

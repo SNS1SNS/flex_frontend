@@ -12,6 +12,12 @@ class ChartSyncManager {
     this.lastPanRange = null; // Последний диапазон панорамирования
     this.lastSelectionRange = null; // Последний диапазон выделения
     this.syncSelectionEnabled = true; // Флаг включения/выключения синхронизации выделений
+    this._aggressiveMode = false; // Флаг агрессивного режима поиска графиков
+    
+    // Для отслеживания уже зарегистрированных canvas-элементов
+    this.registeredCanvasElements = new WeakMap();
+    this.lastScanTime = Date.now();
+    this.scanCooldown = 1000; // Минимальный интервал между сканированиями в мс
     
     // Регистрируем глобальный обработчик для отслеживания новых графиков после разделения экрана
     document.addEventListener('splitContainerComplete', this.handleSplitComplete.bind(this));
@@ -57,11 +63,11 @@ class ChartSyncManager {
         
         // Применяем последний масштаб и выделение ко всем графикам, если они существуют
         this.applyLastRanges();
-        
-        // На некоторых итерациях принудительно синхронизируем все графики
-        if (index === 2 || index === timeouts.length - 1) {
-          console.log(`ChartSyncManager: Выполняем принудительную синхронизацию после разделения экрана (попытка ${index+1})`);
-          this.forceSyncAllCharts();
+          
+          // На некоторых итерациях принудительно синхронизируем все графики
+          if (index === 2 || index === timeouts.length - 1) {
+            console.log(`ChartSyncManager: Выполняем принудительную синхронизацию после разделения экрана (попытка ${index+1})`);
+            this.forceSyncAllCharts();
           
           // Также применяем выделение, если оно есть
           if (this.syncSelectionEnabled && this.lastSelectionRange) {
@@ -129,57 +135,73 @@ class ChartSyncManager {
    * @param {boolean} useAggressiveSearch - Использовать более агрессивный алгоритм поиска для сложных случаев
    */
   scanForNewCharts(useAggressiveSearch = false) {
+    // Проверяем, не слишком ли часто вызывается сканирование
+    const now = Date.now();
+    if (!useAggressiveSearch && now - this.lastScanTime < this.scanCooldown) {
+        console.log(`ChartSyncManager: Пропуск сканирования (слишком частые вызовы)`);
+        return;
+    }
+    this.lastScanTime = now;
+
+    // Устанавливаем флаг агрессивного режима, чтобы он был доступен в processCanvasElement
+    this._aggressiveMode = useAggressiveSearch;
+    
     // Получаем все canvas-элементы графиков на странице
     const canvasElements = document.querySelectorAll('canvas');
     console.log(`ChartSyncManager: Сканирование DOM, найдено ${canvasElements.length} canvas-элементов`);
     
     // Если включен агрессивный поиск и нет canvas элементов, смотрим глубже
     if (useAggressiveSearch && canvasElements.length === 0) {
-      console.log(`ChartSyncManager: Применяем агрессивный поиск canvas-элементов`);
-      
-      // Ищем в shadow DOM если он используется
-      const shadowRoots = [];
-      const findShadowRoots = (element) => {
-        if (element.shadowRoot) {
-          shadowRoots.push(element.shadowRoot);
+        console.log(`ChartSyncManager: Применяем агрессивный поиск canvas-элементов`);
+        
+        // Ищем в shadow DOM если он используется
+        const shadowRoots = [];
+        const findShadowRoots = (element) => {
+            if (element.shadowRoot) {
+                shadowRoots.push(element.shadowRoot);
+            }
+            Array.from(element.children).forEach(findShadowRoots);
+        };
+        
+        findShadowRoots(document.body);
+        
+        for (const root of shadowRoots) {
+            const shadowCanvases = root.querySelectorAll('canvas');
+            if (shadowCanvases.length > 0) {
+                console.log(`ChartSyncManager: Найдено ${shadowCanvases.length} canvas-элементов в shadow DOM`);
+                shadowCanvases.forEach(canvas => {
+                    this.processCanvasElement(canvas);
+                });
+            }
         }
-        Array.from(element.children).forEach(findShadowRoots);
-      };
-      
-      findShadowRoots(document.body);
-      
-      for (const root of shadowRoots) {
-        const shadowCanvases = root.querySelectorAll('canvas');
-        if (shadowCanvases.length > 0) {
-          console.log(`ChartSyncManager: Найдено ${shadowCanvases.length} canvas-элементов в shadow DOM`);
-          shadowCanvases.forEach(canvas => {
-            this.processCanvasElement(canvas);
-          });
+        
+        // Ищем элементы в iframes
+        const iframes = document.querySelectorAll('iframe');
+        for (const iframe of iframes) {
+            try {
+                const iframeCanvases = iframe.contentDocument?.querySelectorAll('canvas');
+                if (iframeCanvases && iframeCanvases.length > 0) {
+                    console.log(`ChartSyncManager: Найдено ${iframeCanvases.length} canvas-элементов в iframe`);
+                    iframeCanvases.forEach(canvas => {
+                        this.processCanvasElement(canvas);
+                    });
+                }
+            } catch (e) {
+                console.warn('ChartSyncManager: Не удалось получить доступ к содержимому iframe', e);
+            }
         }
-      }
-      
-      // Ищем элементы в iframes
-      const iframes = document.querySelectorAll('iframe');
-      for (const iframe of iframes) {
-        try {
-          const iframeCanvases = iframe.contentDocument?.querySelectorAll('canvas');
-          if (iframeCanvases && iframeCanvases.length > 0) {
-            console.log(`ChartSyncManager: Найдено ${iframeCanvases.length} canvas-элементов в iframe`);
-            iframeCanvases.forEach(canvas => {
-              this.processCanvasElement(canvas);
-            });
-          }
-        } catch (e) {
-          console.warn('ChartSyncManager: Не удалось получить доступ к содержимому iframe', e);
-        }
-      }
-      
-      return;
+        
+        // Сбрасываем флаг агрессивного режима
+        this._aggressiveMode = false;
+        return;
     }
     
     canvasElements.forEach(canvas => {
-      this.processCanvasElement(canvas);
+        this.processCanvasElement(canvas);
     });
+    
+    // Сбрасываем флаг агрессивного режима
+    this._aggressiveMode = false;
   }
   
   /**
@@ -187,93 +209,295 @@ class ChartSyncManager {
    * @param {HTMLCanvasElement} canvas - Canvas элемент для обработки
    */
   processCanvasElement(canvas) {
-    // Проверяем, что canvas имеет Chart.js инстанс
-    if (!canvas.__chartjs__) {
-      // Дополнительная проверка - возможно, это особый canvas с нестандартным свойством
-      const chartInstance = canvas._chart || canvas.chart;
-      if (!chartInstance) return;
-      
-      // Если найден нестандартный экземпляр графика, используем его
-      canvas.__chartjs__ = chartInstance;
-      console.log(`ChartSyncManager: Найден нестандартный экземпляр графика в canvas`);
+    // Проверяем, был ли этот canvas уже зарегистрирован
+    if (this.registeredCanvasElements.has(canvas)) {
+        // Получаем ID, с которым был зарегистрирован этот canvas
+        const existingId = this.registeredCanvasElements.get(canvas);
+        
+        // Если график с этим ID все еще зарегистрирован, пропускаем обработку
+        if (this.charts.has(existingId)) {
+            return;
+        }
     }
 
-    // Получаем ID контейнера графика через несколько стратегий
+      // Проверяем, что canvas имеет Chart.js инстанс
+    let chartInstance = null;
     
-    // Стратегия 1: Поиск через data-container-id
-    const containerByAttr = canvas.closest('[data-container-id]');
-    if (containerByAttr) {
-      const containerId = containerByAttr.getAttribute('data-container-id');
-      if (containerId && !this.charts.has(containerId)) {
-        console.log(`ChartSyncManager: Обнаружен новый график в контейнере ${containerId} (стратегия 1)`);
-        this.registerChart(containerId, canvas.__chartjs__);
-        return;
-      }
-    }
-    
-    // Стратегия 2: Поиск по ID контейнера
-    const containerById = canvas.closest('[id]');
-    if (containerById) {
-      const containerId = containerById.id;
-      if (containerId && !this.charts.has(containerId)) {
-        console.log(`ChartSyncManager: Обнаружен новый график в контейнере ${containerId} (стратегия 2)`);
-        this.registerChart(containerId, canvas.__chartjs__);
-        return;
-      }
-    }
-    
-    // Стратегия 3: Поиск через классы, которые обычно используются для контейнеров графиков
-    // Расширяем список селекторов для разделенных отчетов
-    const containerSelectors = [
-      '.chart-container', 
-      '.chart-split-container', 
-      '.split-screen-container', 
-      '.report-container',
-      '.split-pane',
-      '.split-view',
-      '.split-container',
-      '[data-chart="true"]',
-      '[data-report-type]'
-    ];
-    
-    for (const selector of containerSelectors) {
-      const containerByClass = canvas.closest(selector);
-      if (containerByClass) {
-        // Если контейнер найден по классу, используем его ID или генерируем новый
-        let containerId = containerByClass.id;
+    // Проверка 1: Стандартное свойство __chartjs__
+    if (canvas.__chartjs__) {
+        chartInstance = canvas.__chartjs__;
+        console.log(`ChartSyncManager: Найден стандартный экземпляр Chart.js в canvas`);
+    } 
+    // Проверка 2: Альтернативные свойства
+    else {
+        // Проверяем различные альтернативные свойства, которые могут содержать инстанс графика
+        const possibleProperties = ['_chart', 'chart', 'chartInstance', '__chart__'];
         
-        // Если у контейнера нет ID, генерируем уникальный
-        if (!containerId) {
-          containerId = `chart-container-${Math.random().toString(36).substring(2, 11)}`;
-          containerByClass.id = containerId;
-          console.log(`ChartSyncManager: Создан новый ID ${containerId} для контейнера`);
+        for (const prop of possibleProperties) {
+            if (canvas[prop]) {
+                chartInstance = canvas[prop];
+                console.log(`ChartSyncManager: Найден экземпляр графика в свойстве ${prop} canvas-элемента`);
+                break;
+            }
         }
         
-        if (!this.charts.has(containerId)) {
-          console.log(`ChartSyncManager: Обнаружен новый график в контейнере ${containerId} (стратегия 3: ${selector})`);
-          this.registerChart(containerId, canvas.__chartjs__);
-          return;
+        // Проверка 3: Проверка родительских элементов на наличие ссылки на график
+        if (!chartInstance) {
+            const parent = canvas.parentElement;
+            if (parent) {
+                for (const prop of [...possibleProperties, 'chart', 'chartObj']) {
+                    if (parent[prop]) {
+                        chartInstance = parent[prop];
+                        console.log(`ChartSyncManager: Найден экземпляр графика в свойстве ${prop} родительского элемента`);
+                        break;
+                    }
+                }
+            }
         }
-      }
+        
+        // Проверка 4: Проверка глобального реестра графиков (если есть)
+        if (!chartInstance && window.Chart && window.Chart.instances) {
+            for (const instance of Object.values(window.Chart.instances)) {
+                if (instance.canvas === canvas) {
+                    chartInstance = instance;
+                    console.log(`ChartSyncManager: Найден экземпляр графика в глобальном реестре Chart.instances`);
+                    break;
+                }
+            }
+        }
+        
+        // Проверка 5: Если всё еще нет инстанса, но есть контекст - создаем минимальный объект
+        if (!chartInstance && canvas.getContext) {
+            const context = canvas.getContext('2d');
+            if (context) {
+                // Создаем минимальную структуру для работы с графиком
+                console.log(`ChartSyncManager: Создание базового экземпляра графика для canvas без обнаруженного Chart.js`);
+                chartInstance = {
+                    canvas: canvas,
+                    ctx: context,
+                    scales: { 
+                        x: { 
+                            min: 0, 
+                            max: 100,
+                            options: { min: 0, max: 100 }
+                        }
+                    },
+                    update: function(mode) {
+                        console.log(`ChartSyncManager: Вызван метод update для базового экземпляра графика (${mode || 'default'})`);
+                        // Если нет реального метода, хотя бы регистрируем вызов
+                        try {
+                            canvas.dispatchEvent(new Event('update'));
+                        } catch (e) {
+                            console.warn('ChartSyncManager: Ошибка при вызове события update на canvas', e);
+                        }
+                    },
+                    resetZoom: function() {
+                        console.log(`ChartSyncManager: Сброс масштаба базового экземпляра графика`);
+                        // Сбрасываем значения масштаба к начальным
+                        if (this.scales && this.scales.x) {
+                            this.scales.x.min = 0;
+                            this.scales.x.max = 100;
+                            if (this.scales.x.options) {
+                                this.scales.x.options.min = 0;
+                                this.scales.x.options.max = 100;
+                            }
+                        }
+                        // Обновляем после сброса
+                        this.update('none');
+                    },
+                    setResponsive: function() {
+                        // Заглушка для метода setResponsive
+                        console.log(`ChartSyncManager: Вызов setResponsive для базового экземпляра графика`);
+                    },
+                    options: {
+                        plugins: {
+                            zoom: {
+                                zoom: {
+                                    enabled: true
+                                },
+                                pan: {
+                                    enabled: true
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+        }
+    }
+
+    // Если не удалось найти или создать инстанс, выходим
+    if (!chartInstance) {
+        console.warn(`ChartSyncManager: Не удалось определить экземпляр графика для canvas-элемента`);
+        
+        // В случае агрессивного режима попробуем создать синтетический объект
+        if (this._aggressiveMode) {
+            console.log(`ChartSyncManager: Агрессивный режим - создаем синтетический график для canvas`);
+            chartInstance = {
+                canvas: canvas,
+                scales: {
+                    x: {
+                        min: 0,
+                        max: 100,
+                        options: { min: 0, max: 100 }
+                    }
+                },
+                update: function(mode) {
+                    console.log(`ChartSyncManager: Обновление синтетического графика (${mode || 'default'})`);
+                    try {
+                        canvas.dispatchEvent(new Event('update'));
+                    } catch (e) {
+                        console.warn(`ChartSyncManager: Ошибка при обновлении синтетического графика:`, e);
+                    }
+                },
+                resetZoom: function() {
+                    console.log(`ChartSyncManager: Сброс масштаба синтетического графика`);
+                    // Сбрасываем значения масштаба к начальным
+                    if (this.scales && this.scales.x) {
+                        this.scales.x.min = 0;
+                        this.scales.x.max = 100;
+                        if (this.scales.x.options) {
+                            this.scales.x.options.min = 0;
+                            this.scales.x.options.max = 100;
+                        }
+                    }
+                    // Обновляем после сброса
+                    this.update('none');
+                },
+                setResponsive: function() {
+                    // Заглушка для метода setResponsive
+                    console.log(`ChartSyncManager: Вызов setResponsive для синтетического графика`);
+                },
+                options: {
+                    plugins: {
+                        zoom: {
+                            zoom: {
+                                enabled: true
+                            },
+                            pan: {
+                                enabled: true
+                            }
+                        }
+                    }
+                }
+            };
+        } else {
+            return;
+        }
+    }
+
+    // Создаем стабильный, уникальный идентификатор для canvas
+    let containerId = '';
+    let chartHash = '';
+    
+    // Создаем уникальный хеш для canvas на основе его атрибутов
+    try {
+        const hashParts = [
+            canvas.width || 0,
+            canvas.height || 0,
+            canvas.id || '',
+            canvas.className || '',
+            canvas.getAttribute('data-id') || '',
+            canvas.parentElement?.id || '',
+            canvas.parentElement?.className || ''
+        ];
+        chartHash = hashParts.join('-');
+    } catch (e) {
+        chartHash = Math.random().toString(36).substring(2, 9);
     }
     
-    // Стратегия 4: Если все не сработало, создаем ID на основе canvas
-    if (canvas.id) {
-      const containerId = `canvas-${canvas.id}`;
-      if (!this.charts.has(containerId)) {
-        console.log(`ChartSyncManager: Обнаружен новый график с ID canvas ${containerId} (стратегия 4)`);
-        this.registerChart(containerId, canvas.__chartjs__);
-        return;
+    // Проверяем стратегии для определения ID
+      
+      // Стратегия 1: Поиск через data-container-id
+      const containerByAttr = canvas.closest('[data-container-id]');
+      if (containerByAttr) {
+        containerId = containerByAttr.getAttribute('data-container-id');
+        console.log(`ChartSyncManager: Обнаружен график в контейнере ${containerId} (стратегия 1)`);
       }
-    } else {
-      // Создаем уникальный ID для canvas без ID
-      const containerId = `canvas-${Math.random().toString(36).substring(2, 11)}`;
-      canvas.id = containerId.replace('canvas-', '');
-      if (!this.charts.has(containerId)) {
-        console.log(`ChartSyncManager: Обнаружен новый график, создан ID ${containerId} (стратегия 5)`);
-        this.registerChart(containerId, canvas.__chartjs__);
+      
+      // Стратегия 2: Поиск по ID контейнера
+    if (!containerId) {
+      const containerById = canvas.closest('[id]');
+      if (containerById) {
+            containerId = containerById.id;
+            console.log(`ChartSyncManager: Обнаружен график в контейнере ${containerId} (стратегия 2)`);
+        }
       }
+      
+      // Стратегия 3: Поиск через классы, которые обычно используются для контейнеров графиков
+    if (!containerId) {
+      const containerSelectors = [
+        '.chart-container', 
+        '.chart-split-container', 
+        '.split-screen-container', 
+            '.report-container',
+            '.split-pane',
+            '.split-view',
+            '.split-container',
+            '[data-chart="true"]',
+            '[data-report-type]',
+            // Добавляем более общие селекторы
+            '.chart',
+            '.graph',
+            '.visualisation',
+            '.visualization',
+            'div[style*="position"]', // Любой div с позиционированием
+      ];
+      
+      for (const selector of containerSelectors) {
+        const containerByClass = canvas.closest(selector);
+        if (containerByClass) {
+          // Если контейнер найден по классу, используем его ID или генерируем новый
+                containerId = containerByClass.id;
+          
+          // Если у контейнера нет ID, генерируем уникальный
+          if (!containerId) {
+                    containerId = `chart-container-${chartHash}`;
+            containerByClass.id = containerId;
+            console.log(`ChartSyncManager: Создан новый ID ${containerId} для контейнера`);
+          }
+          
+                console.log(`ChartSyncManager: Обнаружен график в контейнере ${containerId} (стратегия 3: ${selector})`);
+                break;
+          }
+        }
+      }
+      
+      // Стратегия 4: Если все не сработало, создаем ID на основе canvas
+    if (!containerId) {
+      if (canvas.id) {
+            containerId = `canvas-${canvas.id}`;
+            console.log(`ChartSyncManager: Обнаружен график с ID canvas ${containerId} (стратегия 4)`);
+      } else {
+            // Если у canvas нет ID, создаем стабильный на основе хеша
+            containerId = `canvas-${chartHash}`;
+            canvas.id = chartHash;
+            console.log(`ChartSyncManager: Обнаружен график, создан ID ${containerId} (стратегия 5)`);
+        }
     }
+    
+    // Сохраняем canvas в WeakMap для отслеживания уже зарегистрированных элементов
+    this.registeredCanvasElements.set(canvas, containerId);
+    
+    // Проверяем, не зарегистрирован ли уже график с таким ID
+    if (this.charts.has(containerId)) {
+        // Проверяем, не тот же ли это экземпляр графика
+        const existingChart = this.charts.get(containerId);
+        if (existingChart.canvas === canvas) {
+            console.log(`ChartSyncManager: График ${containerId} уже зарегистрирован с тем же canvas`);
+            return;
+        }
+        
+        // Если это другой canvas с тем же ID, обновляем ID
+        containerId = `${containerId}-${chartHash}`;
+        console.log(`ChartSyncManager: Изменен ID на уникальный ${containerId}`);
+    }
+    
+    // Регистрируем график с новым ID
+    this.registerChart(containerId, chartInstance);
+    
+    // Сохраняем canvas в WeakMap для будущих проверок
+    this.registeredCanvasElements.set(canvas, containerId);
   }
 
   /**
@@ -287,8 +511,14 @@ class ChartSyncManager {
       return;
     }
 
-    // Если график уже зарегистрирован, удаляем старую регистрацию
+    // Если график уже зарегистрирован, проверяем не тот же ли это экземпляр
     if (this.charts.has(id)) {
+        const existingChart = this.charts.get(id);
+        if (existingChart.canvas === chartInstance.canvas) {
+            console.log(`ChartSyncManager: График ${id} уже зарегистрирован с тем же canvas`);
+            return;
+        }
+        // Если это другой canvas, удаляем старую регистрацию
       this.unregisterChart(id);
     }
 
@@ -610,8 +840,6 @@ class ChartSyncManager {
    * @param {object} range - Диапазон {min, max} осей
    */
   syncZoom(sourceId, range) {
-    if (!range || !range.min || !range.max) return;
-    
     this.suppressEvents = true;
     console.log(`ChartSyncManager: Синхронизируем зум от графика ${sourceId}, диапазон:`, range);
 
@@ -642,8 +870,6 @@ class ChartSyncManager {
    * @param {object} range - Диапазон {min, max} осей
    */
   syncPan(sourceId, range) {
-    if (!range || !range.min || !range.max) return;
-    
     this.suppressEvents = true;
     console.log(`ChartSyncManager: Синхронизируем панорамирование от графика ${sourceId}, диапазон:`, range);
 
@@ -732,8 +958,14 @@ class ChartSyncManager {
 
       // Сбрасываем масштаб
       try {
+        if (chart.resetZoom && typeof chart.resetZoom === 'function') {
+          // Если у графика есть встроенный метод resetZoom, используем его
         chart.resetZoom();
-        console.log(`ChartSyncManager: Зум сброшен для графика ${id}`);
+          console.log(`ChartSyncManager: Зум сброшен для графика ${id} (встроенный метод)`);
+        } else {
+          // Для графиков без метода resetZoom, используем альтернативный подход
+          this.resetChartZoomManually(chart, id);
+        }
       } catch (error) {
         console.error(`ChartSyncManager: Ошибка при сбросе зума для графика ${id}`, error);
       }
@@ -742,6 +974,69 @@ class ChartSyncManager {
     this.suppressEvents = false;
     this.lastZoomRange = null;
     this.lastPanRange = null;
+  }
+
+  /**
+   * Ручной сброс масштаба для графиков без метода resetZoom
+   * @param {object} chart - Экземпляр графика
+   * @param {string} chartId - ID графика для логирования
+   */
+  resetChartZoomManually(chart, chartId) {
+    try {
+      if (!chart || !chart.scales) {
+        console.warn(`ChartSyncManager: График ${chartId} не имеет шкал для сброса масштаба`);
+        return;
+      }
+      
+      let updated = false;
+      
+      // Сброс масштаба на всех шкалах
+      Object.keys(chart.scales).forEach(scaleId => {
+        const scale = chart.scales[scaleId];
+        
+        // Сначала пробуем через options
+        if (scale.options) {
+          if (scale.options.min !== undefined || scale.options.max !== undefined) {
+            scale.options.min = undefined;
+            scale.options.max = undefined;
+            updated = true;
+          }
+        }
+        
+        // Проверяем наличие исходных пределов (ticks.min, ticks.max)
+        if (scale.options && scale.options.ticks) {
+          if (scale.options.ticks.min !== undefined || scale.options.ticks.max !== undefined) {
+            scale.options.ticks.min = undefined;
+            scale.options.ticks.max = undefined;
+            updated = true;
+          }
+        }
+        
+        // Прямая установка для свойств min/max, если они существуют
+        if (scale.min !== undefined && scale.max !== undefined) {
+          if (scale._originalMin !== undefined && scale._originalMax !== undefined) {
+            // Если есть сохраненные исходные пределы, используем их
+            scale.min = scale._originalMin;
+            scale.max = scale._originalMax;
+          } else {
+            // Иначе сбрасываем к разумным значениям по умолчанию (графики будут использовать автоматические пределы)
+            scale.min = undefined;
+            scale.max = undefined;
+          }
+          updated = true;
+        }
+      });
+      
+      // Если какие-то изменения были сделаны, обновляем график
+      if (updated) {
+        chart.update('none');
+        console.log(`ChartSyncManager: Масштаб сброшен вручную для графика ${chartId}`);
+      } else {
+        console.warn(`ChartSyncManager: Не удалось найти параметры масштабирования для сброса в графике ${chartId}`);
+      }
+    } catch (error) {
+      console.warn(`ChartSyncManager: Ошибка при ручном сбросе масштаба графика ${chartId}:`, error);
+    }
   }
 
   /**
@@ -1025,8 +1320,15 @@ class ChartSyncManager {
    */
   saveSelectionFromChart(chartId) {
     if (!this.charts.has(chartId)) {
-      console.warn(`ChartSyncManager: График ${chartId} не найден для сохранения выделения`);
-      return false;
+      // Если не удалось найти по ID, попробуем взять первый доступный график
+      if (this.charts.size > 0) {
+        const firstChartId = Array.from(this.charts.keys())[0];
+        console.log(`ChartSyncManager: График ${chartId} не найден, используем первый доступный ${firstChartId}`);
+        chartId = firstChartId;
+      } else {
+        console.warn(`ChartSyncManager: Нет зарегистрированных графиков для сохранения выделения`);
+        return false;
+      }
     }
     
     const chart = this.charts.get(chartId);
@@ -1048,16 +1350,75 @@ class ChartSyncManager {
     this.lastSelectionRange = range;
     console.log(`ChartSyncManager: Сохранено выделение из графика ${chartId}:`, range);
     
+    // Сохраняем выделение в localStorage для восстановления при перезагрузке
+    this.saveSelectionToStorage(range);
+    
     return true;
+  }
+
+  /**
+   * Сохраняет выделение в локальное хранилище
+   * @param {Object} range - Диапазон выделения для сохранения
+   */
+  saveSelectionToStorage(range) {
+    try {
+      const selectionData = {
+        range: range,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('chartSelectionRange', JSON.stringify(selectionData));
+      console.log('ChartSyncManager: Выделение сохранено в локальное хранилище');
+    } catch (e) {
+      console.warn('ChartSyncManager: Не удалось сохранить выделение в хранилище:', e);
+    }
+  }
+
+  /**
+   * Загружает ранее сохраненное выделение из локального хранилища
+   */
+  loadSelectionFromStorage() {
+    try {
+      const selectionJson = localStorage.getItem('chartSelectionRange');
+      if (selectionJson) {
+        const selectionData = JSON.parse(selectionJson);
+        
+        // Проверяем, не устарело ли сохраненное выделение (24 часа)
+        const maxAgeMs = 24 * 60 * 60 * 1000;
+        if (Date.now() - selectionData.timestamp < maxAgeMs) {
+          this.lastSelectionRange = selectionData.range;
+          console.log('ChartSyncManager: Выделение восстановлено из хранилища:', this.lastSelectionRange);
+          return true;
+        } else {
+          console.log('ChartSyncManager: Сохраненное выделение устарело, удаляем');
+          localStorage.removeItem('chartSelectionRange');
+        }
+      }
+    } catch (e) {
+      console.warn('ChartSyncManager: Ошибка при загрузке выделения из хранилища:', e);
+    }
+    return false;
   }
 
   /**
    * Применяет сохраненное выделение ко всем графикам в разделенных отчетах
    */
   applySavedSelectionToAll() {
+    // Сначала проверяем, есть ли сохраненное выделение в памяти
     if (!this.lastSelectionRange) {
-      console.warn('ChartSyncManager: Нет сохраненного выделения для применения');
-      return false;
+      // Попробуем восстановить из локального хранилища
+      this.loadSelectionFromStorage();
+      
+      // Если всё еще нет выделения, пробуем использовать последний масштаб
+      if (!this.lastSelectionRange && this.lastZoomRange) {
+        console.log('ChartSyncManager: Используем последний диапазон масштабирования как выделение');
+        this.lastSelectionRange = this.lastZoomRange;
+      }
+      
+      // Если все еще нет выделения, выходим
+      if (!this.lastSelectionRange) {
+        console.warn('ChartSyncManager: Нет сохраненного выделения для применения');
+        return false;
+      }
     }
     
     console.log('ChartSyncManager: Применяем сохраненное выделение ко всем графикам:', this.lastSelectionRange);
