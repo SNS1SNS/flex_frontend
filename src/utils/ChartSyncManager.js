@@ -1075,44 +1075,132 @@ class ChartSyncManager {
    * @param {object} range - Диапазон выделения {min, max}
    */
   syncSelection(sourceId, range) {
-    if (!this.syncSelectionEnabled || !range || !range.min || !range.max) return;
+    if (!this.syncEnabled || this.suppressEvents) {
+      console.log('ChartSyncManager: Синхронизация отключена или подавлена, пропускаем распространение выделения');
+      return;
+    }
+
+    console.log(`ChartSyncManager: Синхронизируем выделение от контейнера ${sourceId}`, range);
     
-    this.suppressEvents = true;
-    console.log(`ChartSyncManager: Синхронизируем выделение от графика ${sourceId}, диапазон:`, range);
+    // Улучшенная логика синхронизации: сначала собираем все контейнеры для синхронизации
+    const containerIdsToSync = [];
+    const sourceContainer = document.getElementById(sourceId);
+    let syncGroupId = null;
+    
+    // Если есть исходный контейнер, определяем его группу синхронизации
+    if (sourceContainer) {
+      syncGroupId = sourceContainer.getAttribute('data-sync-group');
+      console.log(`ChartSyncManager: Исходный контейнер ${sourceId} в группе синхронизации: ${syncGroupId || 'нет'}`);
+    }
+    
+    // Перебираем все зарегистрированные графики
+    Object.keys(this.charts).forEach(containerId => {
+      // Пропускаем исходный контейнер
+      if (containerId === sourceId) return;
+      
+      // Если задана группа синхронизации, то синхронизируем только в рамках одной группы
+      if (syncGroupId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+          const containerSyncGroup = container.getAttribute('data-sync-group');
+          if (containerSyncGroup && containerSyncGroup === syncGroupId) {
+            containerIdsToSync.push(containerId);
+          }
+        } else {
+          // Если контейнер не найден, проверяем по атрибуту
+          const containersByAttr = document.querySelectorAll(`[data-container-id="${containerId}"][data-sync-group="${syncGroupId}"]`);
+          if (containersByAttr.length > 0) {
+            containerIdsToSync.push(containerId);
+          }
+        }
+      } else {
+        // Если группа не задана, синхронизируем все графики
+        containerIdsToSync.push(containerId);
+      }
+    });
+    
+    console.log(`ChartSyncManager: Найдено ${containerIdsToSync.length} графиков для синхронизации выделения`);
+    
+    // Теперь применяем выделение ко всем собранным контейнерам
+    containerIdsToSync.forEach(containerId => {
+      try {
+        this.applySyncSelection(containerId, range);
+        
+        // Дополнительно отправляем глобальное событие для большей надежности
+        this.dispatchSelectionEvent(containerId, range);
+      } catch (error) {
+        console.error(`ChartSyncManager: Ошибка при синхронизации выделения для контейнера ${containerId}:`, error);
+      }
+    });
     
     // Сохраняем последний диапазон выделения
     this.lastSelectionRange = range;
     
-    this.charts.forEach((chart, id) => {
-      // Пропускаем исходный график
-      if (id === sourceId) return;
+    // Отправляем глобальное событие синхронизации выделения
+    this.dispatchGlobalSelectionEvent(sourceId, range, syncGroupId);
+  }
+
+  // Новый метод для отправки события выделения для конкретного контейнера
+  dispatchSelectionEvent(containerId, range) {
+    try {
+      const container = document.getElementById(containerId) || 
+                        document.querySelector(`[data-container-id="${containerId}"]`);
       
-      try {
-        if (!chart || !chart.scales || !chart.scales.x) {
-          console.warn(`ChartSyncManager: График ${id} не имеет шкал для применения выделения`);
-          return;
-        }
-        
-        console.log(`ChartSyncManager: Применяем выделение к графику ${id}`);
-        
-        // Применяем тот же диапазон выделения
-        this.applyZoomToChart(chart, id, range);
-        
-        // Отправляем событие о применении выделения
-        document.dispatchEvent(new CustomEvent('chartSelectionApplied', {
-          detail: {
-            targetId: id,
-            sourceId: sourceId,
-            range: range,
-            timestamp: Date.now()
-          }
-        }));
-      } catch (error) {
-        console.error(`ChartSyncManager: Ошибка при синхронизации выделения для графика ${id}`, error);
+      if (!container) {
+        console.warn(`ChartSyncManager: Контейнер ${containerId} не найден для отправки события выделения`);
+        return;
       }
-    });
-    
-    this.suppressEvents = false;
+      
+      // Создаем событие выделения
+      const selectionData = {
+        startDate: range.min instanceof Date ? range.min : new Date(range.min),
+        endDate: range.max instanceof Date ? range.max : new Date(range.max),
+        startIndex: typeof range.min === 'number' ? range.min : undefined,
+        endIndex: typeof range.max === 'number' ? range.max : undefined
+      };
+      
+      // Отправляем событие в контейнер
+      const event = new CustomEvent('applySelectionToContainer', {
+        detail: {
+          containerId,
+          selectionData,
+          timestamp: Date.now()
+        }
+      });
+      
+      document.dispatchEvent(event);
+      console.log(`ChartSyncManager: Отправлено событие выделения для контейнера ${containerId}`);
+    } catch (error) {
+      console.error(`ChartSyncManager: Ошибка при отправке события выделения для контейнера ${containerId}:`, error);
+    }
+  }
+
+  // Новый метод для отправки глобального события синхронизации выделения
+  dispatchGlobalSelectionEvent(sourceContainerId, range, syncGroupId) {
+    try {
+      // Создаем данные выделения
+      const selectionData = {
+        startDate: range.min instanceof Date ? range.min : new Date(range.min),
+        endDate: range.max instanceof Date ? range.max : new Date(range.max),
+        startIndex: typeof range.min === 'number' ? range.min : undefined,
+        endIndex: typeof range.max === 'number' ? range.max : undefined
+      };
+      
+      // Отправляем глобальное событие синхронизации
+      const event = new CustomEvent('globalSelectionSync', {
+        detail: {
+          sourceContainerId,
+          syncGroupId,
+          selectionData,
+          timestamp: Date.now()
+        }
+      });
+      
+      document.dispatchEvent(event);
+      console.log(`ChartSyncManager: Отправлено глобальное событие синхронизации выделения от контейнера ${sourceContainerId}`);
+    } catch (error) {
+      console.error(`ChartSyncManager: Ошибка при отправке глобального события синхронизации выделения:`, error);
+    }
   }
 
   /**
@@ -1860,46 +1948,141 @@ class ChartSyncManager {
    * Настраивает обработчики клавиатурных сокращений для графиков
    */
   setupKeyboardShortcuts() {
-    console.log('ChartSyncManager: Настройка клавиатурных сокращений для графиков');
+    // Удаляем предыдущий обработчик, если он был
+    this.removeKeyboardShortcuts();
     
-    // Проверяем, не настроены ли уже обработчики
-    if (this._keyboardShortcutsSetup) {
-      return;
-    }
-    
-    // Слушатель клавиши пробел для сброса зума всех графиков
-    const handleKeyDown = (event) => {
-      // Пробел
-      if (event.key === ' ' || event.key === 'Spacebar') {
-        console.log('ChartSyncManager: Нажата клавиша пробел, сбрасываем зум всех графиков');
-        this.resetAllZoom('keyboard-shortcut');
-        
-        // Предотвращаем стандартное поведение пробела (прокрутка страницы)
+    // Функция для сброса масштаба на всех графиках по нажатию пробела
+    this.keyboardHandler = (event) => {
+      if (event.key === ' ') {
+        console.log('ChartSyncManager: Обнаружено нажатие пробела, сбрасываем масштаб на всех графиках');
+        this.resetAllZoom();
         event.preventDefault();
       }
     };
     
-    // Добавляем слушатель на весь документ
-    document.addEventListener('keydown', handleKeyDown);
-    
-    // Отмечаем, что обработчики настроены
-    this._keyboardShortcutsSetup = true;
-    
-    // Сохраняем ссылку на функцию для возможности удаления
-    this._handleKeyDown = handleKeyDown;
-    
-    console.log('ChartSyncManager: Клавиатурные сокращения настроены');
+    // Добавляем обработчик клавиатуры
+    document.addEventListener('keydown', this.keyboardHandler);
+    console.log('ChartSyncManager: Настроены клавиатурные сокращения');
   }
-  
-  /**
-   * Удаляет обработчики клавиатурных сокращений
-   */
+
+  // Метод для удаления клавиатурных сокращений
   removeKeyboardShortcuts() {
-    if (this._keyboardShortcutsSetup && this._handleKeyDown) {
-      document.removeEventListener('keydown', this._handleKeyDown);
-      this._keyboardShortcutsSetup = false;
-      console.log('ChartSyncManager: Клавиатурные сокращения удалены');
+    if (this.keyboardHandler) {
+      document.removeEventListener('keydown', this.keyboardHandler);
+      this.keyboardHandler = null;
+      console.log('ChartSyncManager: Удалены клавиатурные сокращения');
     }
+  }
+
+  // Улучшенный метод синхронизации для обнаружения всех графиков
+  syncAllCharts() {
+    console.log('ChartSyncManager: Запуск принудительной синхронизации всех графиков');
+    
+    // Находим все canvas элементы с атрибутом data-graph
+    const graphCanvases = document.querySelectorAll('canvas[data-graph]');
+    console.log(`ChartSyncManager: Найдено ${graphCanvases.length} canvas с атрибутом data-graph`);
+    
+    // Организуем графики по группам синхронизации
+    const syncGroups = {};
+    
+    graphCanvases.forEach(canvas => {
+      try {
+        // Получаем данные о контейнере
+        const container = canvas.closest('.split-screen-container, [data-container-id]');
+        if (!container) return;
+        
+        const containerId = container.id || container.getAttribute('data-container-id');
+        const syncGroupId = container.getAttribute('data-sync-group') || 'default';
+        
+        if (!syncGroups[syncGroupId]) {
+          syncGroups[syncGroupId] = [];
+        }
+        
+        // Проверяем, есть ли уже такой контейнер в группе
+        if (!syncGroups[syncGroupId].includes(containerId) && containerId) {
+          syncGroups[syncGroupId].push(containerId);
+        }
+        
+        // Дополнительно проверяем атрибуты canvas для улучшения совместимости
+        canvas.setAttribute('data-sync-group', syncGroupId);
+        canvas.setAttribute('data-container-id', containerId);
+        
+        // Проверяем, зарегистрирован ли этот график в менеджере
+        if (containerId && !this.charts[containerId]) {
+          // Ищем инстанс графика в canvas
+          const chartInstance = this.findChartInstanceInCanvas(canvas);
+          
+          if (chartInstance) {
+            console.log(`ChartSyncManager: Автоматически регистрируем график ${containerId} в группе ${syncGroupId}`);
+            this.registerChart(containerId, chartInstance);
+          }
+        }
+      } catch (error) {
+        console.error('ChartSyncManager: Ошибка при обработке canvas в syncAllCharts:', error);
+      }
+    });
+    
+    console.log('ChartSyncManager: Группы синхронизации:', syncGroups);
+    
+    // Если есть сохраненный диапазон выделения, применяем его ко всем графикам
+    if (this.lastSelectionRange) {
+      console.log('ChartSyncManager: Применяем последний диапазон выделения ко всем группам');
+      
+      // Применяем последнее выделение ко всем группам
+      Object.keys(syncGroups).forEach(groupId => {
+        const containers = syncGroups[groupId];
+        if (containers.length > 0) {
+          // Выбираем первый контейнер в группе как источник
+          const sourceContainerId = containers[0];
+          
+          // Синхронизируем выделение в рамках группы
+          this.syncSelection(sourceContainerId, this.lastSelectionRange);
+        }
+      });
+    }
+    
+    return syncGroups;
+  }
+
+  // Метод для поиска инстанса графика в canvas
+  findChartInstanceInCanvas(canvas) {
+    if (!canvas) return null;
+    
+    // Проверяем различные свойства, где может быть инстанс графика
+    let chartInstance = null;
+    
+    // Проверяем __chartjs__ - стандартное свойство Chart.js
+    if (canvas.__chartjs__) {
+      chartInstance = canvas.__chartjs__;
+    } 
+    // Проверяем __chartInstance__ - наше кастомное свойство
+    else if (canvas.__chartInstance) {
+      chartInstance = canvas.__chartInstance;
+    }
+    // Проверяем Chart или chart свойство
+    else if (canvas.Chart) {
+      chartInstance = canvas.Chart;
+    }
+    else if (canvas.chart) {
+      chartInstance = canvas.chart;
+    }
+    
+    // Если до сих пор не нашли, пробуем найти через дата-атрибуты
+    if (!chartInstance) {
+      // Проверяем, может быть график был зарегистрирован через React ref
+      const container = canvas.closest('.split-screen-container, [data-container-id]');
+      if (container) {
+        // Проверяем различные элементы внутри контейнера, которые могут содержать график
+        const chartElements = container.querySelectorAll('.chartjs-render-monitor, [data-chart]');
+        chartElements.forEach(element => {
+          if (element.__chartjs__ || element.__chartInstance) {
+            chartInstance = element.__chartjs__ || element.__chartInstance;
+          }
+        });
+      }
+    }
+    
+    return chartInstance;
   }
 }
 

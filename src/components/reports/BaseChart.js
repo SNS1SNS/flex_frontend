@@ -884,7 +884,7 @@ const BaseChart = ({
     }
   }, [chartRef]);
 
-  // Функция для синхронизации выделения точки с другими графиками
+  // Обновленный метод syncPointSelection для использования showPointTooltip
   const syncPointSelection = (timestamp, pointIndex) => {
     // Проверка, что timestamp существует
     if (!timestamp) return;
@@ -905,6 +905,11 @@ const BaseChart = ({
     });
     
     document.dispatchEvent(syncEvent);
+    
+    // Добавляем вызов функции showPointTooltip для отображения подсказки
+    if (chartRef.current && pointIndex >= 0) {
+      showPointTooltip(pointIndex);
+    }
   };
 
   // Обработчик события выделения точки на другом графике
@@ -2213,38 +2218,14 @@ const BaseChart = ({
     
     // 1. Устанавливаем выделение через ChartSyncManager
     if (chartSyncManager) {
-      if (chartSyncManager.syncSelectionEnabled) {
-        // Сохраняем выделение в менеджере синхронизации
-        chartSyncManager.saveSelectionFromChart(containerId);
-        // Применяем выделение ко всем связанным графикам
-        chartSyncManager.syncSelection(containerId, {
-          min: startDate ? startDate.getTime() : startIndex,
-          max: endDate ? endDate.getTime() : endIndex
-        });
-      }
+      // Сохраняем выделение в менеджере синхронизации
+      chartSyncManager.saveSelectionFromChart(containerId);
       
-      // Отправляем событие о выделении для разделенных графиков
-      if (syncGroupId) {
-        console.log(`BaseChart: Уведомляем о выделении через синхронизацию группы ${syncGroupId}`);
-        
-        // Специальная обработка для разделенных графиков через менеджер синхронизации
-        document.dispatchEvent(new CustomEvent('graphSelectionChanged', {
-          detail: {
-            sourceContainerId: containerId,
-            syncGroupId,
-            selectionData
-          }
-        }));
-      } else {
-        // Стандартная обработка выделения для обычных графиков
-        console.log(`BaseChart: Уведомляем о выделении через событие graphSelectionChanged`);
-        document.dispatchEvent(new CustomEvent('graphSelectionChanged', {
-          detail: {
-            sourceContainerId: containerId,
-            selectionData
-          }
-        }));
-      }
+      // Применяем выделение ко всем связанным графикам через менеджер
+      chartSyncManager.syncSelection(containerId, {
+        min: startDate ? startDate.getTime() : startIndex,
+        max: endDate ? endDate.getTime() : endIndex
+      });
     }
     
     // 2. Отправляем событие о выделении напрямую родителю, если это разделенный контейнер
@@ -2262,6 +2243,15 @@ const BaseChart = ({
         }
       }));
     }
+    
+    // 3. Отправляем дополнительное событие для обработки другими компонентами
+    document.dispatchEvent(new CustomEvent('chartSelectionChanged', {
+      detail: {
+        sourceContainerId: containerId,
+        selectionData,
+        syncGroupId: syncGroupId || 'default'
+      }
+    }));
     
   }, [getDataPoints, containerId, syncGroupId]);
 
@@ -2354,6 +2344,40 @@ const BaseChart = ({
       window.showNotification('info', message, { autoClose: 1500 });
     }
   };
+
+  // Эффект для обработки глобальной синхронизации выделения между всеми графиками
+  useEffect(() => {
+    const handleGlobalSelectionSync = (event) => {
+      const { sourceContainerId, syncGroupId, selectionData } = event.detail;
+      
+      // Пропускаем обработку события от самого себя
+      if (sourceContainerId === containerId) return;
+      
+      // Проверяем, соответствует ли график текущей группе синхронизации
+      const containerSyncGroupId = chartContainerRef.current?.closest('.split-screen-container')?.getAttribute('data-sync-group');
+      
+      // Если указана группа синхронизации, проверяем соответствие
+      if (syncGroupId && containerSyncGroupId && syncGroupId !== containerSyncGroupId) {
+        console.log(`BaseChart: Пропускаем применение выделения - не совпадают группы синхронизации (${syncGroupId} != ${containerSyncGroupId})`);
+        return;
+      }
+      
+      console.log(`BaseChart: Получено глобальное событие синхронизации выделения от ${sourceContainerId}`);
+      
+      // Применяем выделение к графику
+      if (selectionData) {
+        console.log(`BaseChart: Применяем выделение к графику ${containerId}:`, selectionData);
+        applySelectionToChart(selectionData);
+      }
+    };
+    
+    // Регистрируем обработчик события глобальной синхронизации
+    document.addEventListener('globalSelectionSync', handleGlobalSelectionSync);
+    
+    return () => {
+      document.removeEventListener('globalSelectionSync', handleGlobalSelectionSync);
+    };
+  }, [containerId, applySelectionToChart]);
 
   // Рендер компонента
   return (
