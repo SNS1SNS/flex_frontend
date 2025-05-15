@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
+import annotationPlugin from 'chartjs-plugin-annotation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSyncAlt, faDownload, faExpand, faCompress, faTruck, faColumns, faWindowRestore, faRedo, faSearchMinus, faKeyboard, faLink, faUnlink } from '@fortawesome/free-solid-svg-icons';
 import SplitScreenContainer from '../common/SplitScreenContainer';
@@ -22,7 +23,8 @@ ChartJS.register(
   Tooltip, 
   Legend, 
   Filler,
-  zoomPlugin
+  zoomPlugin,
+  annotationPlugin  // Регистрируем плагин аннотаций
 );
 
 // Активируем синхронизацию графиков при импорте компонента
@@ -34,6 +36,16 @@ if (!chartSyncActivator.initialized) {
 // Используем глобальный объект window для доступа из любого экземпляра компонента
 if (typeof window.reportChooserModalOpen === 'undefined') {
   window.reportChooserModalOpen = false;
+}
+
+// Добавляем глобальные переменные для хранения выделенных точек
+if (typeof window.selectedChartPoint === 'undefined') {
+  window.selectedChartPoint = {
+    timestamp: null,
+    pointIndex: null,
+    value: null,
+    containerId: null
+  };
 }
 
 const BaseChart = ({ 
@@ -734,166 +746,515 @@ const BaseChart = ({
       console.log('BaseChart: График не инициализирован или отсутствуют данные');
       return;
     }
+
+    // Получаем элементы под курсором одним вызовом и используем повторно
+    const clickedElements = chartRef.current.getElementsAtEventForMode(
+      event.nativeEvent, 
+      'nearest', 
+      { intersect: true }, 
+      false
+    );
     
-    console.log(`BaseChart: Обработка клика на графике ${containerId}`);
+    // Если элементы не найдены, прерываем обработку
+    if (!clickedElements || clickedElements.length === 0) {
+      console.log(`BaseChart: Клик не попал в данные графика`);
+      return;
+    }
     
     // Получаем родительский контейнер графика и активируем его
     const container = chartContainerRef.current?.closest('.split-screen-container');
     
     if (container) {
-      // Сначала снимаем активность со всех контейнеров
-      document.querySelectorAll('.split-screen-container[data-active="true"]')
-        .forEach(el => {
-          el.setAttribute('data-active', 'false');
-          el.classList.remove('active-container');
-        });
-      
-      // Активируем наш контейнер
+      // Активируем контейнер - делаем это только для кликнутой точки
       container.setAttribute('data-active', 'true');
       container.classList.add('active-container');
-      
-      console.log(`BaseChart: Активирован контейнер ${container.id || container.getAttribute('data-container-id')}`);
     }
 
-    // Логика выделения на графике
-    // Если пользователь кликнул с нажатой клавишей Shift, выделяем до этой точки
-    if (event.nativeEvent.shiftKey && chartRef.current.lastClickIndex !== undefined) {
-      console.log(`BaseChart: Обнаружен Shift-клик, создаем выделение от ${chartRef.current.lastClickIndex}`);
+    // Если пользователь кликнул на точку графика
+    try {
+      const clickedElement = clickedElements[0];
+      const datasetIndex = clickedElement.datasetIndex;
+      const pointIndex = clickedElement.index;
       
-      // Получаем текущий индекс элемента
-      const elements = chartRef.current.getElementsAtEventForMode(
-        event.nativeEvent, 
-        'nearest', 
-        { intersect: true }, 
-        false
-      );
-      
-      // Если есть элемент под курсором
-      if (elements.length > 0) {
-        const currentIndex = elements[0].index;
-        
-        console.log(`BaseChart: Текущий индекс клика: ${currentIndex}, предыдущий: ${chartRef.current.lastClickIndex}`);
+      // Обработка Shift-клика для создания выделения диапазона
+      if (event.nativeEvent.shiftKey && chartRef.current.lastClickIndex !== undefined) {
+        console.log(`BaseChart: Обнаружен Shift-клик, создаем выделение от ${chartRef.current.lastClickIndex} до ${pointIndex}`);
         
         // Определяем начальный и конечный индексы
-        const startIndex = Math.min(chartRef.current.lastClickIndex, currentIndex);
-        const endIndex = Math.max(chartRef.current.lastClickIndex, currentIndex);
+        const startIndex = Math.min(chartRef.current.lastClickIndex, pointIndex);
+        const endIndex = Math.max(chartRef.current.lastClickIndex, pointIndex);
         
         // Используем наш обработчик выделения
         handleSelection(startIndex, endIndex);
+        return;
       }
-    } 
-    // Обычный клик без Shift - запоминаем индекс для будущего выделения
-    else {
-      const elements = chartRef.current.getElementsAtEventForMode(
-        event.nativeEvent, 
-        'nearest', 
-        { intersect: true }, 
-        false
-      );
       
-      if (elements.length > 0) {
-        const elementIndex = elements[0].index;
-        chartRef.current.lastClickIndex = elementIndex;
-        console.log(`BaseChart: Сохранен индекс ${elementIndex} для будущего выделения`);
-        
-        // Сбрасываем текущее выделение если оно есть
-        if (chartRef.current.canvas.hasAttribute('data-selection-applied')) {
-          console.log(`BaseChart: Сброс текущего выделения`);
-          resetZoom();
+      // Сначала сбрасываем предыдущее выделение на всех графиках
+      resetAllPointHighlights();
+      
+      console.log(`BaseChart: Клик на точке индекс=${pointIndex}, набор данных=${datasetIndex}`);
+      
+      // Получаем данные о точке
+      const dataset = chartRef.current.data.datasets[datasetIndex];
+      const label = chartRef.current.data.labels[pointIndex];
+      const value = dataset.data[pointIndex];
+      
+      // Определяем временную метку
+      let timestamp = null;
+      
+      if (label instanceof Date) {
+        timestamp = label.getTime();
+      } else if (typeof label === 'string') {
+        // Пробуем разобрать строку как дату
+        try {
+          timestamp = new Date(label).getTime();
+        } catch (e) {
+          // Игнорируем ошибки преобразования
         }
-      } else {
-        console.log(`BaseChart: Клик не попал в данные, индекс не сохранен`);
+      } else if (typeof label === 'number') {
+        timestamp = label;
       }
+      
+      // Сохраняем выделенную точку глобально для синхронизации
+      window.selectedChartPoint = {
+        timestamp,
+        pointIndex,
+        value,
+        containerId,
+        label,
+        reportType
+      };
+      
+      // Добавляем выделение с фиксированной подсказкой
+      addHighlightPoint(pointIndex, datasetIndex);
+      
+      // Синхронизируем выделение точки с другими графиками немедленно
+      syncPointSelection(timestamp, pointIndex);
+      
+      // Запоминаем последний выбранный индекс для выделения диапазона
+      chartRef.current.lastClickIndex = pointIndex;
+      
+      // Сбрасываем текущее выделение масштаба если оно есть
+      if (chartRef.current.canvas.hasAttribute('data-selection-applied')) {
+        console.log(`BaseChart: Сброс текущего выделения масштаба`);
+        resetZoom();
+      }
+    } catch (error) {
+      console.error('BaseChart: Ошибка при выделении точки:', error);
     }
   };
 
-  // Функция для отправки события выделения в SplitScreenContainer
-  const notifySelectionChanged = (selectionData) => {
-    // Получаем контейнер с графиком
-    const container = chartContainerRef.current?.closest('.split-screen-container');
-    if (!container) {
-      console.warn(`BaseChart: Не удалось найти контейнер для уведомления о выделении`);
-      return;
-    }
+  // Функция для сброса выделения точек на всех графиках
+  const resetAllPointHighlights = () => {
+    // Отправляем глобальное событие для сброса выделения на всех графиках
+    document.dispatchEvent(new CustomEvent('resetAllPointHighlights', {}));
     
-    const syncGroupId = container.getAttribute('data-sync-group');
-    console.log(`BaseChart: Отправка уведомления о выделении, syncGroupId: ${syncGroupId || 'нет'}`);
+    // Локально сбрасываем выделение на текущем графике
+    resetPointHighlight();
+  };
+
+  // Функция для отображения подсказки для выбранной точки - используется в других частях кода
+  const showPointTooltip = useCallback((pointIndex, datasetIndex = 0) => {
+    if (!chartRef.current) return;
     
-    // Проверяем, есть ли у контейнера атрибут data-sync-selection
-    const shouldSync = container.getAttribute('data-sync-selection') !== 'false';
-    if (!shouldSync) {
-      console.log(`BaseChart: Синхронизация выделений отключена для контейнера ${containerId}`);
-      return;
-    }
-    
-    // Если есть API через __reactInstance, используем его
-    if (container.__reactInstance && container.__reactInstance.notifySelectionChanged) {
-      console.log(`BaseChart: Уведомляем SplitScreenContainer о выделении через API`);
-      container.__reactInstance.notifySelectionChanged(selectionData);
+    try {
+      const chart = chartRef.current;
       
-      // Также отправляем DOM-событие для обработки другими компонентами
-      const containerEvent = new CustomEvent('selectionChanged', {
-        detail: {
-          selectionData,
-          containerId: container.id || container.getAttribute('data-container-id')
-        }
+      // Скрываем все активные подсказки
+      if (chart.tooltip) {
+        chart.tooltip.setActiveElements([], { datasetIndex, index: pointIndex });
+      }
+      
+      // Вычисляем позицию точки на графике
+      const meta = chart.getDatasetMeta(datasetIndex);
+      if (!meta || !meta.data || !meta.data[pointIndex]) return;
+      
+      const element = meta.data[pointIndex];
+      
+      // Создаем и отображаем подсказку
+      chart.tooltip.setActiveElements([{ datasetIndex, index: pointIndex }], {
+        x: element.x,
+        y: element.y
       });
-      container.dispatchEvent(containerEvent);
-      return;
+      
+      // Обновляем график без анимации
+      chart.update('none');
+    } catch (error) {
+      console.error('BaseChart: Ошибка при отображении подсказки:', error);
     }
+  }, [chartRef]);
+
+  // Функция для синхронизации выделения точки с другими графиками
+  const syncPointSelection = (timestamp, pointIndex) => {
+    // Проверка, что timestamp существует
+    if (!timestamp) return;
     
-    // Если нет прямого API, отправляем событие
-    console.log(`BaseChart: Уведомляем о выделении через событие graphSelectionChanged`);
-    const event = new CustomEvent('graphSelectionChanged', {
+    // Отправляем событие для синхронизации выделения точки
+    // Используем одно событие вместо нескольких
+    const syncEvent = new CustomEvent('chartPointSelected', {
       detail: {
         sourceContainerId: containerId,
-        selectionData,
-        syncGroupId,
-        timestamp: Date.now()
-      }
+        timestamp,
+        pointIndex,
+        label: window.selectedChartPoint.label,
+        value: window.selectedChartPoint.value,
+        reportType,
+        priority: 'high' // Для ускорения обработки
+      },
+      bubbles: false // Предотвращаем всплытие события для лучшей производительности
     });
-    document.dispatchEvent(event);
     
-    // Дополнительно, отправляем специальное событие для локальной обработки в контейнере
-    const containerEvent = new CustomEvent('selectionChanged', {
-      detail: {
-        selectionData,
-        containerId: container.id || container.getAttribute('data-container-id')
-      }
-    });
-    container.dispatchEvent(containerEvent);
+    document.dispatchEvent(syncEvent);
+  };
+
+  // Обработчик события выделения точки на другом графике
+  useEffect(() => {
+    let isProcessing = false; // Флаг для предотвращения обработки нескольких событий одновременно
     
-    // Отображаем подсказку пользователю о выделении (если функция доступна)
-    if (window.showNotification) {
-      let message = 'Выделение применено';
-      if (selectionData.startDate && selectionData.endDate) {
-        // Форматируем даты для отображения
-        const startDate = new Date(selectionData.startDate);
-        const endDate = new Date(selectionData.endDate);
-        const options = { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' };
-        message = `Выделено: ${startDate.toLocaleString('ru-RU', options)} - ${endDate.toLocaleString('ru-RU', options)}`;
+    const handlePointSelected = (event) => {
+      const { sourceContainerId, timestamp } = event.detail; // Убираем неиспользуемый priority
+      
+      // Не обрабатываем событие от самого себя
+      if (sourceContainerId === containerId) return;
+      
+      // Если уже обрабатываем событие, пропускаем
+      if (isProcessing) return;
+      isProcessing = true;
+      
+      // Используем requestAnimationFrame вместо setTimeout для лучшей производительности
+      requestAnimationFrame(() => {
+        try {
+          if (!chartRef.current || !chartRef.current.data || !chartRef.current.data.labels) {
+            isProcessing = false;
+            return;
+          }
+          
+          // Ищем соответствующую точку по времени в этом графике
+          const labels = chartRef.current.data.labels;
+          let matchedIndex = -1;
+          let minTimeDiff = Infinity;
+          
+          // Оптимизируем поиск соответствующей точки
+          for (let i = 0; i < labels.length; i++) {
+            const label = labels[i];
+            let labelTime = null;
+            
+            // Извлекаем временную метку из метки
+            if (label instanceof Date) {
+              labelTime = label.getTime();
+            } else if (typeof label === 'string' && /^\d/.test(label)) {
+              try {
+                labelTime = new Date(label).getTime();
+              } catch (e) { /* Ignore parsing errors */ }
+            } else if (typeof label === 'number') {
+              labelTime = label;
+            }
+            
+            // Если нашли точное совпадение
+            if (labelTime === timestamp) {
+              matchedIndex = i;
+              break;
+            }
+            
+            // Если нет точного совпадения, находим ближайшую точку
+            if (labelTime && typeof labelTime === 'number' && typeof timestamp === 'number') {
+              const timeDiff = Math.abs(labelTime - timestamp);
+              if (timeDiff < minTimeDiff) {
+                minTimeDiff = timeDiff;
+                matchedIndex = i;
+              }
+            }
+          }
+          
+          // Если нашли подходящую точку
+          if (matchedIndex !== -1) {
+            // Добавляем выделение на график
+            addHighlightPoint(matchedIndex);
+          }
+    } finally {
+          isProcessing = false;
+        }
+      });
+    };
+    
+    // Обработчик сброса всех выделений
+    const handleResetAllHighlights = () => {
+      resetPointHighlight();
+    };
+    
+    // Добавляем обработчики событий
+    document.addEventListener('chartPointSelected', handlePointSelected);
+    document.addEventListener('resetAllPointHighlights', handleResetAllHighlights);
+    
+    // Удаляем обработчики при размонтировании
+    return () => {
+      document.removeEventListener('chartPointSelected', handlePointSelected);
+      document.removeEventListener('resetAllPointHighlights', handleResetAllHighlights);
+    };
+  }, [containerId]);
+
+  // Функция для добавления выделения точки на график
+  const addHighlightPoint = (pointIndex, datasetIndex = 0) => {
+    if (!chartRef.current) return;
+    
+    try {
+      const chart = chartRef.current;
+      const meta = chart.getDatasetMeta(datasetIndex);
+      if (!meta || !meta.data || !meta.data[pointIndex]) return;
+      
+      // Сбрасываем текущие таймеры если они есть
+      if (chart._highlightResetTimer) {
+        clearTimeout(chart._highlightResetTimer);
+        chart._highlightResetTimer = null;
       }
-      window.showNotification('info', message, { autoClose: 1500 });
+      
+      if (chart._pulseAnimationTimer) {
+        clearTimeout(chart._pulseAnimationTimer);
+        chart._pulseAnimationTimer = null;
+      }
+      
+      // Сохраняем оригинальные настройки для восстановления
+      const originalRadius = chart.data.datasets[datasetIndex].pointRadius;
+      const originalBackgroundColor = chart.data.datasets[datasetIndex].pointBackgroundColor;
+      const originalBorderColor = chart.data.datasets[datasetIndex].pointBorderColor;
+      
+      // Удаляем старую фиксированную подсказку если есть
+      if (chart._fixedTooltipElement) {
+        chart._fixedTooltipElement.remove();
+        chart._fixedTooltipElement = null;
+      }
+      
+      // Создаем массивы для радиусов и цветов точек - оптимизируем, создавая только для одной точки
+      const pointRadiusArray = Array(meta.data.length).fill(0); // Все точки невидимы
+      pointRadiusArray[pointIndex] = 10; // Только выделенная точка видима и увеличенного размера
+      
+      const pointBackgroundColorArray = Array(meta.data.length).fill('transparent');
+      pointBackgroundColorArray[pointIndex] = 'rgba(255, 0, 0, 0.9)'; // Более яркая красная точка для выделения
+      
+      const pointBorderColorArray = Array(meta.data.length).fill('transparent');
+      pointBorderColorArray[pointIndex] = '#fff';
+      
+      // Применяем новые стили точек
+      chart.data.datasets[datasetIndex].pointRadius = pointRadiusArray;
+      chart.data.datasets[datasetIndex].pointBackgroundColor = pointBackgroundColorArray;
+      chart.data.datasets[datasetIndex].pointBorderColor = pointBorderColorArray;
+      
+      // Оптимизированная версия пульсирующей анимации без таймеров
+      // Вместо таймеров используем CSS-анимацию
+      const pointElement = meta.data[pointIndex];
+      
+      // Только если элемент найден
+      if (pointElement && pointElement.element) {
+        // Используем CSS-класс для анимации
+        pointElement.element.classList.add('chart-highlighted-point');
+      }
+      
+      // Сохраняем оригинальные значения для восстановления при следующем клике
+      chart._originalPointStyles = {
+        radius: originalRadius,
+        backgroundColor: originalBackgroundColor,
+        borderColor: originalBorderColor
+      };
+      
+      // Настраиваем активную подсказку (tooltip) для постоянного отображения
+      chart.tooltip.setActiveElements([{ datasetIndex, index: pointIndex }], {
+        x: pointElement.x,
+        y: pointElement.y - 10 // Смещаем немного вверх
+      });
+      
+      // Делаем подсказку постоянно видимой
+      chart.options.plugins.tooltip.enabled = true;
+      chart.options.plugins.tooltip.position = 'nearest';
+      
+      // Сохраняем позицию для обновления во время панорамирования/зума
+      chart._fixedTooltipPosition = {
+        datasetIndex,
+        pointIndex
+      };
+      
+      // Добавляем обработчик для события afterDraw, чтобы подсказка оставалась видимой
+      chart.options.plugins.tooltip.callbacks._persistentTooltip = function(chart) {
+        if (chart._fixedTooltipPosition) {
+          const { datasetIndex, pointIndex } = chart._fixedTooltipPosition;
+          const meta = chart.getDatasetMeta(datasetIndex);
+          if (meta && meta.data && meta.data[pointIndex]) {
+            const element = meta.data[pointIndex];
+            chart.tooltip.setActiveElements([{ datasetIndex, index: pointIndex }], {
+              x: element.x,
+              y: element.y - 10
+            });
+            chart.tooltip.update();
+          }
+        }
+      };
+      
+      // Подключаем обработчик к событию afterRender
+      const originalRender = chart.draw;
+      chart.draw = function() {
+        originalRender.apply(this, arguments);
+        if (this.options.plugins.tooltip.callbacks._persistentTooltip) {
+          this.options.plugins.tooltip.callbacks._persistentTooltip(this);
+        }
+      };
+      
+      // Сохраняем информацию о текущей выделенной точке
+      chart._currentHighlightedPoint = {
+        datasetIndex,
+        pointIndex
+      };
+      
+      // Обновляем график без анимации для мгновенного отображения и лучшей производительности
+      chart.update('none');
+      
+      console.log(`BaseChart: Добавлено выделение точки индекс=${pointIndex}`);
+    } catch (error) {
+      console.error('BaseChart: Ошибка при добавлении выделения точки:', error);
     }
   };
 
-  // Функция загрузки данных
-  const loadData = async () => {
-    if (!vehicle || !startDate || !endDate) {
-      setError('Не выбран транспорт или период');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
+  // Функция для сброса выделения точек
+  const resetPointHighlight = () => {
+    if (!chartRef.current) return;
+    
     try {
-      await fetchData();
-    } catch (err) {
-      console.error(`Ошибка при загрузке данных для графика ${title}:`, err);
-      setError(`Ошибка при загрузке данных: ${err.message || 'Неизвестная ошибка'}`);
-    } finally {
-      setIsLoading(false);
+      const chart = chartRef.current;
+      const originalStyles = chart._originalPointStyles;
+      
+      // Останавливаем анимацию пульсации
+      if (chart._pulseAnimationTimer) {
+        clearTimeout(chart._pulseAnimationTimer);
+        chart._pulseAnimationTimer = null;
+      }
+      
+      // Останавливаем таймер автоматического сброса
+      if (chart._highlightResetTimer) {
+        clearTimeout(chart._highlightResetTimer);
+        chart._highlightResetTimer = null;
+      }
+      
+      // Удаляем фиксированную подсказку если есть
+      if (chart._fixedTooltipElement) {
+        chart._fixedTooltipElement.remove();
+        chart._fixedTooltipElement = null;
+      }
+      
+      // Очищаем информацию о текущей выделенной точке
+      if (chart._currentHighlightedPoint) {
+        // Удаляем CSS-класс анимации, если есть элемент
+        const { datasetIndex, pointIndex } = chart._currentHighlightedPoint;
+        try {
+          const meta = chart.getDatasetMeta(datasetIndex);
+          if (meta && meta.data && meta.data[pointIndex] && meta.data[pointIndex].element) {
+            meta.data[pointIndex].element.classList.remove('chart-highlighted-point');
+          }
+        } catch (e) {
+          // Игнорируем ошибки при поиске элемента
+        }
+        
+        chart._currentHighlightedPoint = null;
+      }
+      
+      // Восстанавливаем оригинальный метод отрисовки, если был изменен
+      if (chart._originalDraw) {
+        chart.draw = chart._originalDraw;
+        chart._originalDraw = null;
+      }
+      
+      // Удаляем обработчик _persistentTooltip
+      if (chart.options.plugins.tooltip.callbacks._persistentTooltip) {
+        delete chart.options.plugins.tooltip.callbacks._persistentTooltip;
+      }
+      
+      // Очищаем фиксированную позицию подсказки
+      chart._fixedTooltipPosition = null;
+      
+      if (originalStyles) {
+        // Восстанавливаем оригинальные стили точек
+        chart.data.datasets.forEach(dataset => {
+          dataset.pointRadius = originalStyles.radius;
+          dataset.pointBackgroundColor = originalStyles.backgroundColor;
+          dataset.pointBorderColor = originalStyles.borderColor;
+        });
+      }
+      
+      // Удаляем аннотацию вертикальной линии если есть
+      if (chart.options.plugins.annotation && 
+          chart.options.plugins.annotation.annotations && 
+          chart.options.plugins.annotation.annotations.verticalLine) {
+        delete chart.options.plugins.annotation.annotations.verticalLine;
+      }
+      
+      // Обновляем график без анимации для лучшей производительности
+      chart.update('none');
+      
+      // Скрываем подсказку
+      if (chart.tooltip) {
+        chart.tooltip.setActiveElements([], {});
+        chart.update('none');
+      }
+      
+      console.log(`BaseChart: Сброшено выделение точек`);
+    } catch (error) {
+      console.error('BaseChart: Ошибка при сбросе выделения точки:', error);
+    }
+  };
+
+  // Добавляем настраиваемый внешний вид подсказки
+  const customTooltip = {
+    enabled: true,
+    position: 'nearest',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    titleFont: {
+      size: 14,
+      family: 'Roboto, sans-serif',
+      weight: 'bold'
+    },
+    bodyFont: {
+      size: 13,
+      family: 'Roboto, sans-serif'
+    },
+    padding: 12,
+    cornerRadius: 6,
+    displayColors: false,
+    callbacks: {
+      title: function(tooltipItems) {
+        if (tooltipItems.length > 0) {
+          const dateLabel = tooltipItems[0].label;
+          if (dateLabel) {
+            try {
+              const dateObj = new Date(dateLabel);
+              if (!isNaN(dateObj.getTime())) {
+                return dateObj.toLocaleString('ru-RU', {
+                  timeZone: 'Asia/Almaty',
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                });
+              }
+            } catch (e) {
+              console.warn('Ошибка при форматировании времени:', e);
+            }
+          }
+          return tooltipItems[0].label;
+        }
+        return '';
+      },
+      label: function(context) {
+        const formattedValue = formatTooltipLabel(context.parsed.y);
+        const label = context.dataset.label || '';
+        return `${label}: ${formattedValue}`;
+      },
+      afterLabel: function() {
+        // Добавляем дополнительную информацию в подсказку
+        const reportTypeLabel = reportType || 'Н/Д';
+        
+        // Возвращаем только метку типа отчета, индекс убираем
+        return [
+          `Тип отчета: ${reportTypeLabel}`
+        ];
+      }
     }
   };
 
@@ -1130,15 +1491,15 @@ const BaseChart = ({
         });
         
         // Отправляем событие без задержки
-        document.dispatchEvent(createEvent);
+            document.dispatchEvent(createEvent);
+            
+            // Добавляем визуальную обратную связь для подтверждения выбора отчета
+            if (window.showNotification) {
+              window.showNotification('success', `Отчет "${selectedReportType}" добавлен в контейнер`);
+            }
         
-        // Добавляем визуальную обратную связь для подтверждения выбора отчета
-        if (window.showNotification) {
-          window.showNotification('success', `Отчет "${selectedReportType}" добавлен в контейнер`);
-        }
-        
-        // Сбрасываем контейнер
-        setContainerToFill(null);
+          // Сбрасываем контейнер
+          setContainerToFill(null);
         return;
       }
       
@@ -1258,7 +1619,7 @@ const BaseChart = ({
       devicePixelRatio: window.devicePixelRatio || 1, // Для более четкого рендеринга на ретина-дисплеях
       elements: {
         point: {
-          radius: 0, // Отключаем точки полностью
+          radius: 2, // Маленькие точки вместо 0, чтобы их можно было выбрать
           hitRadius: 10, // Область для взаимодействия
           hoverRadius: 5, // Размер точки при наведении
         },
@@ -1300,48 +1661,7 @@ const BaseChart = ({
             bottom: 5
           }
         },
-        tooltip: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          titleFont: {
-            size: 13,
-            family: 'Roboto, sans-serif'
-          },
-          bodyFont: {
-            size: 12,
-            family: 'Roboto, sans-serif'
-          },
-          padding: 12,
-          cornerRadius: 6,
-          callbacks: {
-            label: function(context) {
-              return formatTooltipLabel(context.parsed.y);
-            },
-            title: function(tooltipItems) {
-              // Форматируем время для подсказки в казахстанском формате
-              if (tooltipItems.length > 0) {
-                const date = tooltipItems[0].label;
-                if (date) {
-                  try {
-                    const dateObj = new Date(date);
-                    if (!isNaN(dateObj.getTime())) {
-                      return dateObj.toLocaleString('ru-RU', {
-                        timeZone: 'Asia/Almaty',
-                        day: 'numeric',
-                        month: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
-                    }
-                  } catch (e) {
-                    console.warn('Ошибка при форматировании времени:', e);
-                  }
-                }
-                return tooltipItems[0].label;
-              }
-              return '';
-            }
-          }
-        },
+        tooltip: customTooltip,
         zoom: {
           limits: {
             x: {min: 'original', max: 'original', minRange: 10}, // Минимальный размер видимой области по X
@@ -1944,6 +2264,96 @@ const BaseChart = ({
     }
     
   }, [getDataPoints, containerId, syncGroupId]);
+
+  // Функция загрузки данных
+  const loadData = async () => {
+    if (!vehicle || !startDate || !endDate) {
+      setError('Не выбран транспорт или период');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await fetchData();
+    } catch (err) {
+      console.error(`Ошибка при загрузке данных для графика ${title}:`, err);
+      setError(`Ошибка при загрузке данных: ${err.message || 'Неизвестная ошибка'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Функция для отправки события выделения в SplitScreenContainer
+  const notifySelectionChanged = (selectionData) => {
+    // Получаем контейнер с графиком
+    const container = chartContainerRef.current?.closest('.split-screen-container');
+    if (!container) {
+      console.warn(`BaseChart: Не удалось найти контейнер для уведомления о выделении`);
+      return;
+    }
+    
+    const syncGroupId = container.getAttribute('data-sync-group');
+    console.log(`BaseChart: Отправка уведомления о выделении, syncGroupId: ${syncGroupId || 'нет'}`);
+    
+    // Проверяем, есть ли у контейнера атрибут data-sync-selection
+    const shouldSync = container.getAttribute('data-sync-selection') !== 'false';
+    if (!shouldSync) {
+      console.log(`BaseChart: Синхронизация выделений отключена для контейнера ${containerId}`);
+      return;
+    }
+    
+    // Если есть API через __reactInstance, используем его
+    if (container.__reactInstance && container.__reactInstance.notifySelectionChanged) {
+      console.log(`BaseChart: Уведомляем SplitScreenContainer о выделении через API`);
+      container.__reactInstance.notifySelectionChanged(selectionData);
+      
+      // Также отправляем DOM-событие для обработки другими компонентами
+      const containerEvent = new CustomEvent('selectionChanged', {
+        detail: {
+          selectionData,
+          containerId: container.id || container.getAttribute('data-container-id')
+        }
+      });
+      container.dispatchEvent(containerEvent);
+      return;
+    }
+    
+    // Если нет прямого API, отправляем событие
+    console.log(`BaseChart: Уведомляем о выделении через событие graphSelectionChanged`);
+    const event = new CustomEvent('graphSelectionChanged', {
+      detail: {
+        sourceContainerId: containerId,
+        selectionData,
+        syncGroupId,
+        timestamp: Date.now()
+      }
+    });
+    document.dispatchEvent(event);
+    
+    // Дополнительно, отправляем специальное событие для локальной обработки в контейнере
+    const containerEvent = new CustomEvent('selectionChanged', {
+      detail: {
+        selectionData,
+        containerId: container.id || container.getAttribute('data-container-id')
+      }
+    });
+    container.dispatchEvent(containerEvent);
+    
+    // Отображаем подсказку пользователю о выделении (если функция доступна)
+    if (window.showNotification) {
+      let message = 'Выделение применено';
+      if (selectionData.startDate && selectionData.endDate) {
+        // Форматируем даты для отображения
+        const startDate = new Date(selectionData.startDate);
+        const endDate = new Date(selectionData.endDate);
+        const options = { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' };
+        message = `Выделено: ${startDate.toLocaleString('ru-RU', options)} - ${endDate.toLocaleString('ru-RU', options)}`;
+      }
+      window.showNotification('info', message, { autoClose: 1500 });
+    }
+  };
 
   // Рендер компонента
   return (
