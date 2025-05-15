@@ -822,14 +822,15 @@ const BaseChart = ({
         value,
         containerId,
         label,
-        reportType
+        reportType,
+        datasetIndex // Добавляем индекс набора данных для графиков с несколькими линиями
       };
       
       // Добавляем выделение с фиксированной подсказкой
       addHighlightPoint(pointIndex, datasetIndex);
       
       // Синхронизируем выделение точки с другими графиками немедленно
-      syncPointSelection(timestamp, pointIndex);
+      syncPointSelection(timestamp, pointIndex, datasetIndex);
       
       // Запоминаем последний выбранный индекс для выделения диапазона
       chartRef.current.lastClickIndex = pointIndex;
@@ -860,15 +861,26 @@ const BaseChart = ({
     try {
       const chart = chartRef.current;
       
+      // Проверяем, существует ли указанный набор данных
+      if (!chart.data || !chart.data.datasets || !chart.data.datasets[datasetIndex]) {
+        console.warn(`BaseChart: Набор данных с индексом ${datasetIndex} не найден`);
+        // Если набор данных не найден, используем первый доступный
+        datasetIndex = 0;
+      }
+      
+      // Проверяем наличие метаданных для набора данных
+      const meta = chart.getDatasetMeta(datasetIndex);
+      if (!meta || !meta.data || !meta.data[pointIndex]) {
+        console.warn(`BaseChart: Точка ${pointIndex} не найдена в наборе данных ${datasetIndex}`);
+        return;
+      }
+      
       // Скрываем все активные подсказки
       if (chart.tooltip) {
         chart.tooltip.setActiveElements([], { datasetIndex, index: pointIndex });
       }
       
-      // Вычисляем позицию точки на графике
-      const meta = chart.getDatasetMeta(datasetIndex);
-      if (!meta || !meta.data || !meta.data[pointIndex]) return;
-      
+      // Получаем элемент точки данных
       const element = meta.data[pointIndex];
       
       // Создаем и отображаем подсказку
@@ -885,7 +897,7 @@ const BaseChart = ({
   }, [chartRef]);
 
   // Обновленный метод syncPointSelection для использования showPointTooltip
-  const syncPointSelection = (timestamp, pointIndex) => {
+  const syncPointSelection = (timestamp, pointIndex, datasetIndex = 0) => {
     // Проверка, что timestamp существует
     if (!timestamp) return;
     
@@ -896,8 +908,9 @@ const BaseChart = ({
         sourceContainerId: containerId,
         timestamp,
         pointIndex,
-        label: window.selectedChartPoint.label,
-        value: window.selectedChartPoint.value,
+        datasetIndex, // Добавляем индекс набора данных для графиков с несколькими линиями
+        label: window.selectedChartPoint?.label,
+        value: window.selectedChartPoint?.value,
         reportType,
         priority: 'high' // Для ускорения обработки
       },
@@ -908,7 +921,7 @@ const BaseChart = ({
     
     // Добавляем вызов функции showPointTooltip для отображения подсказки
     if (chartRef.current && pointIndex >= 0) {
-      showPointTooltip(pointIndex);
+      showPointTooltip(pointIndex, datasetIndex);
     }
   };
 
@@ -917,7 +930,7 @@ const BaseChart = ({
     let isProcessing = false; // Флаг для предотвращения обработки нескольких событий одновременно
     
     const handlePointSelected = (event) => {
-      const { sourceContainerId, timestamp } = event.detail; // Убираем неиспользуемый priority
+      const { sourceContainerId, timestamp, datasetIndex: sourceDatasetIndex = 0 } = event.detail;
       
       // Не обрабатываем событие от самого себя
       if (sourceContainerId === containerId) return;
@@ -973,8 +986,11 @@ const BaseChart = ({
           
           // Если нашли подходящую точку
           if (matchedIndex !== -1) {
-            // Добавляем выделение на график
-            addHighlightPoint(matchedIndex);
+            // Для графика расхода топлива (fuel) используем только первый набор данных, чтобы избежать выделения нескольких точек
+            const targetDatasetIndex = reportType === 'fuel' ? (sourceDatasetIndex || 0) : 0;
+            
+            // Добавляем выделение на график с указанием нужного набора данных
+            addHighlightPoint(matchedIndex, targetDatasetIndex);
           }
     } finally {
           isProcessing = false;
@@ -1004,8 +1020,20 @@ const BaseChart = ({
     
     try {
       const chart = chartRef.current;
+      
+      // Проверяем, существует ли указанный набор данных
+      if (!chart.data || !chart.data.datasets || !chart.data.datasets[datasetIndex]) {
+        console.warn(`BaseChart: Набор данных с индексом ${datasetIndex} не найден`);
+        // Если набор данных не найден, используем первый доступный
+        datasetIndex = 0;
+      }
+      
+      // Проверяем наличие метаданных для набора данных
       const meta = chart.getDatasetMeta(datasetIndex);
-      if (!meta || !meta.data || !meta.data[pointIndex]) return;
+      if (!meta || !meta.data || !meta.data[pointIndex]) {
+        console.warn(`BaseChart: Точка ${pointIndex} не найдена в наборе данных ${datasetIndex}`);
+        return;
+      }
       
       // Сбрасываем текущие таймеры если они есть
       if (chart._highlightResetTimer) {
@@ -1019,9 +1047,16 @@ const BaseChart = ({
       }
       
       // Сохраняем оригинальные настройки для восстановления
-      const originalRadius = chart.data.datasets[datasetIndex].pointRadius;
-      const originalBackgroundColor = chart.data.datasets[datasetIndex].pointBackgroundColor;
-      const originalBorderColor = chart.data.datasets[datasetIndex].pointBorderColor;
+      if (!chart._originalPointStyles) {
+        chart._originalPointStyles = {};
+        chart.data.datasets.forEach((dataset, i) => {
+          chart._originalPointStyles[i] = {
+            radius: dataset.pointRadius,
+            backgroundColor: dataset.pointBackgroundColor,
+            borderColor: dataset.pointBorderColor
+          };
+        });
+      }
       
       // Удаляем старую фиксированную подсказку если есть
       if (chart._fixedTooltipElement) {
@@ -1029,20 +1064,42 @@ const BaseChart = ({
         chart._fixedTooltipElement = null;
       }
       
-      // Создаем массивы для радиусов и цветов точек - оптимизируем, создавая только для одной точки
-      const pointRadiusArray = Array(meta.data.length).fill(0); // Все точки невидимы
-      pointRadiusArray[pointIndex] = 10; // Только выделенная точка видима и увеличенного размера
+      // Для графика расхода топлива (fuel) подготавливаем только выбранный набор данных
+      // и обнуляем остальные, чтобы избежать выделения нескольких точек
+      const isMultiLineChart = chart.data.datasets.length > 1;
+      const isFuelChart = reportType === 'fuel';
       
-      const pointBackgroundColorArray = Array(meta.data.length).fill('transparent');
-      pointBackgroundColorArray[pointIndex] = 'rgba(255, 0, 0, 0.9)'; // Более яркая красная точка для выделения
-      
-      const pointBorderColorArray = Array(meta.data.length).fill('transparent');
-      pointBorderColorArray[pointIndex] = '#fff';
-      
-      // Применяем новые стили точек
-      chart.data.datasets[datasetIndex].pointRadius = pointRadiusArray;
-      chart.data.datasets[datasetIndex].pointBackgroundColor = pointBackgroundColorArray;
-      chart.data.datasets[datasetIndex].pointBorderColor = pointBorderColorArray;
+      // Сначала сбрасываем стили всех точек на всех наборах данных
+      chart.data.datasets.forEach((ds, i) => {
+        // Для каждого набора данных заполняем массивы с прозрачными точками
+        const dsLength = ds.data ? ds.data.length : 0;
+        
+        // Для не активных наборов данных (не тот, который мы выделяем) в графиках "fuel"
+        // скрываем все точки
+        if (isFuelChart && isMultiLineChart && i !== datasetIndex) {
+          ds.pointRadius = Array(dsLength).fill(0);
+          ds.pointBackgroundColor = Array(dsLength).fill('transparent');
+          ds.pointBorderColor = Array(dsLength).fill('transparent');
+        } else {
+          // Для активного набора данных или не в fuel-графике - подготавливаем массивы
+          if (i === datasetIndex) {
+            // Создаем массивы для радиусов и цветов точек только для выбранного набора
+            const pointRadiusArray = Array(dsLength).fill(0); // Все точки невидимы
+            pointRadiusArray[pointIndex] = 10; // Только выделенная точка видима и увеличенного размера
+            
+            const pointBackgroundColorArray = Array(dsLength).fill('transparent');
+            pointBackgroundColorArray[pointIndex] = 'rgba(255, 0, 0, 0.9)'; // Более яркая красная точка для выделения
+            
+            const pointBorderColorArray = Array(dsLength).fill('transparent');
+            pointBorderColorArray[pointIndex] = '#fff';
+            
+            // Применяем новые стили к выбранному набору данных
+            ds.pointRadius = pointRadiusArray;
+            ds.pointBackgroundColor = pointBackgroundColorArray;
+            ds.pointBorderColor = pointBorderColorArray;
+          }
+        }
+      });
       
       // Оптимизированная версия пульсирующей анимации без таймеров
       // Вместо таймеров используем CSS-анимацию
@@ -1053,13 +1110,6 @@ const BaseChart = ({
         // Используем CSS-класс для анимации
         pointElement.element.classList.add('chart-highlighted-point');
       }
-      
-      // Сохраняем оригинальные значения для восстановления при следующем клике
-      chart._originalPointStyles = {
-        radius: originalRadius,
-        backgroundColor: originalBackgroundColor,
-        borderColor: originalBorderColor
-      };
       
       // Настраиваем активную подсказку (tooltip) для постоянного отображения
       chart.tooltip.setActiveElements([{ datasetIndex, index: pointIndex }], {
@@ -1111,7 +1161,7 @@ const BaseChart = ({
       // Обновляем график без анимации для мгновенного отображения и лучшей производительности
       chart.update('none');
       
-      console.log(`BaseChart: Добавлено выделение точки индекс=${pointIndex}`);
+      console.log(`BaseChart: Добавлено выделение точки индекс=${pointIndex}, набор=${datasetIndex}`);
     } catch (error) {
       console.error('BaseChart: Ошибка при добавлении выделения точки:', error);
     }
@@ -2378,6 +2428,124 @@ const BaseChart = ({
       document.removeEventListener('globalSelectionSync', handleGlobalSelectionSync);
     };
   }, [containerId, applySelectionToChart]);
+
+  // Функция для настройки опций зума для предотвращения исчезновения графика
+  const setupZoomOptions = useCallback(() => {
+    if (!chartRef.current) return;
+    
+    try {
+      const chart = chartRef.current;
+      
+      // Гарантируем, что опции плагина зума существуют
+      if (!chart.options.plugins.zoom) {
+        console.warn('BaseChart: Плагин зума не настроен для графика');
+        return;
+      }
+      
+      // Оригинальный обработчик зума
+      const originalOnZoom = chart.options.plugins.zoom.zoom.onZoom;
+      
+      // Улучшенный обработчик зума с защитой от исчезновения графика
+      chart.options.plugins.zoom.zoom.onZoom = (context) => {
+        // Вызываем оригинальный обработчик если он есть
+        if (originalOnZoom && typeof originalOnZoom === 'function') {
+          originalOnZoom(context);
+        }
+        
+        try {
+          const scale = context.chart.scales.x;
+          if (!scale) return;
+          
+          // Проверяем, что текущий масштаб имеет смысл
+          // Значение min должно быть меньше max
+          if (scale.min >= scale.max) {
+            console.warn('BaseChart: Обнаружен некорректный масштаб, восстанавливаем масштаб');
+            
+            // Сбрасываем масштаб к безопасным значениям
+            setTimeout(() => {
+              if (chartRef.current && !chartRef.current.isDestroyed) {
+                chartRef.current.resetZoom();
+              }
+            }, 10);
+            return;
+          }
+          
+          // Проверяем, что масштаб не слишком маленький
+          const dataLength = context.chart.data.labels?.length || 0;
+          if (dataLength > 0) {
+            const visiblePoints = scale.max - scale.min;
+            
+            // Если видимых точек меньше 2 - опасная ситуация, ограничиваем масштаб
+            if (visiblePoints < 2) {
+              console.warn('BaseChart: Слишком сильное увеличение, корректируем масштаб');
+              
+              const newMin = Math.max(0, scale.min - 1);
+              const newMax = Math.min(dataLength - 1, scale.max + 1);
+              
+              scale.options.min = newMin;
+              scale.options.max = newMax;
+              
+              // Обновляем график без анимации
+              context.chart.update('none');
+            }
+          }
+        } catch (error) {
+          console.error('BaseChart: Ошибка при обработке зума:', error);
+        }
+      };
+      
+      // Ограничиваем минимальный масштаб, чтобы избежать исчезновения графика
+      chart.options.plugins.zoom.zoom.limits = {
+        x: {
+          minRange: 2, // Минимальный диапазон - 2 точки данных
+        }
+      };
+      
+      // Улучшаем обработчик панорамирования
+      const originalOnPan = chart.options.plugins.zoom.pan.onPan;
+      
+      chart.options.plugins.zoom.pan.onPan = (context) => {
+        // Вызываем оригинальный обработчик
+        if (originalOnPan && typeof originalOnPan === 'function') {
+          originalOnPan(context);
+        }
+        
+        // Дополнительная проверка после панорамирования
+        try {
+          const scale = context.chart.scales.x;
+          if (!scale) return;
+          
+          // Проверяем, что после панорамирования у нас есть видимые данные
+          const dataLength = context.chart.data.labels?.length || 0;
+          
+          if (scale.min < 0) {
+            // Коррекция - не выходим за левую границу данных
+            scale.options.min = 0;
+            scale.options.max = scale.max - scale.min;
+            context.chart.update('none');
+          } else if (scale.max > dataLength - 1) {
+            // Коррекция - не выходим за правую границу данных
+            scale.options.max = dataLength - 1;
+            scale.options.min = Math.max(0, scale.min);
+            context.chart.update('none');
+          }
+        } catch (error) {
+          console.error('BaseChart: Ошибка при обработке панорамирования:', error);
+        }
+      };
+      
+      console.log('BaseChart: Настроены улучшенные опции масштабирования для предотвращения исчезновения графика');
+    } catch (error) {
+      console.error('BaseChart: Ошибка при настройке опций зума:', error);
+    }
+  }, []);
+  
+  // Применяем настройки зума после инициализации графика
+  useEffect(() => {
+    if (chartRef.current) {
+      setupZoomOptions();
+    }
+  }, [setupZoomOptions]);
 
   // Рендер компонента
   return (

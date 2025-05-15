@@ -1148,9 +1148,9 @@ class ChartSyncManager {
       
       if (!container) {
         console.warn(`ChartSyncManager: Контейнер ${containerId} не найден для отправки события выделения`);
-        return;
-      }
-      
+          return;
+        }
+        
       // Создаем событие выделения
       const selectionData = {
         startDate: range.min instanceof Date ? range.min : new Date(range.min),
@@ -1161,16 +1161,16 @@ class ChartSyncManager {
       
       // Отправляем событие в контейнер
       const event = new CustomEvent('applySelectionToContainer', {
-        detail: {
+          detail: {
           containerId,
           selectionData,
-          timestamp: Date.now()
-        }
+            timestamp: Date.now()
+          }
       });
       
       document.dispatchEvent(event);
       console.log(`ChartSyncManager: Отправлено событие выделения для контейнера ${containerId}`);
-    } catch (error) {
+      } catch (error) {
       console.error(`ChartSyncManager: Ошибка при отправке события выделения для контейнера ${containerId}:`, error);
     }
   }
