@@ -2,6 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import BaseChart from './BaseChart';
 import { getAuthToken } from '../../utils/authUtils';
 import { toast } from 'react-toastify';
+import chartSyncActivator from '../../utils/ChartSyncActivator';
+
+// Активируем синхронизацию графиков при импорте компонента
+if (!chartSyncActivator.initialized) {
+  chartSyncActivator.initialize();
+}
 
 const VoltageChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }) => {
   const [chartData, setChartData] = useState([]);

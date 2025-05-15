@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
@@ -7,6 +7,7 @@ import { faSyncAlt, faDownload, faExpand, faCompress, faTruck, faColumns, faWind
 import SplitScreenContainer from '../common/SplitScreenContainer';
 import splitScreenManager, { SPLIT_MODES } from '../../utils/SplitScreenManager';
 import chartSyncManager from '../../utils/ChartSyncManager';
+import chartSyncActivator from '../../utils/ChartSyncActivator';
 import ReportChooser from './ReportChooser';
 import { toast } from 'react-toastify';
 import './ChartStyles.css';
@@ -23,6 +24,11 @@ ChartJS.register(
   Filler,
   zoomPlugin
 );
+
+// Активируем синхронизацию графиков при импорте компонента
+if (!chartSyncActivator.initialized) {
+  chartSyncActivator.initialize();
+}
 
 const BaseChart = ({ 
   title,
@@ -52,6 +58,7 @@ const BaseChart = ({
   const chartContainerRef = useRef(null);
   const containerId = useRef(`chart-container-${Math.random().toString(36).substring(2, 11)}`).current;
   const [containerToFill, setContainerToFill] = useState(null);
+  const [syncGroupId, setSyncGroupId] = useState(null);
 
   // Эффект для проверки существования контейнера в DOM и установки ID на DOM-элемент
   useEffect(() => {
@@ -421,63 +428,46 @@ const BaseChart = ({
 
   // Обновляем эффект для регистрации графика в менеджере синхронизации
   useEffect(() => {
-    // Функция для регистрации графика
-    const registerChart = () => {
-      if (chartRef.current && chartRef.current.chart) {
-        // Регистрируем график в менеджере синхронизации
-        chartSyncManager.registerChart(containerId, chartRef.current.chart);
+    if (chartRef.current && chartRef.current.canvas) {
+      // Устанавливаем data-graph атрибут для идентификации канваса
+      chartRef.current.canvas.setAttribute('data-graph', 'true');
+      
+      // Важно: При инициализации графика в разделенном контейнере, 
+      // устанавливаем дополнительные атрибуты для синхронизации
+      if (containerId && containerId.includes('-')) {
+        const baseContainerId = containerId.split('-')[0];
+        chartRef.current.canvas.setAttribute('data-parent-container', baseContainerId);
         
-        // Если есть сохраненный масштаб, применяем его к этому графику
-        chartSyncManager.applyCurrentZoomToChart(containerId);
+        // Получаем группу синхронизации из контейнера или создаем новую
+        const container = chartContainerRef.current?.closest('.split-screen-container');
+        const containerSyncGroupId = container?.getAttribute('data-sync-group') || `sync-${containerId}`;
         
-        // Генерируем событие инициализации графика для других компонентов
-        document.dispatchEvent(new CustomEvent('chartInitialized', {
+        // Устанавливаем syncGroupId
+        setSyncGroupId(containerSyncGroupId);
+        
+        // Добавляем информацию о группе синхронизации
+        chartRef.current.canvas.setAttribute('data-sync-group', containerSyncGroupId);
+        
+        console.log(`BaseChart: График в разделенном контейнере ${containerId} инициализирован, родитель: ${baseContainerId}, группа: ${containerSyncGroupId}`);
+        
+        // Отправляем событие о готовности графика в разделенном контейнере
+        document.dispatchEvent(new CustomEvent('splitChartInitialized', {
           detail: {
-            chartId: containerId,
-            chartInstance: chartRef.current.chart,
+            containerId,
+            baseContainerId,
+            syncGroupId: containerSyncGroupId,
             timestamp: Date.now()
           }
         }));
-        
-        console.log(`BaseChart: График ${containerId} зарегистрирован в ChartSyncManager`);
       }
-    };
-    
-    // Обработчик для отслеживания изменений состояния синхронизации
-    const handleSyncStateChanged = (event) => {
-      // Обновляем UI для отображения состояния синхронизации
-      const syncStatus = document.querySelector(`#${containerId} .sync-status`);
-      if (syncStatus) {
-        syncStatus.innerHTML = `
-          <i class="fa ${event.detail.syncEnabled ? 'fa-link' : 'fa-unlink'}"></i>
-          ${event.detail.syncEnabled ? 'Синхронизировано' : 'Несинхронизировано'}
-        `;
-      }
-    };
-    
-    // Вызываем регистрацию после монтирования и после получения данных
-    const timer = setTimeout(registerChart, 500);
-    
-    // Также повторяем регистрацию каждый раз, когда данные обновляются
-    if (chartData && chartData.labels && chartData.labels.length > 0) {
-      const updateTimer = setTimeout(registerChart, 200);
-      return () => {
-        clearTimeout(updateTimer);
-        clearTimeout(timer);
-        chartSyncManager.unregisterChart(containerId);
-      };
+      
+      // Регистрируем график в ChartSyncManager после короткой задержки,
+      // чтобы убедиться, что все свойства графика полностью инициализированы
+      setTimeout(() => {
+        registerChart();
+      }, 300);
     }
-    
-    // Регистрируем обработчик изменения состояния синхронизации
-    document.addEventListener('syncStateChanged', handleSyncStateChanged);
-    
-    return () => {
-      // При размонтировании удаляем график из синхронизации
-      clearTimeout(timer);
-      document.removeEventListener('syncStateChanged', handleSyncStateChanged);
-      chartSyncManager.unregisterChart(containerId);
-    };
-  }, [containerId, chartData]);
+  }, [chartRef.current]);
 
   // Ефект для добавления data-graph атрибута и интеграции с системой синхронизации выделения
   useEffect(() => {
@@ -774,61 +764,8 @@ const BaseChart = ({
         const startIndex = Math.min(chartRef.current.lastClickIndex, currentIndex);
         const endIndex = Math.max(chartRef.current.lastClickIndex, currentIndex);
         
-        // Проверяем, что у нас есть диапазон выделения
-        if (startIndex !== endIndex) {
-          // Получаем метки времени для выделенного диапазона
-          const labels = chartRef.current.data.labels;
-          
-          // Проверяем, что метки существуют
-          if (labels && labels.length > 0) {
-            // Берем начальную и конечную метки
-            const startLabel = labels[startIndex];
-            const endLabel = labels[endIndex];
-            
-            // Преобразуем метки в даты
-            const startDate = startLabel instanceof Date ? startLabel : new Date(startLabel);
-            const endDate = endLabel instanceof Date ? endLabel : new Date(endLabel);
-            
-            // Проверяем, что обе метки успешно преобразованы в даты
-            if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-              console.log(`BaseChart: Создано выделение от ${startDate.toISOString()} до ${endDate.toISOString()}`);
-              
-              // Создаем объект с данными выделения
-              const selectionData = {
-                startDate: startDate.toISOString(),
-                endDate: endDate.toISOString(),
-                startIndex,
-                endIndex
-              };
-              
-              // Применяем выделение к текущему графику
-              applySelectionToChart(selectionData);
-              
-              // Отправляем событие в SplitScreenContainer
-              notifySelectionChanged(selectionData);
-              return;
-            } else {
-              console.log(`BaseChart: Не удалось преобразовать метки в даты: ${startLabel}, ${endLabel}`);
-              
-              // Если метки не даты, просто используем индексы
-              const selectionData = {
-                startIndex,
-                endIndex
-              };
-              
-              // Применяем выделение к текущему графику
-              applySelectionToChart(selectionData);
-              
-              // Отправляем событие в SplitScreenContainer
-              notifySelectionChanged(selectionData);
-              return;
-            }
-          } else {
-            console.log(`BaseChart: Нет меток для выделения`);
-          }
-        } else {
-          console.log(`BaseChart: Совпадающие индексы, выделение не создано`);
-        }
+        // Используем наш обработчик выделения
+        handleSelection(startIndex, endIndex);
       }
     } 
     // Обычный клик без Shift - запоминаем индекс для будущего выделения
@@ -963,28 +900,62 @@ const BaseChart = ({
     }, 200);
   };
 
-  // Сброс увеличения (зума) графика
-  const resetZoom = () => {
-    if (chartRef.current) {
-      // Отключаем анимацию на время сброса зума
-      const currentAnimation = chartRef.current.options.animation;
-      chartRef.current.options.animation = false;
+  // Функция для сброса масштабирования
+  const resetZoom = useCallback(() => {
+    console.log(`BaseChart: Сброс масштабирования в контейнере ${containerId}`);
+    
+    if (!chartRef.current) {
+      console.warn(`BaseChart: Не удалось найти ссылку на график для сброса масштаба`);
+      return;
+    }
+    
+    try {
+      // Запоминаем, что сброс выполняется для предотвращения рекурсии
+      const isResetting = chartRef.current._isResettingZoom;
       
-      // Сбрасываем зум и немедленно обновляем
-      chartRef.current.resetZoom();
-      chartRef.current.update('none'); // 'none' для мгновенного обновления
+      // Если уже идет сброс, не выполняем повторно
+      if (isResetting) {
+        console.log(`BaseChart: Сброс масштаба уже выполняется, пропускаем`);
+        return;
+      }
       
-      // Синхронизируем сброс зума со всеми графиками
-      chartSyncManager.syncReset(containerId);
+      // Устанавливаем флаг сброса
+      chartRef.current._isResettingZoom = true;
       
-      // Восстанавливаем анимацию
+      // Сбрасываем масштаб через плагин zoom
+      if (chartRef.current.resetZoom) {
+        console.log(`BaseChart: Вызываем resetZoom графика`);
+        chartRef.current.resetZoom();
+      }
+      
+      // Сбрасываем селекцию если она была
+      if (chartRef.current.canvas) {
+        chartRef.current.canvas.removeAttribute('data-selection-applied');
+      }
+      
+      // Синхронизируем сброс масштаба через менеджер
+      if (chartSyncManager && chartSyncManager.syncEnabled) {
+        console.log(`BaseChart: Синхронизируем сброс масштаба через менеджер`);
+        // Используем синхронизацию только если не было уже инициировано другим графиком
+        chartSyncManager.resetAllZoom(containerId);
+      }
+      
+      // Через небольшой таймаут снимаем флаг сброса
       setTimeout(() => {
         if (chartRef.current) {
-          chartRef.current.options.animation = currentAnimation;
+          chartRef.current._isResettingZoom = false;
         }
-      }, 50);
+      }, 200);
+      
+    } catch (error) {
+      console.error(`BaseChart: Ошибка при сбросе масштаба:`, error);
+      
+      // В случае ошибки все равно снимаем флаг сброса
+      if (chartRef.current) {
+        chartRef.current._isResettingZoom = false;
+      }
     }
-  };
+  }, [chartRef, containerId]);
 
   // Экспорт графика как изображение
   const exportChart = () => {
@@ -1273,7 +1244,7 @@ const BaseChart = ({
 
   // Определение опций для графика
   const getChartOptions = () => {
-    return {
+    const baseOptions = {
       responsive: true,
       maintainAspectRatio: false,
       resizeDelay: 100, // Задержка перед изменением размера для плавности
@@ -1374,9 +1345,21 @@ const BaseChart = ({
             mode: 'x', // Только по оси X
             modifierKey: 'shift', // Панорамирование при зажатом Shift
             threshold: 10, // Минимальное перемещение для активации прокрутки
-            onPan: () => {
-              // Событие будет обрабатываться в ChartSyncManager
-              // Этот обработчик может быть переопределен
+            onPan: function(context) {
+              // Синхронизируем панорамирование с другими графиками
+              if (chartSyncManager.syncEnabled && !chartSyncManager.suppressEvents) {
+                const chart = context.chart;
+                
+                // Получаем диапазон осей графика
+                const xAxis = chart.scales.x;
+                const range = {
+                  min: xAxis.min,
+                  max: xAxis.max
+                };
+                
+                // Отправляем событие синхронизации
+                chartSyncManager.syncPan(containerId, range);
+              }
             }
           },
           zoom: {
@@ -1395,12 +1378,49 @@ const BaseChart = ({
               borderWidth: 1
             },
             mode: 'x', // Только по оси X
-            onZoom: () => {
-              // Событие будет обрабатываться в ChartSyncManager
-              // Этот обработчик может быть переопределен
+            onZoom: function(context) {
+              // Синхронизируем зум с другими графиками
+              if (chartSyncManager.syncEnabled && !chartSyncManager.suppressEvents) {
+                const chart = context.chart;
+                
+                // Получаем диапазон осей графика
+                const xAxis = chart.scales.x;
+                const range = {
+                  min: xAxis.min,
+                  max: xAxis.max
+                };
+                
+                // Если есть метки времени, сохраняем также диапазон выделения по времени
+                if (chart.data && chart.data.labels && chart.data.labels.length > 0) {
+                  // Определяем временные границы выделения
+                  const minIndex = Math.floor(xAxis.min);
+                  const maxIndex = Math.ceil(xAxis.max);
+                  
+                  // Безопасно получаем метки времени
+                  if (minIndex >= 0 && maxIndex < chart.data.labels.length) {
+                    const minLabel = chart.data.labels[minIndex];
+                    const maxLabel = chart.data.labels[maxIndex];
+                    
+                    // Если метки это даты, сохраняем их как диапазон выделения
+                    if (minLabel instanceof Date && maxLabel instanceof Date) {
+                      const selectionData = {
+                        startDate: minLabel,
+                        endDate: maxLabel,
+                        startIndex: minIndex,
+                        endIndex: maxIndex
+                      };
+                      
+                      // Отправляем событие выделения
+                      notifySelectionChanged(selectionData);
+                    }
+                  }
+                }
+                
+                // Отправляем событие синхронизации зума
+                chartSyncManager.syncZoom(containerId, range);
+              }
             }
           },
-          // Мгновенное обновление при сбросе зума
           resetSpeed: 0 // Мгновенное возвращение к исходному масштабу
         }
       },
@@ -1457,6 +1477,8 @@ const BaseChart = ({
         duration: 300 // Ускоряем анимацию для более отзывчивого UI
       }
     };
+    
+    return baseOptions;
   };
 
   // Формируем классы в зависимости от режима
@@ -1653,6 +1675,263 @@ const BaseChart = ({
       { autoClose: 1500 }
     );
   };
+
+  // Функция для регистрации графика в менеджере синхронизации
+  const registerChart = useCallback(() => {
+    if (!chartRef.current) {
+      console.log(`BaseChart: Невозможно зарегистрировать график - chartRef не инициализирован`);
+      return;
+    }
+
+    const canvas = chartRef.current.canvas;
+    if (!canvas) {
+      console.log(`BaseChart: Невозможно зарегистрировать график - canvas не найден`);
+      return;
+    }
+
+    console.log(`BaseChart: Регистрация графика ${containerId} в менеджере синхронизации`);
+    
+    // Устанавливаем атрибуты для идентификации графика
+    canvas.setAttribute('data-graph', 'true');
+    canvas.setAttribute('data-container-id', containerId);
+    
+    // Проверяем, находится ли график в разделенном контейнере
+    const isInSplitContainer = containerId.includes('-');
+    
+    if (isInSplitContainer) {
+      const baseContainerId = containerId.split('-')[0];
+      canvas.setAttribute('data-parent-container', baseContainerId);
+      
+      // Получаем группу синхронизации из контейнера или создаем новую
+      const container = chartContainerRef.current?.closest('.split-screen-container');
+      const containerSyncGroupId = container?.getAttribute('data-sync-group') || `sync-${containerId}`;
+      
+      // Устанавливаем syncGroupId
+      setSyncGroupId(containerSyncGroupId);
+      
+      // Добавляем информацию о группе синхронизации
+      canvas.setAttribute('data-sync-group', containerSyncGroupId);
+      
+      console.log(`BaseChart: График в разделенном контейнере ${containerId} инициализирован, родитель: ${baseContainerId}, группа: ${containerSyncGroupId}`);
+      
+      // Отправляем событие о готовности графика в разделенном контейнере
+      document.dispatchEvent(new CustomEvent('splitChartInitialized', {
+        detail: {
+          containerId,
+          baseContainerId,
+          syncGroupId: containerSyncGroupId,
+          timestamp: Date.now()
+        }
+      }));
+    }
+    
+    // Регистрируем график в chartSyncManager
+    if (chartSyncManager) {
+      // Добавляем прямой доступ к экземпляру графика через canvas
+      // для совместимости с разными версиями библиотеки
+      canvas.__chartjs__ = chartRef.current;
+      canvas.__chartInstance = chartRef.current;
+      
+      // Регистрируем график в менеджере синхронизации
+      chartSyncManager.registerChart(containerId, chartRef.current);
+      
+      // Применяем сохраненное выделение, если есть
+      const savedSelection = chartSyncManager.lastSelectionRange;
+      if (savedSelection) {
+        console.log(`BaseChart: Применяем сохраненное выделение к графику ${containerId}`, savedSelection);
+        setTimeout(() => {
+          if (chartRef.current && !chartRef.current.isDestroyed) {
+            // Используем существующую функцию applySelectionToChart вместо несуществующей applySelection
+            applySelectionToChart(savedSelection);
+          }
+        }, 100);
+      }
+    } else {
+      console.warn(`BaseChart: chartSyncManager не найден, синхронизация не будет работать`);
+    }
+  }, [containerId, chartRef, chartContainerRef, setSyncGroupId]);
+
+  // Эффект для регистрации графика в менеджере синхронизации
+  useEffect(() => {
+    let registrationTimeout = null;
+    let chartRegistered = false;
+    
+    const registerChartWithRetry = () => {
+      // Проверяем, что график инициализирован
+      if (chartRef.current && chartRef.current.canvas) {
+        if (!chartRegistered) {
+          console.log(`BaseChart: Регистрируем график ${containerId} в менеджере синхронизации`);
+          registerChart();
+          chartRegistered = true;
+          
+          // Отправляем событие, что график инициализирован
+          document.dispatchEvent(new CustomEvent('chartInitialized', {
+            detail: {
+              containerId,
+              timestamp: Date.now()
+            }
+          }));
+        }
+      } else {
+        // Если график еще не инициализирован, пробуем еще раз через некоторое время
+        console.log(`BaseChart: График ${containerId} еще не готов, пробуем еще раз через 100мс`);
+        registrationTimeout = setTimeout(registerChartWithRetry, 100);
+      }
+    };
+    
+    // Запускаем процесс регистрации с ретраями
+    registerChartWithRetry();
+    
+    // Серия ретраев для гарантированной регистрации
+    const retryTimeouts = [300, 600, 1000];
+    
+    const retryRegistrations = retryTimeouts.map((timeout, index) => {
+      return setTimeout(() => {
+        if (chartRef.current && !chartRef.current.isDestroyed) {
+          console.log(`BaseChart: Повторная проверка регистрации графика ${containerId} (попытка ${index + 1})`);
+          registerChart();
+        }
+      }, timeout);
+    });
+    
+    // Очистка при размонтировании
+    return () => {
+      clearTimeout(registrationTimeout);
+      retryRegistrations.forEach(clearTimeout);
+      
+      // Освобождаем ресурсы графика
+      if (chartRef.current) {
+        if (chartSyncManager) {
+          console.log(`BaseChart: Удаляем график ${containerId} из менеджера синхронизации`);
+          chartSyncManager.unregisterChart(containerId);
+        }
+        
+        try {
+          if (chartRef.current.destroy && !chartRef.current.isDestroyed) {
+            chartRef.current.destroy();
+          }
+        } catch (e) {
+          console.warn(`BaseChart: Ошибка при уничтожении графика ${containerId}:`, e);
+        }
+      }
+    };
+  }, [containerId, registerChart, chartRef]);
+
+  // Функция для получения точек данных графика
+  const getDataPoints = useCallback(() => {
+    if (!chartRef.current || !chartRef.current.data || !chartRef.current.data.datasets || !chartRef.current.data.labels) {
+      return [];
+    }
+    
+    const dataset = chartRef.current.data.datasets[0];
+    const labels = chartRef.current.data.labels;
+    
+    if (!dataset || !dataset.data || !labels) {
+      return [];
+    }
+    
+    return dataset.data.map((y, index) => {
+      // Если labels - массив дат, используем их
+      let x = labels[index];
+      // Если x не является датой, пробуем преобразовать
+      if (!(x instanceof Date) && typeof x === 'string') {
+        try {
+          x = new Date(x);
+        } catch (e) {
+          // Если не удалось преобразовать, оставляем как есть
+          console.log(`BaseChart: Не удалось преобразовать метку ${x} в дату`);
+        }
+      }
+      
+      return { x, y, index };
+    });
+  }, [chartRef]);
+
+  // Обработчик события выделения
+  const handleSelection = useCallback((startIndex, endIndex) => {
+    if (startIndex === undefined || endIndex === undefined) return;
+    
+    // Получаем данные точек
+    const dataPoints = getDataPoints();
+    if (!dataPoints || dataPoints.length === 0) return;
+    
+    // Получаем начальную и конечную точки выделения
+    const startPoint = dataPoints[Math.max(0, startIndex)];
+    const endPoint = dataPoints[Math.min(dataPoints.length - 1, endIndex)];
+    
+    if (!startPoint || !endPoint) return;
+    
+    // Конвертируем индексы в даты (для временных графиков)
+    const startDate = startPoint.x instanceof Date ? startPoint.x : 
+                      typeof startPoint.x === 'number' ? new Date(startPoint.x) : null;
+    const endDate = endPoint.x instanceof Date ? endPoint.x : 
+                    typeof endPoint.x === 'number' ? new Date(endPoint.x) : null;
+    
+    // Создаем объект с данными выделения
+    const selectionData = {
+      startDate,
+      endDate,
+      startIndex,
+      endIndex
+    };
+    
+    console.log(`BaseChart: Отправка уведомления о выделении, syncGroupId: ${syncGroupId}`);
+    
+    // Обрабатываем выделение различными способами для максимальной совместимости
+    
+    // 1. Устанавливаем выделение через ChartSyncManager
+    if (chartSyncManager) {
+      if (chartSyncManager.syncSelectionEnabled) {
+        // Сохраняем выделение в менеджере синхронизации
+        chartSyncManager.saveSelectionFromChart(containerId);
+        // Применяем выделение ко всем связанным графикам
+        chartSyncManager.syncSelection(containerId, {
+          min: startDate ? startDate.getTime() : startIndex,
+          max: endDate ? endDate.getTime() : endIndex
+        });
+      }
+      
+      // Отправляем событие о выделении для разделенных графиков
+      if (syncGroupId) {
+        console.log(`BaseChart: Уведомляем о выделении через синхронизацию группы ${syncGroupId}`);
+        
+        // Специальная обработка для разделенных графиков через менеджер синхронизации
+        document.dispatchEvent(new CustomEvent('graphSelectionChanged', {
+          detail: {
+            sourceContainerId: containerId,
+            syncGroupId,
+            selectionData
+          }
+        }));
+      } else {
+        // Стандартная обработка выделения для обычных графиков
+        console.log(`BaseChart: Уведомляем о выделении через событие graphSelectionChanged`);
+        document.dispatchEvent(new CustomEvent('graphSelectionChanged', {
+          detail: {
+            sourceContainerId: containerId,
+            selectionData
+          }
+        }));
+      }
+    }
+    
+    // 2. Отправляем событие о выделении напрямую родителю, если это разделенный контейнер
+    if (containerId && containerId.includes('-')) {
+      const baseContainerId = containerId.split('-')[0];
+      
+      // Отправляем событие выделения к родительскому контейнеру
+      console.log(`BaseChart: Отправляем событие выделения к родительскому контейнеру ${baseContainerId}`);
+      document.dispatchEvent(new CustomEvent('childGraphSelection', {
+        detail: {
+          childId: containerId,
+          parentId: baseContainerId,
+          syncGroupId,
+          selectionData
+        }
+      }));
+    }
+    
+  }, [getDataPoints, containerId, syncGroupId]);
 
   // Рендер компонента
   return (

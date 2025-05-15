@@ -3,7 +3,13 @@ import BaseChart from './BaseChart';
 import { getAuthToken } from '../../utils/authUtils';
 import { toast } from 'react-toastify';
 import KalmanFilter from '../../utils/KalmanFilter';
+import chartSyncActivator from '../../utils/ChartSyncActivator';
 import './ChartStyles.css';
+
+// Активируем синхронизацию графиков при импорте компонента
+if (!chartSyncActivator.initialized) {
+  chartSyncActivator.initialize();
+}
 
 // Статические параметры фильтра Калмана
 const KALMAN_PROCESS_NOISE = 0.0275;  // Q - шум процесса
