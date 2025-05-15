@@ -288,6 +288,12 @@ const SplitScreenContainer = forwardRef(({
             
             // Даем немного времени на обновление DOM, увеличиваем задержку
             setTimeout(() => {
+              // Проверяем есть ли уже открытое модальное окно
+              if (typeof window.reportChooserModalOpen !== 'undefined' && window.reportChooserModalOpen) {
+                console.log(`SplitScreenContainer: Модальное окно уже открыто, пропускаем запрос выбора отчета`);
+                return;
+              }
+              
               // Проверяем состояние DOM и компонентов перед отправкой события
               try {
                 // Проверяем, что DOM-элемент контейнера существует перед отправкой события
@@ -340,8 +346,13 @@ const SplitScreenContainer = forwardRef(({
                 }
               } catch (error) {
                 console.error('SplitScreenContainer: Ошибка при отправке события requestReportSelector:', error);
-                // В случае ошибки всё равно пытаемся отправить событие
-                document.dispatchEvent(selectReportEvent);
+                // В случае ошибки проверяем, не открыто ли уже модальное окно
+                if (typeof window.reportChooserModalOpen === 'undefined' || !window.reportChooserModalOpen) {
+                  // Отправляем событие только если нет открытого окна
+                  document.dispatchEvent(selectReportEvent);
+                } else {
+                  console.log('SplitScreenContainer: Не отправляем событие после ошибки, т.к. модальное окно уже открыто');
+                }
               }
             }, 300);
           } else {

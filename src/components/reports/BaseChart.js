@@ -30,6 +30,12 @@ if (!chartSyncActivator.initialized) {
   chartSyncActivator.initialize();
 }
 
+// Добавляем глобальный флаг для отслеживания открытых модальных окон выбора отчета
+// Используем глобальный объект window для доступа из любого экземпляра компонента
+if (typeof window.reportChooserModalOpen === 'undefined') {
+  window.reportChooserModalOpen = false;
+}
+
 const BaseChart = ({ 
   title,
   vehicle,
@@ -365,7 +371,13 @@ const BaseChart = ({
     const handleRequestReportSelector = (event) => {
       const { containerId, direction, activateContainer } = event.detail;
       
-      // Проверяем, что модальное окно еще не открыто и флаг не установлен
+      // Проверяем глобальный флаг, что модальное окно еще не открыто где-то
+      if (window.reportChooserModalOpen) {
+        console.log(`BaseChart: Пропускаем запрос выбора отчета, модальное окно уже открыто в другом экземпляре`);
+        return;
+      }
+      
+      // Проверяем локальное состояние
       if (showReportChooser || modalRequested) {
         console.log(`BaseChart: Пропускаем повторный запрос выбора отчета, так как модальное окно уже ${showReportChooser ? 'открыто' : 'запрошено'}`);
         return;
@@ -373,6 +385,8 @@ const BaseChart = ({
       
       // Устанавливаем флаг, что запрос обработан
       modalRequested = true;
+      // Устанавливаем глобальный флаг
+      window.reportChooserModalOpen = true;
       
       console.log(`BaseChart: Получен запрос на открытие селектора отчетов для контейнера ${containerId}`);
       
@@ -511,7 +525,7 @@ const BaseChart = ({
     document.addEventListener('applyGraphSelection', handleApplyGraphSelection);
     document.addEventListener('applySelectionToContainer', handleApplySelectionToContainer);
     
-    return () => {
+      return () => {
       document.removeEventListener('applyGraphSelection', handleApplyGraphSelection);
       document.removeEventListener('applySelectionToContainer', handleApplySelectionToContainer);
     };
@@ -925,7 +939,7 @@ const BaseChart = ({
       // Сбрасываем масштаб через плагин zoom
       if (chartRef.current.resetZoom) {
         console.log(`BaseChart: Вызываем resetZoom графика`);
-        chartRef.current.resetZoom();
+      chartRef.current.resetZoom();
       }
       
       // Сбрасываем селекцию если она была
@@ -1069,9 +1083,11 @@ const BaseChart = ({
   // Обновляем обработчик выбора отчета для поддержки выбора отчета для разделенного контейнера
   const handleReportSelect = (selectedReportType) => {
     try {
-      // Закрываем выбор отчета
+      // Закрываем выбор отчета сразу, чтобы избежать повторных вызовов
       console.log('BaseChart: handleReportSelect - закрываем окно выбора отчета');
       setShowReportChooser(false);
+      // Сбрасываем глобальный флаг
+      window.reportChooserModalOpen = false;
       
       if (containerToFill) {
         // Если у нас есть контейнер для заполнения из события разделения,
@@ -1113,28 +1129,16 @@ const BaseChart = ({
           }
         });
         
-        // Небольшая задержка перед отправкой события для гарантии готовности DOM
-        setTimeout(() => {
-          // Повторно проверяем, что контейнер всё ещё существует
-          if (document.getElementById(containerToFill) || 
-              document.querySelector(`[data-container-id="${containerToFill}"]`)) {
-            
-            document.dispatchEvent(createEvent);
-            
-            // Добавляем визуальную обратную связь для подтверждения выбора отчета
-            if (window.showNotification) {
-              window.showNotification('success', `Отчет "${selectedReportType}" добавлен в контейнер`);
-            }
-          } else {
-            console.warn(`BaseChart: Контейнер ${containerToFill} был удален за время создания отчета`);
-            if (window.showNotification) {
-              window.showNotification('warning', 'Не удалось добавить отчет: контейнер был удален');
-            }
-          }
-          // Сбрасываем контейнер
-          setContainerToFill(null);
-        }, 100);
+        // Отправляем событие без задержки
+        document.dispatchEvent(createEvent);
         
+        // Добавляем визуальную обратную связь для подтверждения выбора отчета
+        if (window.showNotification) {
+          window.showNotification('success', `Отчет "${selectedReportType}" добавлен в контейнер`);
+        }
+        
+        // Сбрасываем контейнер
+        setContainerToFill(null);
         return;
       }
       
@@ -1143,10 +1147,6 @@ const BaseChart = ({
         console.warn('BaseChart: Попытка разделения экрана без указания направления');
         return;
       }
-      
-      // В этой версии мы не ищем контейнер напрямую, т.к. использование React root
-      // для создания компонентов в произвольных DOM-элементах может вызвать ошибки
-      // Вместо этого используем событие для сообщения родительскому компоненту
       
       // Создаем событие для создания отчета в контейнере
       const createEvent = new CustomEvent('createReportInContainer', {
@@ -1167,6 +1167,9 @@ const BaseChart = ({
       setSplitDirection(null);
     } catch (error) {
       console.error('BaseChart: Ошибка при обработке выбора отчета:', error);
+      
+      // Сбрасываем глобальный флаг в случае ошибки
+      window.reportChooserModalOpen = false;
       
       // Показываем ошибку в уведомлении, если доступно
       if (window.showNotification) {
@@ -1239,6 +1242,10 @@ const BaseChart = ({
     setShowReportChooser(false);
     setSplitDirection(null);
     setContainerToFill(null); // Сбрасываем контейнер для заполнения
+    
+    // Сбрасываем глобальный флаг
+    window.reportChooserModalOpen = false;
+    
     console.log('BaseChart: Окно выбора отчета должно быть закрыто, showReportChooser =', false);
   };
 
@@ -1481,18 +1488,23 @@ const BaseChart = ({
     return baseOptions;
   };
 
-  // Формируем классы в зависимости от режима
+  // Получение классов контейнера
   const getContainerClasses = () => {
-    let classes = 'chart-container';
-    
-    if (expandedMode) {
-      classes += ' tm-expanded';
-    }
-    
-    return classes;
+    return `chart-container ${expandedMode ? 'expanded' : ''} ${isLoading ? 'loading' : ''}`;
   };
 
-  // Содержимое графика
+  // Эффект для сброса глобального флага при размонтировании компонента 
+  // если окно было открыто в этом экземпляре
+  useEffect(() => {
+    return () => {
+      if (showReportChooser && window.reportChooserModalOpen) {
+        console.log('BaseChart: Сброс глобального флага reportChooserModalOpen при размонтировании');
+        window.reportChooserModalOpen = false;
+      }
+    };
+  }, [showReportChooser]);
+
+  // Отрисовка содержимого графика
   const renderChartContent = () => {
     return (
       <>

@@ -87,7 +87,7 @@ class ChartSyncManager {
         
         if (newChartsFound > 0) {
           console.log(`ChartSyncManager: Найдено ${newChartsFound} новых графиков при сканировании #${index+1}`);
-          
+        
           // Применяем последний масштаб и выделение ко всем новым графикам
           this.forceSyncAllCharts();
         }
@@ -223,7 +223,7 @@ class ChartSyncManager {
           
           containerCanvases.forEach(canvas => {
             // Проверяем, не зарегистрирован ли уже этот график
-            if (!this.charts.has(containerId)) {
+        if (!this.charts.has(containerId)) {
               const chartInstance = this.extractChartInstanceFromCanvas(canvas);
               
               if (chartInstance) {
@@ -294,7 +294,7 @@ class ChartSyncManager {
       console.warn('ChartSyncManager: Невозможно зарегистрировать график. Отсутствует ID или экземпляр графика.');
       return;
     }
-    
+
     // Проверяем, не был ли график уничтожен
     if (chartInstance.isDestroyed) {
       console.warn(`ChartSyncManager: График ${id} не может быть зарегистрирован, так как он уничтожен.`);
@@ -306,7 +306,7 @@ class ChartSyncManager {
       const existingChart = this.charts.get(id);
       if (existingChart !== chartInstance) {
         console.log(`ChartSyncManager: Обновляем регистрацию графика ${id} с новым экземпляром`);
-        this.unregisterChart(id);
+      this.unregisterChart(id);
       } else {
         // Это тот же экземпляр, ничего не делаем
         return;
@@ -326,16 +326,16 @@ class ChartSyncManager {
       setTimeout(() => {
         if (this.charts.has(id) && !chartInstance.isDestroyed) {
           console.log(`ChartSyncManager: Применяем сохраненный масштаб к графику ${id}`);
-          this.applyCurrentZoomToChart(id);
-          
-          // Добавляем событие, что график был обновлен после регистрации
-          document.dispatchEvent(new CustomEvent('chartSynchronized', {
-            detail: {
-              chartId: id,
-              range: this.lastZoomRange,
-              timestamp: Date.now()
-            }
-          }));
+      this.applyCurrentZoomToChart(id);
+      
+      // Добавляем событие, что график был обновлен после регистрации
+      document.dispatchEvent(new CustomEvent('chartSynchronized', {
+        detail: {
+          chartId: id,
+          range: this.lastZoomRange,
+          timestamp: Date.now()
+        }
+      }));
         }
       }, 100);
     } else if (this.charts.size > 1) {
@@ -724,7 +724,7 @@ class ChartSyncManager {
           // Применяем масштаб безопасно через общий метод
           this.applyZoomToChart(chartInstance, chartId, range);
           updatedCount++;
-        } catch (error) {
+      } catch (error) {
           console.error(`ChartSyncManager: Ошибка при синхронизации зума графика ${chartId}:`, error);
         }
       }
@@ -736,7 +736,7 @@ class ChartSyncManager {
       // Важно: снимаем флаги после завершения синхронизации
       setTimeout(() => {
         // Используем timeout для гарантии, что все асинхронные операции завершатся
-        this.suppressEvents = false;
+    this.suppressEvents = false;
         this.syncInProgress = false;
         console.log('ChartSyncManager: Снят флаг блокировки событий syncZoom');
       }, 200);
@@ -804,7 +804,7 @@ class ChartSyncManager {
           // Применяем масштаб безопасно через общий метод
           this.applyZoomToChart(chartInstance, chartId, range);
           updatedCount++;
-        } catch (error) {
+      } catch (error) {
           console.error(`ChartSyncManager: Ошибка при синхронизации панорамирования графика ${chartId}:`, error);
         }
       }
@@ -816,7 +816,7 @@ class ChartSyncManager {
       // Важно: снимаем флаги после завершения синхронизации
       setTimeout(() => {
         // Используем timeout для гарантии, что все асинхронные операции завершатся
-        this.suppressEvents = false;
+    this.suppressEvents = false;
         this.panInProgress = false;
         console.log('ChartSyncManager: Снят флаг блокировки событий syncPan');
       }, 200);
@@ -848,7 +848,7 @@ class ChartSyncManager {
         return;
       }
       
-      // Проверка на наличие шкалы X
+    // Проверка на наличие шкалы X
       if (!chart.scales || !chart.scales.x) {
         console.warn(`ChartSyncManager: У графика ${chartId} отсутствует шкала X`);
         return;
@@ -875,8 +875,8 @@ class ChartSyncManager {
         // Используем безопасное обновление с таймаутом
         if (chart.update && typeof chart.update === 'function') {
           // Обновляем график без анимации для быстродействия и безопасности
-          chart.update('none');
-          console.log(`ChartSyncManager: Масштаб применен к графику ${chartId}`);
+      chart.update('none'); 
+      console.log(`ChartSyncManager: Масштаб применен к графику ${chartId}`);
         }
       } catch (updateError) {
         console.error(`ChartSyncManager: Ошибка при обновлении графика ${chartId}:`, updateError);
@@ -885,7 +885,7 @@ class ChartSyncManager {
         setTimeout(() => {
           try {
             if (chart && chart.update && !chart.isDestroyed) {
-              chart.update('none');
+        chart.update('none');
               console.log(`ChartSyncManager: Масштаб применен к графику ${chartId} с отложенным обновлением`);
             }
           } catch (delayedError) {

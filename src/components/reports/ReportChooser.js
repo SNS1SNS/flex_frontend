@@ -20,6 +20,23 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
   // Состояние и ref для управления порталом
   const [portalElement, setPortalElement] = useState(null);
   const modalRef = useRef(null);
+  // Ref для отслеживания, был ли выбран отчет
+  const reportSelectedRef = useRef(false);
+  
+  // Убедимся, что глобальный флаг установлен
+  useEffect(() => {
+    // Уведомляем о том, что окно выбора отчетов открыто
+    console.log('ReportChooser: Модальное окно открыто');
+    window.reportChooserModalOpen = true;
+    
+    // Сбрасываем глобальный флаг при размонтировании, если отчет не был выбран
+    return () => {
+      if (!reportSelectedRef.current) {
+        console.log('ReportChooser: Модальное окно закрывается, сбрасываем глобальный флаг');
+        window.reportChooserModalOpen = false;
+      }
+    };
+  }, []);
   
   // Создаем DOM-элемент для портала при первом рендере
   useEffect(() => {
@@ -104,18 +121,18 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         console.log('ReportChooser: Нажата клавиша Escape, закрываем модальное окно');
-        onClose();
+        safeClose();
       }
     };
     
     // Добавляем обработчик при монтировании
     document.addEventListener('keydown', handleKeyDown);
     
-    // Также закроем модальное окно автоматически через 1 минуту (на всякий случай)
+    // Также закроем модальное окно автоматически через 30 секунд
     const autoCloseTimeout = setTimeout(() => {
-      console.log('ReportChooser: Автоматическое закрытие модального окна через 1 минуту');
-      onClose();
-    }, 60000);
+      console.log('ReportChooser: Автоматическое закрытие модального окна через 30 секунд');
+      safeClose();
+    }, 30000);
     
     // Удаляем обработчик при размонтировании
     return () => {
@@ -128,7 +145,7 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
   useEffect(() => {
     const handleBeforeUnload = () => {
       console.log('ReportChooser: Страница закрывается, закрываем модальное окно');
-      onClose();
+      window.reportChooserModalOpen = false;
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -136,7 +153,26 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [onClose]);
+  }, []);
+
+  // Безопасное закрытие модального окна
+  const safeClose = () => {
+    if (reportSelectedRef.current) {
+      console.log('ReportChooser: Отчет был выбран, пропускаем закрытие');
+      return;
+    }
+    
+    // Устанавливаем флаг для предотвращения двойного закрытия
+    reportSelectedRef.current = true;
+    
+    try {
+      onClose();
+    } catch (err) {
+      console.error('ReportChooser: Ошибка при закрытии модального окна:', err);
+      // В случае ошибки сбрасываем глобальный флаг
+      window.reportChooserModalOpen = false;
+    }
+  };
 
   // Обработчик выбора отчета
   const handleSelectReport = (reportType) => {
@@ -148,6 +184,9 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
     console.log('ReportChooser: Выбран отчет', reportType);
     
     try {
+      // Устанавливаем флаг, что отчет выбран (для предотвращения двойного закрытия)
+      reportSelectedRef.current = true;
+      
       // Вызываем переданный обработчик
       onSelectReport(reportType);
       
@@ -156,6 +195,8 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
       onClose();
     } catch (err) {
       console.error('ReportChooser: Ошибка при обработке выбора отчета:', err);
+      // В случае ошибки сбрасываем глобальный флаг
+      window.reportChooserModalOpen = false;
     }
   };
 
@@ -164,7 +205,7 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
     // Останавливаем всплытие события только если это клик по фону
     if (event.target === event.currentTarget) {
       console.log('ReportChooser: Клик по overlay, закрываем');
-      onClose();
+      safeClose();
     }
   };
   
@@ -178,14 +219,14 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
   const handleCloseButtonClick = (event) => {
     event.stopPropagation();
     console.log('ReportChooser: Нажата кнопка закрытия');
-    onClose();
+    safeClose();
   };
 
   // Обработчик кнопки отмена в футере
   const handleCancelButtonClick = (event) => {
     event.stopPropagation();
     console.log('ReportChooser: Нажата кнопка Отмена в футере');
-    onClose();
+    safeClose();
   };
 
   // Создаем модальное содержимое
@@ -256,18 +297,21 @@ const ReportChooser = ({ onSelectReport, onClose, selectedVehicle, originalRepor
         </div>
         
         <div className="report-chooser-footer">
-          <button className="btn btn-cancel" onClick={handleCancelButtonClick}>Отмена</button>
-          <div className="footer-info">
-            Выберите тип отчета для отображения
-          </div>
+          <button className="btn btn-secondary" onClick={handleCancelButtonClick}>
+            Отмена
+          </button>
         </div>
       </div>
     </div>
   );
 
-  // Используем React Portal для рендеринга модального окна в отдельной части DOM
-  // Это помогает избежать проблем с порядком монтирования/размонтирования
-  return portalElement ? ReactDOM.createPortal(modalContent, portalElement) : null;
+  // Если portal element не создан, возвращаем null
+  if (!portalElement) {
+    return null;
+  }
+
+  // Рендерим модальное окно в портал
+  return ReactDOM.createPortal(modalContent, portalElement);
 };
 
 export default ReportChooser; 

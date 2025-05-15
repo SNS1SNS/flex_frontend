@@ -15,6 +15,7 @@
     "browserify-zlib": "^0.2.0",
     "buffer": "^6.0.3",
     "chart.js": "^4.4.9",
+    "chartjs-plugin-annotation": "^3.1.0",
     "chartjs-plugin-zoom": "^2.2.0",
     "classnames": "^2.5.1",
     "https-browserify": "^1.0.0",
