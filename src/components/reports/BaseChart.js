@@ -1069,6 +1069,9 @@ const BaseChart = ({
       const isMultiLineChart = chart.data.datasets.length > 1;
       const isFuelChart = reportType === 'fuel';
       
+      // Получаем текущий набор данных
+      const dataset = chart.data.datasets[datasetIndex];
+      
       // Сначала сбрасываем стили всех точек на всех наборах данных
       chart.data.datasets.forEach((ds, i) => {
         // Для каждого набора данных заполняем массивы с прозрачными точками
@@ -2428,124 +2431,6 @@ const BaseChart = ({
       document.removeEventListener('globalSelectionSync', handleGlobalSelectionSync);
     };
   }, [containerId, applySelectionToChart]);
-
-  // Функция для настройки опций зума для предотвращения исчезновения графика
-  const setupZoomOptions = useCallback(() => {
-    if (!chartRef.current) return;
-    
-    try {
-      const chart = chartRef.current;
-      
-      // Гарантируем, что опции плагина зума существуют
-      if (!chart.options.plugins.zoom) {
-        console.warn('BaseChart: Плагин зума не настроен для графика');
-        return;
-      }
-      
-      // Оригинальный обработчик зума
-      const originalOnZoom = chart.options.plugins.zoom.zoom.onZoom;
-      
-      // Улучшенный обработчик зума с защитой от исчезновения графика
-      chart.options.plugins.zoom.zoom.onZoom = (context) => {
-        // Вызываем оригинальный обработчик если он есть
-        if (originalOnZoom && typeof originalOnZoom === 'function') {
-          originalOnZoom(context);
-        }
-        
-        try {
-          const scale = context.chart.scales.x;
-          if (!scale) return;
-          
-          // Проверяем, что текущий масштаб имеет смысл
-          // Значение min должно быть меньше max
-          if (scale.min >= scale.max) {
-            console.warn('BaseChart: Обнаружен некорректный масштаб, восстанавливаем масштаб');
-            
-            // Сбрасываем масштаб к безопасным значениям
-            setTimeout(() => {
-              if (chartRef.current && !chartRef.current.isDestroyed) {
-                chartRef.current.resetZoom();
-              }
-            }, 10);
-            return;
-          }
-          
-          // Проверяем, что масштаб не слишком маленький
-          const dataLength = context.chart.data.labels?.length || 0;
-          if (dataLength > 0) {
-            const visiblePoints = scale.max - scale.min;
-            
-            // Если видимых точек меньше 2 - опасная ситуация, ограничиваем масштаб
-            if (visiblePoints < 2) {
-              console.warn('BaseChart: Слишком сильное увеличение, корректируем масштаб');
-              
-              const newMin = Math.max(0, scale.min - 1);
-              const newMax = Math.min(dataLength - 1, scale.max + 1);
-              
-              scale.options.min = newMin;
-              scale.options.max = newMax;
-              
-              // Обновляем график без анимации
-              context.chart.update('none');
-            }
-          }
-        } catch (error) {
-          console.error('BaseChart: Ошибка при обработке зума:', error);
-        }
-      };
-      
-      // Ограничиваем минимальный масштаб, чтобы избежать исчезновения графика
-      chart.options.plugins.zoom.zoom.limits = {
-        x: {
-          minRange: 2, // Минимальный диапазон - 2 точки данных
-        }
-      };
-      
-      // Улучшаем обработчик панорамирования
-      const originalOnPan = chart.options.plugins.zoom.pan.onPan;
-      
-      chart.options.plugins.zoom.pan.onPan = (context) => {
-        // Вызываем оригинальный обработчик
-        if (originalOnPan && typeof originalOnPan === 'function') {
-          originalOnPan(context);
-        }
-        
-        // Дополнительная проверка после панорамирования
-        try {
-          const scale = context.chart.scales.x;
-          if (!scale) return;
-          
-          // Проверяем, что после панорамирования у нас есть видимые данные
-          const dataLength = context.chart.data.labels?.length || 0;
-          
-          if (scale.min < 0) {
-            // Коррекция - не выходим за левую границу данных
-            scale.options.min = 0;
-            scale.options.max = scale.max - scale.min;
-            context.chart.update('none');
-          } else if (scale.max > dataLength - 1) {
-            // Коррекция - не выходим за правую границу данных
-            scale.options.max = dataLength - 1;
-            scale.options.min = Math.max(0, scale.min);
-            context.chart.update('none');
-          }
-        } catch (error) {
-          console.error('BaseChart: Ошибка при обработке панорамирования:', error);
-        }
-      };
-      
-      console.log('BaseChart: Настроены улучшенные опции масштабирования для предотвращения исчезновения графика');
-    } catch (error) {
-      console.error('BaseChart: Ошибка при настройке опций зума:', error);
-    }
-  }, []);
-  
-  // Применяем настройки зума после инициализации графика
-  useEffect(() => {
-    if (chartRef.current) {
-      setupZoomOptions();
-    }
-  }, [setupZoomOptions]);
 
   // Рендер компонента
   return (

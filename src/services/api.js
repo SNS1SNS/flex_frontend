@@ -177,7 +177,43 @@ const api = {
    * @returns {Promise<Object>} Обновленное транспортное средство
    */
   async updateVehicle(id, vehicleData) {
-    return this.put(`/vehicles/${id}`, vehicleData);
+    console.log(`Отправка PUT запроса на http://localhost:8081/api/vehicles/${id} с данными:`, vehicleData);
+    
+    // Используем прямой URL для запроса
+    const url = `http://localhost:8081/api/vehicles/${id}`;
+    
+    // Получаем токен для авторизации
+    const token = tokenService.getAccessToken();
+    
+    try {
+      // Выполняем запрос с прямым URL
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify(vehicleData)
+      });
+      
+      // Если запрос неуспешен
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw {
+          status: response.status,
+          message: errorData.message || response.statusText,
+          details: errorData
+        };
+      }
+      
+      // Получаем и возвращаем обновленные данные
+      const result = await response.json();
+      console.log('Данные ТС успешно обновлены:', result);
+      return result;
+    } catch (error) {
+      console.error('Ошибка при обновлении ТС:', error);
+      throw error;
+    }
   },
   
   /**
@@ -196,7 +232,10 @@ const api = {
    * @returns {Promise<Object>} Обновленное транспортное средство
    */
   async updateEngineSettings(id, engineData) {
-    return this.put(`/vehicles/${id}`, engineData);
+    console.log(`Отправка PUT запроса для настроек двигателя на http://localhost:8081/api/vehicles/${id} с данными:`, engineData);
+    
+    // Используем прямой URL и вызываем общий метод updateVehicle
+    return this.updateVehicle(id, engineData);
   },
   
   /**
@@ -206,7 +245,23 @@ const api = {
    * @returns {Promise<Object>} Обновленное транспортное средство
    */
   async updateTerminalSettings(id, terminalData) {
-    return this.put(`/vehicles/${id}/terminal`, terminalData);
+    console.log(`Отправка PUT запроса для настроек терминала на http://localhost:8081/api/vehicles/${id} с данными:`, terminalData);
+    
+    // Используем прямой URL и вызываем общий метод updateVehicle
+    return this.updateVehicle(id, terminalData);
+  },
+  
+  /**
+   * Сохраняет все настройки транспортного средства
+   * @param {number|string} id - ID транспортного средства
+   * @param {Object} allSettings - Все настройки ТС
+   * @returns {Promise<Object>} Обновленное транспортное средство
+   */
+  async saveAllSettings(id, allSettings) {
+    console.log(`Отправка PUT запроса для сохранения всех настроек на http://localhost:8081/api/vehicles/${id} с данными:`, allSettings);
+    
+    // Используем прямой URL и вызываем общий метод updateVehicle
+    return this.updateVehicle(id, allSettings);
   }
 };
 

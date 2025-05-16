@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faBars, faFilter, faPlus, faDownload, faTruck, faSearch,
-  faSync, faCog, faEdit, faTrash, faEye, faDatabase, faCompress, faExpand,
+  faPlus, faTruck, faSearch,
+  faSync, faEdit, faTrash, faEye, faDatabase,
   faSort, faSortUp, faSortDown, faChevronLeft, faChevronRight, faExclamationTriangle,
-  faInfoCircle, faRoute, faGasPump, faCalendarAlt, faMapMarkerAlt, faClipboardList,
-  faTrackingDot, faHistory, faMapPin, faTools, faPowerOff, faFolderOpen, faFileExport, faFileDownload, faExchangeAlt
+  faRoute, faMapMarkerAlt, faClipboardList,
+  faTools, faPowerOff, faFolderOpen, faFileExport, faFileDownload, faExchangeAlt
 } from '@fortawesome/free-solid-svg-icons';
 import './VehiclesPage.css';
-import { useUser } from '../context/UserContext';
 import { useSidebar } from '../context/SidebarContext';
 import { apiService } from '../services';
 import { useLoading } from '../context/LoadingContext';
+import AddVehicleModal from './AddVehicleModal';
+import ManageGroupsModal from './ManageGroupsModal';
+import { convertVehiclesToCSV, exportCSV, exportJSON, prepareVehiclesForExport } from '../utils/exportUtils';
 
 /**
  * Компонент страницы с транспортными средствами
@@ -21,15 +23,16 @@ const VehiclesPage = () => {
   // Получаем доступ к глобальному индикатору загрузки
   const { showLoader, hideLoader } = useLoading();
   
-  const [loading, setLoading] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [isDataFetched, setIsDataFetched] = useState(false);
   const [selectedVehicles, setSelectedVehicles] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
   const [showVehicleDetails, setShowVehicleDetails] = useState(false);
   const [selectedVehicleDetails, setSelectedVehicleDetails] = useState(null);
-
+  const [isAddVehicleModalOpen, setIsAddVehicleModalOpen] = useState(false);
+  const [isManageGroupsModalOpen, setIsManageGroupsModalOpen] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState('json');
   // Состояния для фильтров и поиска
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -47,17 +50,9 @@ const VehiclesPage = () => {
     vehicleId: null
   });
   
-  // Получаем данные пользователя из контекста
-  const { user } = useUser();
   // Получаем функции для работы с боковым меню
-  const { toggleSidebar, toggleCompactMode, compactMode } = useSidebar();
+  const { compactMode } = useSidebar();
   
-  // Обработчик переключения бокового меню
-  const handleToggleSidebar = (e) => {
-    e.preventDefault();
-    toggleSidebar();
-  };
-
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (!token) {
@@ -79,7 +74,6 @@ const VehiclesPage = () => {
 
   // Функция для загрузки данных с сервера через apiService
   const handleFetchData = () => {
-    setLoading(true);
     // Показываем индикатор загрузки с глобальным контекстом
     showLoader('Загрузка списка транспортных средств...');
     
@@ -118,13 +112,11 @@ const VehiclesPage = () => {
         console.log('Полученные данные ТС:', processedVehicles);
         setVehicles(processedVehicles);
         setIsDataFetched(true);
-        setLoading(false);
         // Скрываем индикатор загрузки
         hideLoader();
       })
       .catch(error => {
         console.error('Ошибка при загрузке данных:', error);
-        setLoading(false);
         // Скрываем индикатор загрузки
         hideLoader();
         
@@ -182,7 +174,6 @@ const VehiclesPage = () => {
           ];
           setVehicles(demoData);
           setIsDataFetched(true);
-          setLoading(false);
           
           // Скрываем индикатор загрузки после небольшой задержки
           setTimeout(() => {
@@ -203,12 +194,6 @@ const VehiclesPage = () => {
     };
     
     return statusMap[status] || status || 'Нет данных';
-  };
-
-  // Функция для очистки данных
-  const handleClearData = () => {
-    setVehicles([]);
-    setIsDataFetched(false);
   };
 
   // Функция для получения класса статуса
@@ -413,8 +398,14 @@ const VehiclesPage = () => {
       return selectedVehicles.length !== 1;
     }
     
-    // Кнопка удаления - активна только когда выбрано хотя бы одно ТС
-    if (buttonType === 'Удалить') {
+    // Кнопки, активные только когда выбрано хотя бы одно ТС
+    const atLeastOneSelectionButtons = [
+      'Удалить',
+      'Управление группами',
+      'Экспорт ТС'
+    ];
+    
+    if (atLeastOneSelectionButtons.includes(buttonType)) {
       return selectedVehicles.length === 0;
     }
     
@@ -422,9 +413,234 @@ const VehiclesPage = () => {
     return selectedVehicles.length === 0;
   };
 
+  // Обработчик добавления нового ТС
+  const handleVehicleAdded = (newVehicle) => {
+    console.log('Новое ТС добавлено:', newVehicle);
+    // Обновляем список ТС
+    handleFetchData();
+  };
+
+  // Обработчик открытия модального окна управления группами
+  const handleManageGroups = () => {
+    if (selectedVehicles.length === 0) {
+      alert('Пожалуйста, выберите хотя бы одно транспортное средство');
+      return;
+    }
+    setIsManageGroupsModalOpen(true);
+  };
+  
+  // Обработчик обновления групп
+  const handleGroupsUpdated = () => {
+    // Обновляем список транспортных средств после изменения групп
+    handleFetchData();
+  };
+
+  // Функция для показа уведомлений через встроенный alert
+  const showNotification = (message, type) => {
+    if (type === 'error') {
+      alert(`Ошибка: ${message}`);
+    } else {
+      alert(message);
+    }
+  };
+
+  // Функция для удаления транспортных средств
+  const handleDeleteVehicles = async () => {
+    if (selectedVehicles.length === 0) {
+      showNotification('Не выбрано ни одно транспортное средство для удаления', 'error');
+      return;
+    }
+
+    try {
+      // Получаем JWT токен из localStorage
+      const token = localStorage.getItem('access_token');
+      
+      // Показываем уведомление о начале процесса удаления
+      showLoader(`Удаление ${selectedVehicles.length} транспортных средств...`);
+      
+      // Создаем массив промисов для удаления каждого ТС
+      const deletePromises = selectedVehicles.map(async (vehicleId) => {
+        console.log(`Удаление ТС с ID: ${vehicleId}`);
+        
+        // Отправляем DELETE запрос на удаление ТС
+        const deleteResponse = await fetch(`http://localhost:8081/api/vehicles/${vehicleId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          }
+        });
+        
+        if (!deleteResponse.ok) {
+          throw new Error(`Ошибка удаления ТС ${vehicleId}: ${deleteResponse.status}`);
+        }
+        
+        // Для DELETE запросов часто возвращается пустое тело ответа
+        // Но если сервер возвращает данные, можно их обработать
+        let result;
+        try {
+          const text = await deleteResponse.text();
+          result = text ? JSON.parse(text) : { success: true, id: vehicleId };
+        } catch (e) {
+          result = { success: true, id: vehicleId };
+        }
+        
+        console.log(`Результат удаления ТС ${vehicleId}:`, result);
+        return result;
+      });
+      
+      // Ждем завершения всех запросов
+      await Promise.all(deletePromises);
+      
+      console.log('Все выбранные ТС успешно удалены');
+      
+      // Скрываем индикатор загрузки
+      hideLoader();
+      
+      // Обновляем список ТС после удаления
+      handleFetchData();
+      
+      // Закрываем модальное окно подтверждения
+      setShowDeleteConfirm(false);
+      
+      // Очищаем список выбранных ТС
+      setSelectedVehicles([]);
+      
+      // Показываем уведомление об успешном удалении
+      showNotification(`Успешно удалено ${selectedVehicles.length} транспортных средств`, 'success');
+    } catch (error) {
+      console.error('Ошибка при удалении ТС:', error);
+      
+      // Скрываем индикатор загрузки
+      hideLoader();
+      
+      // Показываем уведомление об ошибке
+      showNotification(error.message || 'Не удалось удалить транспортные средства', 'error');
+    }
+  };
+
+  // Функция для экспорта выбранных ТС
+  const handleExportVehicles = () => {
+    if (selectedVehicles.length === 0) {
+      showNotification('Не выбрано ни одно транспортное средство для экспорта', 'error');
+      return;
+    }
+    
+    // Показываем модальное окно выбора формата экспорта
+    setShowExportModal(true);
+  };
+  
+  // Функция для выполнения экспорта в выбранном формате
+  const executeExport = () => {
+    try {
+      // Показываем уведомление о начале процесса
+      showLoader('Подготовка данных для экспорта...');
+      
+      // Фильтруем только выбранные ТС
+      const selectedVehiclesData = vehicles.filter(vehicle => selectedVehicles.includes(vehicle.id));
+      
+      // Подготавливаем данные для экспорта
+      const exportData = prepareVehiclesForExport(selectedVehiclesData, true);
+      
+      // Формируем часть имени файла с датой
+      const dateString = new Date().toISOString().slice(0, 10);
+      
+      if (exportFormat === 'json') {
+        // Экспортируем данные в JSON
+        exportJSON(exportData, `vehicles_export_${dateString}`);
+        showNotification(`Успешно экспортировано ${selectedVehicles.length} ТС в формате JSON`, 'success');
+      } else if (exportFormat === 'csv') {
+        // Определяем поля для экспорта
+        const exportFields = [
+          'id',
+          'name',
+          'garage_number',
+          'imei',
+          'factory_number',
+          'phone',
+          'groups',
+          'type',
+          'status',
+          'last_data',
+          'created_at'
+        ];
+        
+        // Преобразуем данные в CSV
+        const csvData = convertVehiclesToCSV(exportData, exportFields);
+        
+        // Экспортируем данные в CSV
+        exportCSV(csvData, `vehicles_export_${dateString}`);
+        showNotification(`Успешно экспортировано ${selectedVehicles.length} ТС в формате CSV`, 'success');
+      }
+      
+      // Закрываем модальное окно
+      setShowExportModal(false);
+      
+      // Скрываем индикатор загрузки
+      hideLoader();
+    } catch (error) {
+      console.error('Ошибка при экспорте ТС:', error);
+      
+      // Скрываем индикатор загрузки
+      hideLoader();
+      
+      // Показываем уведомление об ошибке
+      showNotification(error.message || 'Не удалось экспортировать транспортные средства', 'error');
+      
+      // Закрываем модальное окно
+      setShowExportModal(false);
+    }
+  };
+
+  // Функция для экспорта списка всех ТС в CSV
+  const handleExportVehiclesList = () => {
+    try {
+      // Показываем уведомление о начале процесса
+      showLoader('Подготовка списка для экспорта...');
+      
+      // Определяем поля для экспорта списка
+      const exportFields = [
+        'id',
+        'name',
+        'garage_number',
+        'imei',
+        'factory_number',
+        'phone',
+        'groups',
+        'type',
+        'status',
+        'last_data',
+        'created_at'
+      ];
+      
+      // Подготавливаем данные для экспорта
+      const exportData = prepareVehiclesForExport(vehicles, true);
+      
+      // Преобразуем данные в CSV
+      const csvData = convertVehiclesToCSV(exportData, exportFields);
+      
+      // Экспортируем данные в CSV
+      exportCSV(csvData, `vehicles_list_${new Date().toISOString().slice(0, 10)}`);
+      
+      // Скрываем индикатор загрузки
+      hideLoader();
+      
+      // Показываем уведомление об успешном экспорте
+      showNotification(`Успешно экспортирован список из ${vehicles.length} транспортных средств`, 'success');
+    } catch (error) {
+      console.error('Ошибка при экспорте списка ТС:', error);
+      
+      // Скрываем индикатор загрузки
+      hideLoader();
+      
+      // Показываем уведомление об ошибке
+      showNotification(error.message || 'Не удалось экспортировать список транспортных средств', 'error');
+    }
+  };
+
   // Рендер компонента
   return (
-    <div className="vehicles-layout">
+    <div className={`vehicles-page ${compactMode ? 'compact-mode' : ''}`}>
       {/* Боковое меню */}
       <Sidebar />
       
@@ -448,7 +664,7 @@ const VehiclesPage = () => {
             </button>
             <button 
               className="control-button" 
-              onClick={() => setShowAddVehicleModal(true)}
+              onClick={() => setIsAddVehicleModalOpen(true)}
             >
               <FontAwesomeIcon icon={faPlus} /> <span>Добавить ТС</span>
             </button>
@@ -467,12 +683,14 @@ const VehiclesPage = () => {
             <button 
               className="control-button"
               disabled={isButtonDisabled('Управление группами')}
+              onClick={handleManageGroups}
             >
               <FontAwesomeIcon icon={faFolderOpen} /> <span>Управление группами</span>
             </button>
             <button 
               className="control-button"
               disabled={isButtonDisabled('Экспорт ТС')}
+              onClick={handleExportVehicles}
             >
               <FontAwesomeIcon icon={faFileExport} /> <span>Экспорт ТС</span>
             </button>
@@ -491,7 +709,10 @@ const VehiclesPage = () => {
             </button>
 
             
-            <button className="control-button">
+            <button 
+              className="control-button" 
+              onClick={handleExportVehiclesList}
+            >
               <FontAwesomeIcon icon={faFileDownload} /> <span>Экспорт списка ТС</span>
             </button>
             
@@ -752,12 +973,7 @@ const VehiclesPage = () => {
                 <div className="form-actions">
                   <button 
                     className="btn btn-danger" 
-                    onClick={() => {
-                      // Здесь будет логика удаления
-                      console.log('Удаление ТС:', selectedVehicles);
-                      setShowDeleteConfirm(false);
-                      setSelectedVehicles([]);
-                    }}
+                    onClick={handleDeleteVehicles}
                   >
                     <FontAwesomeIcon icon={faTrash} /> <span>Удалить</span>
                   </button>
@@ -886,6 +1102,83 @@ const VehiclesPage = () => {
             </div>
           </div>
         )}
+        
+        {/* Модальное окно для выбора формата экспорта */}
+        {showExportModal && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h2>Формат экспорта</h2>
+                <span className="close" onClick={() => setShowExportModal(false)}>&times;</span>
+              </div>
+              <div className="modal-body">
+                <div className="export-options">
+                  <p>Выберите формат для экспорта {selectedVehicles.length} транспортных средств:</p>
+                  
+                  <div className="export-format-options">
+                    <div className="export-format-option">
+                      <input 
+                        type="radio" 
+                        id="json-format" 
+                        name="export-format" 
+                        value="json" 
+                        checked={exportFormat === 'json'} 
+                        onChange={() => setExportFormat('json')}
+                      />
+                      <label htmlFor="json-format">
+                        <strong>JSON</strong> - Полные данные в формате JSON
+                      </label>
+                    </div>
+                    
+                    <div className="export-format-option">
+                      <input 
+                        type="radio" 
+                        id="csv-format" 
+                        name="export-format" 
+                        value="csv" 
+                        checked={exportFormat === 'csv'} 
+                        onChange={() => setExportFormat('csv')}
+                      />
+                      <label htmlFor="csv-format">
+                        <strong>CSV</strong> - Таблица для Excel или других программ
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="form-actions">
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={executeExport}
+                  >
+                    <FontAwesomeIcon icon={faFileExport} /> <span>Экспортировать</span>
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => setShowExportModal(false)}
+                  >
+                    <span>Отмена</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Модальное окно для добавления транспортного средства */}
+        <AddVehicleModal
+          isOpen={isAddVehicleModalOpen}
+          onClose={() => setIsAddVehicleModalOpen(false)}
+          onVehicleAdded={handleVehicleAdded}
+        />
+        
+        {/* Модальное окно управления группами */}
+        <ManageGroupsModal
+          isOpen={isManageGroupsModalOpen}
+          onClose={() => setIsManageGroupsModalOpen(false)}
+          selectedVehicleIds={selectedVehicles}
+          onGroupsUpdated={handleGroupsUpdated}
+        />
         
         {/* Контекстное меню для ТС */}
         {contextMenu.visible && (

@@ -644,7 +644,9 @@ const VoltageChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDat
       return date.toLocaleString('ru-RU', {
         timeZone: 'Asia/Almaty',
         day: 'numeric',
-        month: 'numeric'
+        month: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
     }
   };

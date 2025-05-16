@@ -1,0 +1,180 @@
+/* Базовые стили для контейнера */
+.tooltip-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Базовые стили для подсказки */
+.tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 300px;
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Типы подсказок */
+.tooltip-info {
+  background-color: #f0f9ff;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+}
+
+.tooltip-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+.tooltip-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.tooltip-success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+/* Стрелки для различных позиций */
+.tooltip-arrow.tooltip-top::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  margin-left: -10px;
+  border-width: 10px 10px 0;
+  border-style: solid;
+  border-color: currentColor transparent transparent transparent;
+}
+
+.tooltip-arrow.tooltip-bottom::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  margin-left: -10px;
+  border-width: 0 10px 10px;
+  border-style: solid;
+  border-color: transparent transparent currentColor transparent;
+}
+
+.tooltip-arrow.tooltip-left::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -10px;
+  margin-top: -10px;
+  border-width: 10px 0 10px 10px;
+  border-style: solid;
+  border-color: transparent transparent transparent currentColor;
+}
+
+.tooltip-arrow.tooltip-right::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -10px;
+  margin-top: -10px;
+  border-width: 10px 10px 10px 0;
+  border-style: solid;
+  border-color: transparent currentColor transparent transparent;
+}
+
+/* Применяем цвета для стрелок */
+.tooltip-info::after {
+  border-color: inherit;
+}
+
+.tooltip-warning::after {
+  border-color: inherit;
+}
+
+.tooltip-error::after {
+  border-color: inherit;
+}
+
+.tooltip-success::after {
+  border-color: inherit;
+}
+
+/* Эффекты при наведении */
+.tooltip-container:hover .tooltip {
+  opacity: 1;
+}
+
+/* Добавление темной версии тултипа */
+.tooltip-dark {
+  background-color: rgba(33, 37, 41, 0.95);
+  color: #fff;
+  border: none;
+}
+
+.tooltip-dark.tooltip-top::after {
+  border-top-color: rgba(33, 37, 41, 0.95);
+}
+
+.tooltip-dark.tooltip-bottom::after {
+  border-bottom-color: rgba(33, 37, 41, 0.95);
+}
+
+.tooltip-dark.tooltip-left::after {
+  border-left-color: rgba(33, 37, 41, 0.95);
+}
+
+.tooltip-dark.tooltip-right::after {
+  border-right-color: rgba(33, 37, 41, 0.95);
+}
+
+/* Стиль для анимации появления и исчезновения */
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tooltipFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.tooltip-appear {
+  animation: tooltipFadeIn 0.3s ease-in-out;
+}
+
+.tooltip-disappear {
+  animation: tooltipFadeOut 0.2s ease-in-out;
+}
+
+/* Дополнительные размеры тултипов */
+.tooltip-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.tooltip-lg {
+  padding: 12px 18px;
+  font-size: 16px;
+  max-width: 400px;
+}
+
+/* Возможность выключать скрытие при взаимодействии с тултипом */
+.tooltip-interactive {
+  pointer-events: auto;
+} 

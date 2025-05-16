@@ -129,8 +129,11 @@ export const exportToCsv = (data, filename = 'report.csv') => {
     // Добавляем строку заголовков
     csvRows.unshift(headers.join(','));
     
+    // Добавляем BOM (Byte Order Mark) для правильной кодировки UTF-8 в Excel
+    const BOM = '\ufeff';
+    const csvContent = BOM + csvRows.join('\n');
+    
     // Создаем Blob и URL для скачивания
-    const csvContent = csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     

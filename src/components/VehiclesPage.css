@@ -1167,4 +1167,98 @@ body {
 .right-controls .control-button svg {
   margin-right: 10px;
   font-size: 16px;
+}
+
+/* Стили для модального окна выбора формата экспорта */
+.export-options {
+  margin-bottom: 20px;
+}
+
+.export-format-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 15px;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+}
+
+.export-format-option {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.export-format-option:hover {
+  background-color: #eaeaea;
+}
+
+.export-format-option input[type="radio"] {
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.export-format-option label {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.export-format-option strong {
+  font-size: 1.1em;
+  margin-bottom: 3px;
+}
+
+/* Стили для кнопок в модальном окне экспорта */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.form-actions .btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.form-actions .btn:hover {
+  transform: translateY(-1px);
+}
+
+.form-actions .btn-primary {
+  color: white;
+}
+
+
+
+.form-actions .btn-secondary {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.form-actions .btn-secondary:hover {
+  background-color: #e4e4e4;
+}
+
+.form-actions .btn-danger {
+  background-color: #f44336;
+  color: white;
+}
+
+.form-actions .btn-danger:hover {
+  background-color: #d32f2f;
 } 

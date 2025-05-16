@@ -1,0 +1,106 @@
+.chart-tooltip {
+  min-width: 200px;
+  padding: 12px 15px;
+  font-family: 'Roboto', Arial, sans-serif;
+}
+
+.chart-tooltip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chart-tooltip-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 5px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.chart-tooltip-value,
+.chart-tooltip-date,
+.chart-tooltip-additional {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.chart-tooltip-label {
+  color: rgba(0, 0, 0, 0.65);
+  font-weight: 500;
+  margin-right: 8px;
+  min-width: 75px;
+  text-align: left;
+}
+
+.chart-tooltip-data {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Стилизация для разных типов подсказок */
+.tooltip-info .chart-tooltip-title {
+  color: #0c5460;
+}
+
+.tooltip-warning .chart-tooltip-title {
+  color: #856404;
+}
+
+.tooltip-error .chart-tooltip-title {
+  color: #721c24;
+}
+
+.tooltip-success .chart-tooltip-title {
+  color: #155724;
+}
+
+.tooltip-dark.chart-tooltip .chart-tooltip-title {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.tooltip-dark.chart-tooltip .chart-tooltip-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tooltip-dark.chart-tooltip .chart-tooltip-data {
+  color: #fff;
+}
+
+/* Версия для плотных данных */
+.chart-tooltip-compact {
+  min-width: 150px;
+  padding: 8px 10px;
+}
+
+.chart-tooltip-compact .chart-tooltip-title {
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.chart-tooltip-compact .chart-tooltip-value,
+.chart-tooltip-compact .chart-tooltip-date,
+.chart-tooltip-compact .chart-tooltip-additional {
+  font-size: 11px;
+}
+
+/* Анимация при обновлении данных */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(0, 123, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+  }
+}
+
+.chart-tooltip.tooltip-updated {
+  animation: pulse 1s infinite;
+} 

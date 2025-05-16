@@ -252,10 +252,7 @@ const VehicleProfile = () => {
       // Создаем кнопку
       const saveButton = document.createElement('button');
       saveButton.className = 'fixed-save-btn';
-      saveButton.textContent = 'Сохранить';
-      saveButton.style.borderRadius = '0';
-      saveButton.style.width = '100%';
-      saveButton.style.margin = '0';
+      saveButton.innerHTML = '<i class="fas fa-save"></i> Сохранить все настройки';
       btnContainer.appendChild(saveButton);
       
       // Сохраняем ссылку на контейнер
@@ -271,8 +268,44 @@ const VehicleProfile = () => {
         btnContainer.style.width = updatedRect.width + 'px';
       });
       
-      // Обработчик для кнопки сохранения
-      saveButton.addEventListener('click', handleSaveAllSettings);
+      // Обработчик для кнопки сохранения с анимацией
+      saveButton.addEventListener('click', async () => {
+        console.log('Нажата кнопка сохранения всех настроек');
+        
+        // Добавляем класс анимации
+        saveButton.classList.add('fixed-save-btn-animated');
+        
+        // Изменяем текст на "Сохранение..."
+        const originalText = saveButton.innerHTML;
+        saveButton.innerHTML = '<i class="fas fa-sync fa-spin"></i> Сохранение...';
+        
+        try {
+          // Вызываем функцию сохранения
+          await handleSaveAllSettings();
+          
+          // При успешном сохранении меняем текст на "Сохранено!"
+          saveButton.innerHTML = '<i class="fas fa-check"></i> Сохранено!';
+          saveButton.style.backgroundColor = '#4CAF50';
+          
+          // Через 3 секунды возвращаем исходный вид
+          setTimeout(() => {
+            saveButton.innerHTML = originalText;
+            saveButton.classList.remove('fixed-save-btn-animated');
+            saveButton.style.backgroundColor = '';
+          }, 3000);
+        } catch (error) {
+          // При ошибке меняем текст и цвет
+          saveButton.innerHTML = '<i class="fas fa-times"></i> Ошибка!';
+          saveButton.style.backgroundColor = '#f44336';
+          
+          // Через 3 секунды возвращаем исходный вид
+          setTimeout(() => {
+            saveButton.innerHTML = originalText;
+            saveButton.classList.remove('fixed-save-btn-animated');
+            saveButton.style.backgroundColor = '';
+          }, 3000);
+        }
+      });
     }
   };
   
@@ -301,7 +334,7 @@ const VehicleProfile = () => {
       console.log('Сохранение настроек ТС:', vehicleSettings);
       showNotification('Отправка данных на сервер...', 'info');
       
-      // Отправляем запрос через новый API сервис
+      // Отправляем запрос через обновленный API сервис
       const result = await api.updateVehicle(vehicleId, vehicleSettings);
       
       console.log('Результат сохранения настроек ТС:', result);
@@ -337,7 +370,7 @@ const VehicleProfile = () => {
       console.log('Сохранение настроек двигателя:', engineSettings);
       showNotification('Отправка данных на сервер...', 'info');
       
-      // Используем новый API метод для сохранения настроек двигателя
+      // Используем обновленный API метод для сохранения настроек двигателя
       const result = await api.updateEngineSettings(vehicleId, engineSettings);
       
       console.log('Результат сохранения настроек двигателя:', result);
@@ -377,7 +410,7 @@ const VehicleProfile = () => {
       console.log('Сохранение настроек терминала:', terminalSettings);
       showNotification('Отправка данных на сервер...', 'info');
       
-      // Используем новый API метод для сохранения настроек терминала
+      // Используем обновленный API метод для сохранения настроек терминала
       const result = await api.updateTerminalSettings(vehicleId, terminalSettings);
       
       console.log('Результат сохранения настроек терминала:', result);
@@ -437,7 +470,7 @@ const VehicleProfile = () => {
       showNotification('Отправка данных на сервер...', 'info');
       
       // Используем новый API метод для сохранения всех настроек
-      const result = await api.updateVehicle(vehicleId, allSettings);
+      const result = await api.saveAllSettings(vehicleId, allSettings);
       
       console.log('Результат сохранения всех настроек:', result);
       showNotification('Все настройки успешно сохранены', 'success');
@@ -749,14 +782,24 @@ const VehicleProfile = () => {
       reader.onload = (event) => {
         try {
           const data = new Uint8Array(event.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
+          // Добавляем явные параметры кодировки и типа для поддержки кириллицы
+          const workbook = XLSX.read(data, { 
+            type: 'array',
+            codepage: 65001, // UTF-8
+            raw: true
+          });
           
           // Получаем первый лист
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
           
-          // Преобразуем данные в массив объектов
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          // Преобразуем данные в массив объектов с поддержкой кириллицы
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+            raw: false, // Обрабатывать все значения как строки
+            defval: '', // Значение по умолчанию для пустых ячеек
+            blankrows: false // Пропускать пустые строки
+          });
+          
           console.log('Данные из Excel:', jsonData);
           
           if (jsonData.length === 0) {
@@ -861,14 +904,24 @@ const VehicleProfile = () => {
         'Литры': row.liters
       }));
       
-      // Создание рабочей книги
+      // Создание рабочей книги с параметрами для кириллицы
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
+      
+      // Настройка кодировки для корректного отображения кириллицы
       XLSX.utils.book_append_sheet(workbook, worksheet, `Датчик ${sensorNumber}`);
       
-      // Сохранение файла
+      // Настройка параметров записи для поддержки кириллицы
+      const writeOptions = { 
+        bookType: 'xlsx',
+        type: 'array',
+        bookSST: true, // Использовать общую таблицу строк для уменьшения размера файла
+        codepage: 65001 // UTF-8
+      };
+      
+      // Сохранение файла с кодировкой UTF-8
       const fileName = `Calibration_Sensor_${sensorNumber}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
+      XLSX.writeFile(workbook, fileName, writeOptions);
       
       showNotification(`Таблица для датчика №${sensorNumber} успешно экспортирована в Excel`, 'success');
     } catch (err) {
@@ -1144,20 +1197,13 @@ const VehicleProfile = () => {
           <div className="sync-history-header">
             <div className="sync-time">Время</div>
             <div className="sync-action">Операция</div>
-            <div className="sync-status">Статус</div>
             <div className="sync-duration">Длительность</div>
           </div>
           {syncHistory.map(item => (
             <div key={item.id} className={`sync-history-row ${item.success ? 'success' : 'error'}`}>
               <div className="sync-time">{item.timestamp.toLocaleTimeString()}</div>
               <div className="sync-action">{item.action}</div>
-              <div className="sync-status">
-                {item.success ? (
-                  <span className="sync-success"><FontAwesomeIcon icon={faCheck} /> Успешно</span>
-                ) : (
-                  <span className="sync-error"><FontAwesomeIcon icon={faExclamationCircle} /> Ошибка</span>
-                )}
-              </div>
+              
               <div className="sync-duration">
                 {item.success ? `${item.time.toFixed(2)} сек` : '-'}
               </div>

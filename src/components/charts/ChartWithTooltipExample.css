@@ -1,0 +1,274 @@
+.chart-tooltip-example {
+  max-width: 1000px;
+  margin: 30px auto;
+  padding: 25px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  font-family: 'Roboto', Arial, sans-serif;
+}
+
+.chart-tooltip-example h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #333;
+  font-size: 28px;
+}
+
+.chart-section {
+  margin-bottom: 40px;
+  padding-bottom: 30px;
+  border-bottom: 1px solid #eee;
+}
+
+.chart-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.chart-section h3 {
+  margin-bottom: 20px;
+  color: #2c80d3;
+  font-size: 22px;
+  position: relative;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.chart-container {
+  position: relative;
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.react-tooltip-anchor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.invisible-anchor {
+  width: 1px;
+  height: 1px;
+  background: transparent;
+}
+
+.refresh-chart-btn {
+  display: block;
+  margin: 20px auto;
+  padding: 12px 25px;
+  background-color: #4a90e2;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.refresh-chart-btn:hover {
+  background-color: #2c80d3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.refresh-chart-btn:active {
+  transform: translateY(0);
+}
+
+.chart-section p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #555;
+  margin-bottom: 20px;
+}
+
+.chart-section code {
+  background-color: #f0f0f0;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  color: #e64a19;
+}
+
+.code-example {
+  display: flex;
+  justify-content: center;
+  margin: 30px 0;
+}
+
+.view-code-btn {
+  padding: 10px 20px;
+  background-color: #333;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.3s ease;
+}
+
+.view-code-btn:hover {
+  background-color: #555;
+}
+
+pre {
+  background-color: #282c34;
+  color: #abb2bf;
+  border-radius: 6px;
+  padding: 15px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Подсветка кода */
+pre .keyword {
+  color: #c678dd;
+}
+
+pre .string {
+  color: #98c379;
+}
+
+pre .number {
+  color: #d19a66;
+}
+
+pre .comment {
+  color: #5c6370;
+  font-style: italic;
+}
+
+/* Стили для типов тултипов */
+.tooltip-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 25px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.tooltip-type-card {
+  width: 250px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.tooltip-type-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.tooltip-type-card h4 {
+  padding: 15px;
+  margin: 0;
+  text-align: center;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 18px;
+  color: #333;
+}
+
+.tooltip-preview {
+  padding: 15px;
+  background-color: #fff;
+}
+
+.tooltip-info-preview {
+  border-left: 4px solid #17a2b8;
+}
+
+.tooltip-warning-preview {
+  border-left: 4px solid #ffc107;
+}
+
+.tooltip-error-preview {
+  border-left: 4px solid #dc3545;
+}
+
+.tooltip-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  text-align: center;
+  font-size: 16px;
+}
+
+.tooltip-info-preview .tooltip-title {
+  color: #0c5460;
+}
+
+.tooltip-warning-preview .tooltip-title {
+  color: #856404;
+}
+
+.tooltip-error-preview .tooltip-title {
+  color: #721c24;
+}
+
+.tooltip-content .tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #333;
+}
+
+.tooltip-content .tooltip-row:last-child {
+  margin-bottom: 0;
+}
+
+.tooltip-content .tooltip-row span:first-child {
+  color: #666;
+  font-weight: 500;
+}
+
+.tooltip-content .tooltip-row span:last-child {
+  font-weight: 600;
+}
+
+/* Адаптивный дизайн */
+@media (max-width: 768px) {
+  .chart-tooltip-example {
+    padding: 15px;
+    margin: 15px;
+  }
+  
+  .chart-tooltip-example h2 {
+    font-size: 24px;
+  }
+  
+  .chart-section h3 {
+    font-size: 20px;
+  }
+  
+  .tooltip-types {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .tooltip-type-card {
+    width: 100%;
+    max-width: 300px;
+  }
+} 
