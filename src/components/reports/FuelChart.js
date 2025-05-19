@@ -142,7 +142,7 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
       }
       
       // URL для запроса данных о топливе
-      const url = `http://localhost:8081/api/fuel/${vehicle.imei}/liters?startTime=${startISO}&endTime=${endISO}`;
+      const url = `https://185.234.114.212:8443/api/fuel/${vehicle.imei}/liters?startTime=${startISO}&endTime=${endISO}`;
       
       console.log('FuelChart: Запрос данных топлива:', url);
       

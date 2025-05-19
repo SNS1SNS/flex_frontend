@@ -320,3 +320,54 @@
     text-align: center;
     color: #6c757d;
 } 
+
+/* Стили для формы входа */
+.form-groups {
+    margin-bottom: 25px;
+}
+
+.input-icon-wrapper {
+    position: relative;
+}
+
+.input-icon-wrapper input {
+    width: 100%;
+    padding: 15px 20px 15px 50px;
+    border: 2px solid rgba(44, 62, 80, 0.1);
+    border-radius: var(--border-radius);
+    font-size: 15px;
+    transition: all 0.3s ease;
+    background-color: rgba(255, 255, 255, 0.9);
+    color: var(--text-color);
+    font-family: 'Montserrat', sans-serif;
+}
+
+.input-icon-wrapper input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+    outline: none;
+}
+
+.input-icon-wrapper svg {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(44, 62, 80, 0.5);
+    transition: all 0.3s ease;
+    font-size: 18px;
+}
+
+.input-icon-wrapper input:focus + svg {
+    color: var(--accent-color);
+}
+
+.error-message {
+    color: var(--secondary-color);
+    font-size: 13px;
+    margin-top: 8px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}

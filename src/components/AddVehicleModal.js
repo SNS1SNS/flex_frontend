@@ -53,7 +53,7 @@ const AddVehicleModal = ({ isOpen, onClose, onVehicleAdded }) => {
             console.log('Загружаем список групп...');
             
             // Исправляем URL для получения групп
-            const response = await fetch('http://localhost:8081/api/folders/type/group', {
+            const response = await fetch('https://185.234.114.212:8443/api/folders/type/group', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -141,7 +141,7 @@ const AddVehicleModal = ({ isOpen, onClose, onVehicleAdded }) => {
             const token = localStorage.getItem('access_token');
             
             // Получаем список всех транспортных средств для проверки уникальности
-            const vehiclesResponse = await fetch('http://localhost:8081/api/vehicles', {
+            const vehiclesResponse = await fetch('https://185.234.114.212:8443/api/vehicles', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -202,7 +202,7 @@ const AddVehicleModal = ({ isOpen, onClose, onVehicleAdded }) => {
             showNotification('Создание транспортного средства...', 'info');
             
             // Отправка запроса на создание ТС
-            const response = await fetch('http://localhost:8081/api/vehicles', {
+            const response = await fetch('https://185.234.114.212:8443/api/vehicles', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -62,7 +62,7 @@ const ManageGroupsModal = ({ isOpen, onClose, selectedVehicleIds = [], onGroupsU
             console.log('Загружаем список групп...');
             
             // Правильный URL для получения групп
-            const response = await fetch('http://localhost:8081/api/folders/type/group', {
+            const response = await fetch('https://185.234.114.212:8443/api/folders/type/group', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -180,7 +180,7 @@ const ManageGroupsModal = ({ isOpen, onClose, selectedVehicleIds = [], onGroupsU
                 console.log(`Обновление ТС с ID: ${vehicleId}`);
                 
                 // Получаем текущие данные ТС
-                const vehicleResponse = await fetch(`http://localhost:8081/api/vehicles/${vehicleId}`, {
+                const vehicleResponse = await fetch(`https://185.234.114.212:8443/api/vehicles/${vehicleId}`, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -213,7 +213,7 @@ const ManageGroupsModal = ({ isOpen, onClose, selectedVehicleIds = [], onGroupsU
                 console.log(`Обновленные данные для ТС ${vehicleId}:`, updatedData);
                 
                 // Отправляем обновленные данные
-                const updateResponse = await fetch(`http://localhost:8081/api/vehicles/${vehicleId}`, {
+                const updateResponse = await fetch(`https://185.234.114.212:8443/api/vehicles/${vehicleId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',

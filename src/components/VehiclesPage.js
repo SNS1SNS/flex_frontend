@@ -463,7 +463,7 @@ const VehiclesPage = () => {
         console.log(`Удаление ТС с ID: ${vehicleId}`);
         
         // Отправляем DELETE запрос на удаление ТС
-        const deleteResponse = await fetch(`http://localhost:8081/api/vehicles/${vehicleId}`, {
+        const deleteResponse = await fetch(`https://185.234.114.212:8443/api/vehicles/${vehicleId}`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',

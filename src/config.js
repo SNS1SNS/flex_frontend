@@ -1,7 +1,7 @@
 // Конфигурация API
 const config = {
   // Базовый URL API
-  apiUrl: 'http://localhost:8081',
+  apiUrl: 'https://185.234.114.212:8443',
   
   // Таймаут для запросов (в миллисекундах)
   apiTimeout: 15000,

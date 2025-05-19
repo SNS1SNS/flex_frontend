@@ -44,7 +44,7 @@ const CreateGroupModal = ({ isOpen, onClose, onGroupCreated }) => {
             console.log('Загружаем список тарифов...');
             
             // Запрос на получение тарифов
-            const response = await fetch('http://localhost:8081/api/folders/type/tariff', {
+            const response = await fetch('https://185.234.114.212:8443/api/folders/type/tariff', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -136,7 +136,7 @@ const CreateGroupModal = ({ isOpen, onClose, onGroupCreated }) => {
             showNotification('Создание группы...', 'info');
             
             // Отправка запроса на создание группы
-            const response = await fetch('http://localhost:8081/api/folders', {
+            const response = await fetch('https://185.234.114.212:8443/api/folders', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -32,7 +32,7 @@ const VehiclesList = () => {
     const fetchVehicles = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8081/api/vehicles');
+            const response = await fetch('https://185.234.114.212:8443/api/vehicles');
             const data = await response.json();
             
             if (Array.isArray(data)) {

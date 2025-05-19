@@ -14,6 +14,9 @@ import { isAdmin } from './utils/roleUtils';
 import { UserProvider } from './context/UserContext';
 import { SidebarProvider } from './context/SidebarContext';
 import { LoadingProvider } from './context/LoadingContext';
+import { ConfigProvider } from 'antd';
+import ruRU from 'antd/lib/locale/ru_RU';
+import { SplitScreenProvider } from './contexts/SplitScreenContext';
 import './App.css';
 
 /**
@@ -32,118 +35,122 @@ const AdminPlaceholder = ({ title }) => (
  */
 function App() {
   return (
-    <UserProvider>
-      <SidebarProvider>
-        <LoadingProvider>
-          <BrowserRouter>
-            <Notifications />
-            <Routes>
-              {/* Публичные маршруты */}
-              <Route path="/login" element={<LoginPage />} />
-              
-              {/* Добавляем тестовую страницу */}
-              <Route path="/chart-sync-test" element={<ChartSyncTestPage />} />
-              
-              {/* Защищенные маршруты для обычных пользователей */}
-              
-              <Route 
-                path="/vehicles" 
-                element={
-                  <PrivateRoute>
-                    <VehiclesPage />
-                  </PrivateRoute>
-                } 
-              />
-              
-              {/* Маршрут для страницы профиля ТС */}
-              <Route 
-                path="/admin/vehicles/profile" 
-                element={
-                  <PrivateRoute>
-                    <VehicleProfile />
-                  </PrivateRoute>
-                } 
-              />
-              
-              {/* Перенаправление со старого URL dashboard на vehicles */}
-              <Route 
-                path="/dashboard" 
-                element={<Navigate to="/vehicles" replace />} 
-              />
-              
-              <Route 
-                path="/drivers" 
-                element={
-                  <PrivateRoute>
-                    <DriversPage />
-                  </PrivateRoute>
-                } 
-              />
-              
-              <Route 
-                path="/users" 
-                element={
-                  <PrivateRoute>
-                    <UsersPage />
-                  </PrivateRoute>
-                } 
-              />
-              
-              <Route 
-                path="/reports" 
-                element={
-                  <PrivateRoute>
-                    <ReportsPage />
-                  </PrivateRoute>
-                } 
-              />
-              
-              {/* Административная панель */}
-              <Route 
-                path="/admin" 
-                element={<AdminLayout />}
-              >
-                <Route path="vehicles" element={<AdminPlaceholder title="Транспортные средства" />} />
-                <Route path="drivers" element={<AdminPlaceholder title="Водители" />} />
-                <Route path="users" element={<AdminPlaceholder title="Пользователи" />} />
-              </Route>
-              
-              {/* Маршрут по умолчанию */}
-              <Route 
-                path="/" 
-                element={
-                  isAdmin() ? <Navigate to="/admin" replace /> : <Navigate to="/vehicles" replace />
-                } 
-              />
-              
-              {/* Страница "Доступ запрещен" */}
-              <Route 
-                path="/access-denied" 
-                element={
-                  <div className="error-page">
-                    <h1>Доступ запрещен</h1>
-                    <p>У вас нет прав для просмотра этой страницы.</p>
-                    <a href="/login">Вернуться на страницу входа</a>
-                  </div>
-                } 
-              />
-              
-              {/* Обработка несуществующих маршрутов */}
-              <Route 
-                path="*" 
-                element={
-                  <div className="error-page">
-                    <h1>Страница не найдена</h1>
-                    <p>Страница, которую вы ищете, не существует.</p>
-                    <a href="/login">Вернуться на страницу входа</a>
-                  </div>
-                } 
-              />
-            </Routes>
-          </BrowserRouter>
-        </LoadingProvider>
-      </SidebarProvider>
-    </UserProvider>
+    <ConfigProvider locale={ruRU}>
+      <UserProvider>
+        <SidebarProvider>
+          <LoadingProvider>
+            <SplitScreenProvider>
+              <BrowserRouter>
+                <Notifications />
+                <Routes>
+                  {/* Публичные маршруты */}
+                  <Route path="/login" element={<LoginPage />} />
+                  
+                  {/* Добавляем тестовую страницу */}
+                  <Route path="/chart-sync-test" element={<ChartSyncTestPage />} />
+                  
+                  {/* Защищенные маршруты для обычных пользователей */}
+                  
+                  <Route 
+                    path="/vehicles" 
+                    element={
+                      <PrivateRoute>
+                        <VehiclesPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  
+                  {/* Маршрут для страницы профиля ТС */}
+                  <Route 
+                    path="/admin/vehicles/profile" 
+                    element={
+                      <PrivateRoute>
+                        <VehicleProfile />
+                      </PrivateRoute>
+                    } 
+                  />
+                  
+                  {/* Перенаправление со старого URL dashboard на vehicles */}
+                  <Route 
+                    path="/dashboard" 
+                    element={<Navigate to="/vehicles" replace />} 
+                  />
+                  
+                  <Route 
+                    path="/drivers" 
+                    element={
+                      <PrivateRoute>
+                        <DriversPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/users" 
+                    element={
+                      <PrivateRoute>
+                        <UsersPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/reports" 
+                    element={
+                      <PrivateRoute>
+                        <ReportsPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  
+                  {/* Административная панель */}
+                  <Route 
+                    path="/admin" 
+                    element={<AdminLayout />}
+                  >
+                    <Route path="vehicles" element={<AdminPlaceholder title="Транспортные средства" />} />
+                    <Route path="drivers" element={<AdminPlaceholder title="Водители" />} />
+                    <Route path="users" element={<AdminPlaceholder title="Пользователи" />} />
+                  </Route>
+                  
+                  {/* Маршрут по умолчанию */}
+                  <Route 
+                    path="/" 
+                    element={
+                      isAdmin() ? <Navigate to="/admin" replace /> : <Navigate to="/vehicles" replace />
+                    } 
+                  />
+                  
+                  {/* Страница "Доступ запрещен" */}
+                  <Route 
+                    path="/access-denied" 
+                    element={
+                      <div className="error-page">
+                        <h1>Доступ запрещен</h1>
+                        <p>У вас нет прав для просмотра этой страницы.</p>
+                        <a href="/login">Вернуться на страницу входа</a>
+                      </div>
+                    } 
+                  />
+                  
+                  {/* Обработка несуществующих маршрутов */}
+                  <Route 
+                    path="*" 
+                    element={
+                      <div className="error-page">
+                        <h1>Страница не найдена</h1>
+                        <p>Страница, которую вы ищете, не существует.</p>
+                        <a href="/login">Вернуться на страницу входа</a>
+                      </div>
+                    } 
+                  />
+                </Routes>
+              </BrowserRouter>
+            </SplitScreenProvider>
+          </LoadingProvider>
+        </SidebarProvider>
+      </UserProvider>
+    </ConfigProvider>
   );
 }
 

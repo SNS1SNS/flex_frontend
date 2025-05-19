@@ -31,7 +31,7 @@ const api = {
     }
     
     // Формируем полный URL
-    const fullUrl = url.startsWith('http') ? url : `${this.baseUrl}${url}`;
+    const fullUrl = url.startsWith('https') ? url : `${this.baseUrl}${url}`;
     
     console.log(`API запрос: ${options.method || 'GET'} ${fullUrl}`);
     
@@ -177,10 +177,10 @@ const api = {
    * @returns {Promise<Object>} Обновленное транспортное средство
    */
   async updateVehicle(id, vehicleData) {
-    console.log(`Отправка PUT запроса на http://localhost:8081/api/vehicles/${id} с данными:`, vehicleData);
+    console.log(`Отправка PUT запроса на https://185.234.114.212:8443/api/vehicles/${id} с данными:`, vehicleData);
     
     // Используем прямой URL для запроса
-    const url = `http://localhost:8081/api/vehicles/${id}`;
+    const url = `https://185.234.114.212:8443/api/vehicles/${id}`;
     
     // Получаем токен для авторизации
     const token = tokenService.getAccessToken();
@@ -232,7 +232,7 @@ const api = {
    * @returns {Promise<Object>} Обновленное транспортное средство
    */
   async updateEngineSettings(id, engineData) {
-    console.log(`Отправка PUT запроса для настроек двигателя на http://localhost:8081/api/vehicles/${id} с данными:`, engineData);
+    console.log(`Отправка PUT запроса для настроек двигателя на https://185.234.114.212:8443/api/vehicles/${id} с данными:`, engineData);
     
     // Используем прямой URL и вызываем общий метод updateVehicle
     return this.updateVehicle(id, engineData);
@@ -245,7 +245,7 @@ const api = {
    * @returns {Promise<Object>} Обновленное транспортное средство
    */
   async updateTerminalSettings(id, terminalData) {
-    console.log(`Отправка PUT запроса для настроек терминала на http://localhost:8081/api/vehicles/${id} с данными:`, terminalData);
+    console.log(`Отправка PUT запроса для настроек терминала на https://185.234.114.212:8443/api/vehicles/${id} с данными:`, terminalData);
     
     // Используем прямой URL и вызываем общий метод updateVehicle
     return this.updateVehicle(id, terminalData);
@@ -258,7 +258,7 @@ const api = {
    * @returns {Promise<Object>} Обновленное транспортное средство
    */
   async saveAllSettings(id, allSettings) {
-    console.log(`Отправка PUT запроса для сохранения всех настроек на http://localhost:8081/api/vehicles/${id} с данными:`, allSettings);
+    console.log(`Отправка PUT запроса для сохранения всех настроек на https://185.234.114.212:8443/api/vehicles/${id} с данными:`, allSettings);
     
     // Используем прямой URL и вызываем общий метод updateVehicle
     return this.updateVehicle(id, allSettings);

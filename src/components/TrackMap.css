@@ -1,0 +1,174 @@
+/* Основной контейнер для карты */
+.track-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Контейнер Leaflet карты */
+.map-container {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  flex: 1;
+  z-index: 1;
+}
+
+/* Оверлей для индикации загрузки */
+.map-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.7);
+  z-index: 1000;
+}
+
+/* Оверлей для отображения ошибок */
+.map-error-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  max-width: 500px;
+  z-index: 1000;
+}
+
+/* Стили для контрольных элементов карты */
+.map-controls-card {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  max-width: 320px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+/* Стили для всплывающих окон на маркерах */
+.leaflet-popup-content-wrapper {
+  border-radius: 4px;
+  padding: 0;
+}
+
+.marker-popup {
+  padding: 8px;
+  max-width: 300px;
+}
+
+.marker-popup-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #1890ff;
+}
+
+.marker-popup-content {
+  font-size: 12px;
+}
+
+.marker-popup-timestamp {
+  font-size: 11px;
+  color: #888;
+  margin-top: 8px;
+}
+
+/* Стили для анимированного маркера */
+.animated-marker {
+  border: 2px solid #1890ff;
+  border-radius: 50%;
+  background-color: rgba(24, 144, 255, 0.3);
+  width: 12px !important;
+  height: 12px !important;
+  margin-left: -6px !important;
+  margin-top: -6px !important;
+  transition: transform 0.3s ease;
+  box-shadow: 0 0 0 rgba(24, 144, 255, 0.4);
+  animation: pulse 2s infinite;
+}
+
+/* Стили для пульсации анимированного маркера */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(24, 144, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(24, 144, 255, 0);
+  }
+}
+
+/* Стили для полилинии трека */
+.track-polyline {
+  stroke-width: 3;
+  opacity: 0.7;
+}
+
+/* Стили для разделенного экрана */
+.split-screen-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.split-screen-container {
+  position: relative;
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
+  transition: flex 0.3s ease;
+}
+
+.split-screen-container.active-container {
+  border: 1px solid #1890ff;
+}
+
+/* Для разных режимов разделения */
+.split-horizontal {
+  display: flex;
+  flex-direction: column;
+}
+
+.split-vertical {
+  display: flex;
+  flex-direction: row;
+}
+
+.split-quad {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+/* Адаптивные стили для мобильных устройств */
+@media (max-width: 768px) {
+  .map-controls-card {
+    max-width: 100%;
+    width: calc(100% - 20px);
+    top: auto;
+    bottom: 10px;
+    right: 10px;
+  }
+  
+  .split-vertical {
+    flex-direction: column;
+  }
+  
+  .split-quad {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr 1fr 1fr;
+  }
+} 

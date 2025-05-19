@@ -28,7 +28,13 @@
 }
 
 body {
-  font-family: 'Roboto', Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
   color: #333;
   background-color: #f5f5f5;
@@ -309,4 +315,93 @@ label {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* Стили для заголовка */
+.ant-layout-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+  padding: 0 50px;
+}
+
+/* Стили для логотипа */
+.logo {
+  display: flex;
+  align-items: center;
+}
+
+.logo a {
+  text-decoration: none;
+}
+
+/* Стили для контентной области */
+.site-layout-content {
+  background-color: #fff;
+  padding: 24px;
+  min-height: calc(100vh - 64px - 70px); /* Вычитаем высоту Header и Footer */
+  border-radius: 2px;
+}
+
+/* Стили для страницы дашборда */
+.dashboard-container {
+  padding: 20px 0;
+}
+
+/* Стили для карты */
+.map-container {
+  height: 100%;
+  min-height: 500px;
+}
+
+/* Стили для загрузки Leaflet CSS */
+@import url('https://unpkg.com/leaflet@1.7.1/dist/leaflet.css');
+
+/* Стили для всплывающих уведомлений */
+.ant-notification-notice {
+  border-radius: 4px;
+}
+
+/* Стили для разделенного экрана */
+.split-screen-root {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+}
+
+/* Адаптивные стили для мобильных устройств */
+@media (max-width: 768px) {
+  .ant-layout-header {
+    padding: 0 20px;
+  }
+  
+  .site-layout-content {
+    padding: 12px;
+  }
+  
+  .ant-layout-content {
+    padding: 0 20px !important;
+  }
+  
+  .ant-statistic-title {
+    font-size: 12px;
+  }
+  
+  .ant-card-body {
+    padding: 12px;
+  }
+}
+
+/* Стили для темного режима (если будет добавлен) */
+@media (prefers-color-scheme: dark) {
+  .site-layout-content {
+    background-color: #141414;
+  }
+}
+
+/* Стили для активного элемента */
+.active-element {
+  border: 2px solid #1890ff;
+  box-shadow: 0 0 8px rgba(24, 144, 255, 0.5);
 }

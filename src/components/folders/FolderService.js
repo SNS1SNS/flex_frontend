@@ -1,5 +1,5 @@
 // Базовый URL для API
-const API_BASE_URL = 'http://localhost:8081/api';
+const API_BASE_URL = 'https://185.234.114.212:8443/api';
 
 /**
  * Создание тестового JWT токена

@@ -27,7 +27,7 @@ const FolderList = ({ onVehicleSelect }) => {
   const [expandedFolders, setExpandedFolders] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+    
   // Состояния для выбранных элементов
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(() => {

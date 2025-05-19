@@ -419,7 +419,7 @@ const SpeedChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate 
       // Базовый URL API - заменяем с учетом текущего окружения
       // Определяем базовый URL в зависимости от среды запуска
       const baseUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:8081' 
+        ? 'https://185.234.114.212:8443' 
         : `${window.location.protocol}//${window.location.host}`;
       
       // Формируем параметры запроса
