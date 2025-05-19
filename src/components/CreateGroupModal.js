@@ -206,7 +206,7 @@ const CreateGroupModal = ({ isOpen, onClose, onGroupCreated }) => {
                     </div>
                     
                     <form onSubmit={handleSubmit}>
-                        <div className="form-group">
+                        <div className="form-groups">
                             <label htmlFor="groupName">Название группы</label>
                             <input 
                                 type="text" 
@@ -219,7 +219,7 @@ const CreateGroupModal = ({ isOpen, onClose, onGroupCreated }) => {
                             />
                         </div>
                         
-                        <div className="form-group">
+                        <div className="form-groups">
                             <label htmlFor="tariffId">Тариф</label>
                             <select 
                                 id="tariffId" 

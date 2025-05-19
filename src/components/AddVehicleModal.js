@@ -299,7 +299,7 @@ const AddVehicleModal = ({ isOpen, onClose, onVehicleAdded }) => {
                         )}
                         
                         <form onSubmit={handleSubmit}>
-                            <div className="form-group">
+                            <div className="form-groups">
                                 <label htmlFor="name">Название транспортного средства</label>
                                 <input 
                                     type="text" 
@@ -312,7 +312,7 @@ const AddVehicleModal = ({ isOpen, onClose, onVehicleAdded }) => {
                                 />
                             </div>
                             
-                            <div className="form-group">
+                            <div className="form-groups">
                                 <label htmlFor="imei">IMEI терминала</label>
                                 <input 
                                     type="text" 
@@ -327,7 +327,7 @@ const AddVehicleModal = ({ isOpen, onClose, onVehicleAdded }) => {
                                 <small className="form-hint">Должен содержать ровно 15 цифр (текущая длина: {formData.imei.length})</small>
                             </div>
                             
-                            <div className="form-group">
+                            <div className="form-groups">
                                 <label htmlFor="userGroup">Группа</label>
                                 <div className="group-selection">
                                     <select 
