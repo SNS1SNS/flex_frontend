@@ -2019,7 +2019,6 @@ useEffect(() => {
         Высота: ${point.altitude} м<br>
         Курс: ${point.course}°<br>
         Спутники: ${point.satellites}<br>
-        Топливо: ${point.fuel}%
       `);
     } catch (error) {
       console.error('Ошибка при обновлении анимированного маркера:', error);
@@ -3197,7 +3196,6 @@ useEffect(() => {
               ${point.altitude ? `<p><strong>Высота:</strong> ${point.altitude} м</p>` : ''}
               ${point.course ? `<p><strong>Курс:</strong> ${point.course}°</p>` : ''}
               ${point.satellites ? `<p><strong>Спутники:</strong> ${point.satellites}</p>` : ''}
-              ${point.fuel !== undefined ? `<p><strong>Топливо:</strong> ${point.fuel}%</p>` : ''}
             </div>
           </div>
         `;
