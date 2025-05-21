@@ -1585,6 +1585,66 @@ class ChartSyncManager {
   }
   
   /**
+   * Отправляет уведомление о выбранной точке всем компонентам
+   * @param {object} pointData - Данные о выбранной точке
+   * @param {string} sourceId - ID источника события (компонента, который выбрал точку)
+   * @param {string} syncGroupId - ID группы синхронизации (опционально)
+   */
+  notifyPointSelected(pointData, sourceId = null, syncGroupId = '*') {
+    // Избегаем циклических вызовов
+    if (this.suppressEvents) return;
+    
+    console.log(`ChartSyncManager: Уведомление о выбранной точке от ${sourceId || 'неизвестного источника'}`, pointData);
+    
+    // Если не указана группа синхронизации, используем '*' (все группы)
+    const targetGroupId = syncGroupId || '*';
+    
+    // Создаем событие для отправки
+    const event = new CustomEvent('pointSelected', {
+      detail: { 
+        ...pointData,
+        sourceId,
+        syncGroupId: targetGroupId,
+        timestamp: Date.now()
+      }
+    });
+    
+    // Отправляем глобальное событие
+    document.dispatchEvent(event);
+    
+    // Также отправляем специфическое событие для каждого контейнера группы
+    if (this.syncGroups && this.syncGroups.has(targetGroupId)) {
+      const containers = this.syncGroups.get(targetGroupId);
+      containers.forEach(containerId => {
+        if (containerId !== sourceId) {
+          const container = document.getElementById(containerId) || 
+                           document.querySelector(`[data-container-id="${containerId}"]`);
+          
+          if (container) {
+            console.log(`ChartSyncManager: Отправка уведомления о точке в контейнер ${containerId}`);
+            
+            // Сначала проверяем наличие API для контейнера через __reactInstance
+            if (container.__reactInstance && container.__reactInstance.applyPointSelection) {
+              container.__reactInstance.applyPointSelection(pointData);
+            } else {
+              // Отправляем событие напрямую контейнеру
+              container.dispatchEvent(new CustomEvent('applyPointSelection', {
+                detail: { 
+                  pointData,
+                  sourceId,
+                  targetContainerId: containerId
+                }
+              }));
+            }
+          }
+        }
+      });
+    } else {
+      console.log(`ChartSyncManager: Нет зарегистрированных контейнеров для группы ${targetGroupId}`);
+    }
+  }
+  
+  /**
    * Применяет выделение к контейнеру
    * @param {HTMLElement} container - DOM-элемент контейнера
    * @param {object} selectionData - Данные о выделении
