@@ -4330,7 +4330,9 @@ useEffect(() => {
             syncGroupId: currentSyncGroup,
             label: pointData.timestamp,
             value: pointData.speed,
-            reportType: 'trackmap'
+            reportType: 'trackmap',
+            priority: 'high', // Для ускорения обработки
+            syncGroupId: currentSyncGroup // Добавляем syncGroupId для использования переменной
           };
           
           console.log('TrackMap: Используем ChartSyncManager.notifyPointSelected для синхронизации');
@@ -4365,7 +4367,9 @@ useEffect(() => {
               syncGroupId: currentSyncGroup,
               label: pointData.timestamp,
               value: pointData.speed,
-              reportType: 'trackmap'
+              reportType: 'trackmap',
+              priority: 'high', // Для ускорения обработки
+              syncGroupId: currentSyncGroup // Добавляем syncGroupId для использования переменной
             };
             
             // Для каждого canvas элемента
@@ -4520,7 +4524,7 @@ useEffect(() => {
     if (!trackData || trackData.length === 0) return;
     
     // Функция для отправки события клика в графики
-    const sendPointClickToCharts = (pointIndex) => {
+    window.sendPointClickToCharts = (pointIndex) => {
       if (pointIndex < 0 || pointIndex >= trackData.length) return;
       
       try {
@@ -4529,24 +4533,25 @@ useEffect(() => {
         
         // Создаем данные точки в формате BaseChart
         const chartPointData = {
-          index: pointIndex,
-          point: pointData,
-          totalPoints: trackData.length,
-          timestamp: pointData.timestamp,
-          sourceId: containerId || 'track-map',
-          syncGroupId: currentSyncGroup,
+          sourceContainerId: containerId || 'track-map', // Исправлено: используем sourceContainerId как в BaseChart
+          timestamp: new Date(pointData.timestamp).getTime(), // Исправлено: конвертируем timestamp в число
+          pointIndex: pointIndex, // Исправлено: используем pointIndex как в BaseChart
+          datasetIndex: 0, // Добавляем datasetIndex для совместимости с BaseChart
           label: pointData.timestamp,
           value: pointData.speed,
-          reportType: 'trackmap'
+          reportType: 'trackmap',
+          priority: 'high', // Для ускорения обработки
+          syncGroupId: currentSyncGroup // Добавляем syncGroupId для использования переменной
         };
         
         // Создаем и отправляем событие точно такое же, какое ожидает BaseChart
         const chartEvent = new CustomEvent('chartPointSelected', {
-          detail: chartPointData
+          detail: chartPointData,
+          bubbles: false // Предотвращаем всплытие события для лучшей производительности
         });
         
         document.dispatchEvent(chartEvent);
-        console.log('TrackMap: Отправлено событие chartPointSelected при выделении точки');
+        console.log('TrackMap: Отправлено событие chartPointSelected при выделении точки', chartPointData);
       } catch (error) {
         console.error('TrackMap: Ошибка при отправке события клика в графики:', error);
       }
@@ -4554,6 +4559,7 @@ useEffect(() => {
     
     return () => {
       // Очистка при размонтировании
+      delete window.sendPointClickToCharts;
     };
   }, [trackData, syncGroup, tabId, containerId]);
 
@@ -4606,6 +4612,11 @@ useEffect(() => {
         
         // Подсвечиваем точку
         highlightTrackPoint(closestIndex);
+        
+        // Отправляем событие chartPointSelected напрямую в графики
+        if (typeof window.sendPointClickToCharts === 'function') {
+          window.sendPointClickToCharts(closestIndex);
+        }
         
         // Выполняем ручную синхронизацию с графиками
         handleManualSync(closestIndex);
