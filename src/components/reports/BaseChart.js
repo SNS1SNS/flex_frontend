@@ -1069,9 +1069,6 @@ const BaseChart = ({
       const isMultiLineChart = chart.data.datasets.length > 1;
       const isFuelChart = reportType === 'fuel';
       
-      // Получаем текущий набор данных
-      const dataset = chart.data.datasets[datasetIndex];
-      
       // Сначала сбрасываем стили всех точек на всех наборах данных
       chart.data.datasets.forEach((ds, i) => {
         // Для каждого набора данных заполняем массивы с прозрачными точками
@@ -1114,46 +1111,34 @@ const BaseChart = ({
         pointElement.element.classList.add('chart-highlighted-point');
       }
       
-      // Настраиваем активную подсказку (tooltip) для постоянного отображения
+      // ИЗМЕНЕНО: Не закрепляем подсказку, чтобы можно было видеть данные других точек
+      // Просто показываем подсказку один раз для выделенной точки
       chart.tooltip.setActiveElements([{ datasetIndex, index: pointIndex }], {
         x: pointElement.x,
-        y: pointElement.y - 10 // Смещаем немного вверх
+        y: pointElement.y - 10
       });
       
-      // Делаем подсказку постоянно видимой
+      // Обновляем настройки подсказки, чтобы она работала при наведении
       chart.options.plugins.tooltip.enabled = true;
       chart.options.plugins.tooltip.position = 'nearest';
       
-      // Сохраняем позицию для обновления во время панорамирования/зума
-      chart._fixedTooltipPosition = {
-        datasetIndex,
-        pointIndex
-      };
+      // УДАЛЕНО: Не сохраняем позицию фиксированной подсказки
+      // chart._fixedTooltipPosition = { datasetIndex, pointIndex };
       
-      // Добавляем обработчик для события afterDraw, чтобы подсказка оставалась видимой
-      chart.options.plugins.tooltip.callbacks._persistentTooltip = function(chart) {
-        if (chart._fixedTooltipPosition) {
-          const { datasetIndex, pointIndex } = chart._fixedTooltipPosition;
-          const meta = chart.getDatasetMeta(datasetIndex);
-          if (meta && meta.data && meta.data[pointIndex]) {
-            const element = meta.data[pointIndex];
-            chart.tooltip.setActiveElements([{ datasetIndex, index: pointIndex }], {
-              x: element.x,
-              y: element.y - 10
-            });
-            chart.tooltip.update();
-          }
-        }
-      };
+      // УДАЛЕНО: Не добавляем обработчик persistentTooltip
+      // Вместо этого восстанавливаем стандартное поведение подсказок
+      if (chart.options.plugins.tooltip.callbacks._persistentTooltip) {
+        delete chart.options.plugins.tooltip.callbacks._persistentTooltip;
+      }
       
-      // Подключаем обработчик к событию afterRender
-      const originalRender = chart.draw;
-      chart.draw = function() {
-        originalRender.apply(this, arguments);
-        if (this.options.plugins.tooltip.callbacks._persistentTooltip) {
-          this.options.plugins.tooltip.callbacks._persistentTooltip(this);
-        }
-      };
+      // Восстанавливаем оригинальный метод отрисовки, если он был изменен
+      if (chart._originalDraw) {
+        chart.draw = chart._originalDraw;
+        chart._originalDraw = null;
+      } else {
+        // Сохраняем оригинальный метод отрисовки
+        chart._originalDraw = chart.draw;
+      }
       
       // Сохраняем информацию о текущей выделенной точке
       chart._currentHighlightedPoint = {
@@ -1224,14 +1209,18 @@ const BaseChart = ({
       }
       
       // Очищаем фиксированную позицию подсказки
-      chart._fixedTooltipPosition = null;
+      if (chart._fixedTooltipPosition) {
+        chart._fixedTooltipPosition = null;
+      }
       
       if (originalStyles) {
-        // Восстанавливаем оригинальные стили точек
-        chart.data.datasets.forEach(dataset => {
-          dataset.pointRadius = originalStyles.radius;
-          dataset.pointBackgroundColor = originalStyles.backgroundColor;
-          dataset.pointBorderColor = originalStyles.borderColor;
+        // Восстанавливаем оригинальные стили точек для всех наборов данных
+        chart.data.datasets.forEach((dataset, i) => {
+          if (originalStyles[i]) {
+            dataset.pointRadius = originalStyles[i].radius;
+            dataset.pointBackgroundColor = originalStyles[i].backgroundColor;
+            dataset.pointBorderColor = originalStyles[i].borderColor;
+          }
         });
       }
       
