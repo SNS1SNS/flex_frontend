@@ -3,6 +3,7 @@ import BaseChart from './BaseChart';
 import { getAuthToken } from '../../utils/authUtils';
 import { toast } from 'react-toastify';
 import chartSyncActivator from '../../utils/ChartSyncActivator';
+import { ensureValidDate, formatChartTimeLabel, formatChartTooltipTime, validateDateRange } from '../../utils/DateUtils';
 
 // Активируем синхронизацию графиков при импорте компонента
 if (!chartSyncActivator.initialized) {
@@ -23,46 +24,6 @@ const VoltageChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDat
   // Преобразование из милливольт в вольты для отображения
   const toVolts = (millivolts) => millivolts / 1000;
 
-  // Функция для проверки и преобразования даты
-  const ensureValidDate = (dateInput) => {
-    try {
-      // Если дата уже является объектом Date и она валидна
-      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
-        return dateInput;
-      }
-      
-      // Если дата - строка
-      if (typeof dateInput === 'string') {
-        // Проверяем, не является ли строка пустой или невалидной
-        if (!dateInput || dateInput === 'Invalid Date') {
-          console.warn('VoltageChart: Получена невалидная строка даты:', dateInput);
-          return new Date();
-        }
-        
-        // Пробуем стандартный метод
-        const newDate = new Date(dateInput);
-        if (!isNaN(newDate.getTime())) {
-          return newDate;
-        }
-      }
-      
-      // Если дата - timestamp (число)
-      if (typeof dateInput === 'number') {
-        const newDate = new Date(dateInput);
-        if (!isNaN(newDate.getTime())) {
-          return newDate;
-        }
-      }
-      
-      // Если не удалось создать валидную дату, возвращаем текущую
-      console.warn('VoltageChart: Невозможно создать валидную дату из:', dateInput);
-      return new Date();
-    } catch (error) {
-      console.error('VoltageChart: Ошибка при обработке даты:', error, dateInput);
-      return new Date();
-    }
-  };
-  
   // Функция для получения данных из localStorage
   const getDateRangeFromLocalStorage = () => {
     try {
@@ -383,69 +344,56 @@ const VoltageChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDat
     }
   }, [error]);
 
-  // Функция для загрузки данных о напряжении
   const fetchVoltageData = async (useStartDate = startDate, useEndDate = endDate) => {
-    // Используем переданные параметры или значения из состояния
-    const effectiveStartDate = useStartDate || startDate;
-    const effectiveEndDate = useEndDate || endDate;
-    
-    if (!vehicle || !vehicle.imei || !effectiveStartDate || !effectiveEndDate) {
-      console.warn('VoltageChart: Не хватает данных для загрузки:', { 
-        vehicle: vehicle ? vehicle.imei : 'не установлен',
-        startDate: effectiveStartDate ? effectiveStartDate.toISOString() : 'не установлена',
-        endDate: effectiveEndDate ? effectiveEndDate.toISOString() : 'не установлена'
-      });
-      setError('Не выбран транспорт или период');
+    // Проверяем наличие ТС
+    if (!vehicle || !vehicle.imei) {
+      console.error('Не удалось получить IMEI транспортного средства');
+      setError('Для получения данных о напряжении необходимо указать IMEI транспортного средства');
+      setIsLoading(false);
       return;
     }
-
-    console.log('VoltageChart: Начало fetchVoltageData с датами:', {
-      startDate: effectiveStartDate.toISOString(),
-      endDate: effectiveEndDate.toISOString()
-    });
-
-    // Проверка дат на будущее
-    const now = new Date();
-    if (effectiveStartDate > now || effectiveEndDate > now) {
-      console.warn('VoltageChart: Даты в будущем:', {
-        startDate: effectiveStartDate.toISOString(),
-        endDate: effectiveEndDate.toISOString(),
-        now: now.toISOString()
-      });
-      setError('Внимание: вы выбрали даты в будущем. Данные могут отсутствовать.');
-    } else {
-      setError(null);
+    
+    // Проверяем даты
+    if (!useStartDate || !useEndDate) {
+      console.error('Не указаны даты для запроса данных о напряжении');
+      setError('Необходимо указать период для получения данных о напряжении');
+      setIsLoading(false);
+      return;
     }
-
-    // Отменяем предыдущий запрос, если он был
+    
+    // Логируем значения для отладки
+    console.log('VoltageChart: Проверка типов перед validateDateRange:', {
+      useStartDate: useStartDate,
+      useStartDateType: typeof useStartDate,
+      isDateObject: useStartDate instanceof Date,
+      useEndDate: useEndDate,
+      useEndDateType: typeof useEndDate,
+      isEndDateObject: useEndDate instanceof Date
+    });
+    
+    // Отменяем предыдущий запрос, если он выполняется
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     
-    // Создаем новый контроллер для отмены
+    // Создаем новый контроллер прерывания
     abortControllerRef.current = new AbortController();
     
-    // Устанавливаем состояние загрузки
     setIsLoading(true);
     setError(null);
     
-    // Базовый URL API - заменяем с учетом текущего окружения
-    // Определяем базовый URL в зависимости от среды запуска
-    const baseUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:8081' 
-      : `${window.location.protocol}//${window.location.host}`;
+    // Убедимся, что даты являются объектами Date
+    const startObj = useStartDate instanceof Date ? useStartDate : new Date(useStartDate);
+    const endObj = useEndDate instanceof Date ? useEndDate : new Date(useEndDate);
     
-    // Формируем параметры запроса
-    const params = new URLSearchParams({
-      startTime: effectiveStartDate.toISOString(),
-      endTime: effectiveEndDate.toISOString()
-    });
-    
-    // Полный URL для API напряжения
-    const apiUrl = `${baseUrl}/api/telemetry/v3/${vehicle.imei}/voltage?${params.toString()}`;
+    // Проверяем и исправляем диапазон дат перед запросом
+    const { startDate: validStartDate, endDate: validEndDate } = validateDateRange(startObj, endObj);
     
     try {
-      console.log(`VoltageChart: Запрос данных: ${apiUrl}`);
+      console.log(`VoltageChart: Запрос данных о напряжении для ТС ${vehicle.name || vehicle.imei} за период с ${validStartDate.toISOString()} по ${validEndDate.toISOString()}`);
+      
+      // Формируем URL для запроса
+      const apiUrl = `/api/telemetry/v3/${vehicle.imei}/voltage?startTime=${validStartDate.toISOString()}&endTime=${validEndDate.toISOString()}`;
       
       // Получаем токен авторизации
       const authToken = getAuthToken();
@@ -615,40 +563,9 @@ const VoltageChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDat
   // Форматирование подписей осей
   const formatVoltageLabel = (value) => `${toVolts(value).toFixed(1)} В`;
   
-  // Форматирование временных меток
+  // Заменяем функцию formatTimeLabel на использование общей утилиты
   const formatTimeLabel = (date) => {
-    if (!(date instanceof Date)) {
-      return '';
-    }
-    
-    // Форматируем дату в зависимости от диапазона дат
-    const diffHours = endDate && startDate ? 
-      (endDate.getTime() - startDate.getTime()) / (3600 * 1000) : 0;
-    
-    if (diffHours <= 24) {
-      // Для периода до 24 часов: ЧЧ:MM
-      return date.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } else if (diffHours <= 72) {
-      // Для периода до 3 дней: ДД.ММ ЧЧ:MM
-      return date.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } else {
-      // Для более длительных периодов: ДД.ММ
-      return date.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        day: 'numeric',
-        month: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
+    return formatChartTimeLabel(date, startDate, endDate);
   };
 
   // Получение опций для графика
@@ -663,14 +580,7 @@ const VoltageChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDat
             if (tooltipItems.length > 0) {
               const dateTime = tooltipItems[0].xLabel;
               if (dateTime && dateTime instanceof Date) {
-                return dateTime.toLocaleString('ru-RU', {
-                  timeZone: 'Asia/Almaty',
-                  day: 'numeric',
-                  month: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                });
+                return formatChartTooltipTime(dateTime);
               }
             }
             return '';

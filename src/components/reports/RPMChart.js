@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BaseChart from './BaseChart';
 import { getAuthToken } from '../../utils/authUtils';
+import { formatChartTimeLabel, validateDateRange } from '../../utils/DateUtils';
 
 const RPMChart = ({ vehicle, startDate, endDate }) => {
   const [chartData, setChartData] = useState([]);
@@ -12,58 +13,37 @@ const RPMChart = ({ vehicle, startDate, endDate }) => {
       return;
     }
 
+    // Проверяем и исправляем диапазон дат
+    const { startDate: validStartDate, endDate: validEndDate } = validateDateRange(startDate, endDate);
+
     // Преобразование дат в ISO формат для API
-    const startISOString = startDate instanceof Date ? startDate.toISOString() : new Date(startDate).toISOString();
-    const endISOString = endDate instanceof Date ? endDate.toISOString() : new Date(endDate).toISOString();
+    const startISOString = validStartDate instanceof Date ? validStartDate.toISOString() : new Date(validStartDate).toISOString();
+    const endISOString = validEndDate instanceof Date ? validEndDate.toISOString() : new Date(validEndDate).toISOString();
 
     try {
-      // Получаем токен авторизации
-      const authToken = getAuthToken();
-      
-      // Формируем URL для API
-      const apiUrl = `/api/telemetry/v3/${vehicle.imei}/data?parameter=rpm&startTime=${encodeURIComponent(startISOString)}&endTime=${encodeURIComponent(endISOString)}&limit=5000`;
-      
-      // Подготавливаем заголовки
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
-      
-      // Добавляем токен авторизации, если он есть
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-      
-      // Выполняем запрос
-      const response = await fetch(apiUrl, { 
-        method: 'GET',
-        headers: headers
+      const response = await fetch(`/api/rpm/${vehicle.imei}?startTime=${startISOString}&endTime=${endISOString}`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
       });
-      
+
       if (!response.ok) {
-        throw new Error(`Ошибка API: ${response.status} ${response.statusText}`);
+        throw new Error(`Ошибка получения данных: ${response.status}`);
       }
-      
+
       const data = await response.json();
       
-      if (!Array.isArray(data) || data.length === 0) {
-        console.warn('API вернул пустой массив данных об оборотах двигателя');
+      if (data && Array.isArray(data.points)) {
+        const processedData = preprocessRPMData(data.points);
+        setChartData(processedData.values);
+        setChartLabels(processedData.labels);
+      } else {
+        console.warn('Получен неверный формат данных об оборотах двигателя');
         setChartData([]);
         setChartLabels([]);
-        return;
       }
-      
-      console.log(`Получено ${data.length} точек для графика оборотов двигателя`);
-      
-      // Фильтруем и подготавливаем данные
-      const processedData = preprocessRPMData(data);
-      
-      // Обновляем состояние компонента
-      setChartData(processedData.values);
-      setChartLabels(processedData.labels);
     } catch (error) {
       console.error('Ошибка при загрузке данных об оборотах двигателя:', error);
-      throw error;
     }
   };
   
@@ -115,22 +95,9 @@ const RPMChart = ({ vehicle, startDate, endDate }) => {
   // Форматирование подписей осей
   const formatRPMLabel = (value) => `${value} об/мин`;
   
-  // Форматирование меток времени на оси X
+  // Форматирование меток времени на оси X с использованием общей утилиты
   const formatTimeLabel = (dateTime) => {
-    if (!dateTime || !(dateTime instanceof Date)) return '';
-    
-    const hours = dateTime.getHours().toString().padStart(2, '0');
-    const minutes = dateTime.getMinutes().toString().padStart(2, '0');
-    
-    // Если данные за несколько дней, добавляем дату
-    if (startDate && endDate && 
-        endDate.getTime() - startDate.getTime() > 24 * 60 * 60 * 1000) {
-      const day = dateTime.getDate().toString().padStart(2, '0');
-      const month = (dateTime.getMonth() + 1).toString().padStart(2, '0');
-      return `${day}.${month} ${hours}:${minutes}`;
-    }
-    
-    return `${hours}:${minutes}`;
+    return formatChartTimeLabel(dateTime, startDate, endDate);
   };
   
   return (

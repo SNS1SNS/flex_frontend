@@ -11,6 +11,7 @@ import chartSyncManager from '../../utils/ChartSyncManager';
 import chartSyncActivator from '../../utils/ChartSyncActivator';
 import ReportChooser from './ReportChooser';
 import { toast } from 'react-toastify';
+import { formatChartTooltipTime, validateDateRange } from '../../utils/DateUtils';
 import './ChartStyles.css';
 
 // Регистрируем необходимые компоненты ChartJS
@@ -77,6 +78,9 @@ const BaseChart = ({
   const containerId = useRef(`chart-container-${Math.random().toString(36).substring(2, 11)}`).current;
   const [containerToFill, setContainerToFill] = useState(null);
   const [syncGroupId, setSyncGroupId] = useState(null);
+  // Добавляем локальное состояние для хранения данных из localStorage
+  const [localStorageVehicle, setLocalStorageVehicle] = useState(null);
+  const [localStorageDateRange, setLocalStorageDateRange] = useState(null);
 
   // Эффект для проверки существования контейнера в DOM и установки ID на DOM-элемент
   useEffect(() => {
@@ -168,6 +172,39 @@ const BaseChart = ({
       loadData();
     }
   }, [vehicle, startDate, endDate]);
+  
+  // Эффект для обновления данных графика при изменении данных в localStorage
+  useEffect(() => {
+    if (!fetchData) return; // Если нет функции загрузки данных, пропускаем
+    
+    // Проверяем, что данные из localStorage получены и отличаются от текущих
+    const shouldUpdateVehicle = localStorageVehicle && 
+      (!vehicle || localStorageVehicle.id !== vehicle.id);
+    
+    const shouldUpdateDateRange = localStorageDateRange && 
+      (!startDate || !endDate || 
+       new Date(localStorageDateRange.startDate).getTime() !== new Date(startDate).getTime() || 
+       new Date(localStorageDateRange.endDate).getTime() !== new Date(endDate).getTime());
+    
+    // Если нужно обновить данные
+    if (shouldUpdateVehicle || shouldUpdateDateRange) {
+      console.log(`BaseChart: Обновляем данные графика из localStorage:`, {
+        currentVehicle: vehicle ? vehicle.name : 'нет',
+        newVehicle: localStorageVehicle ? localStorageVehicle.name : 'нет',
+        currentStartDate: startDate,
+        newStartDate: localStorageDateRange ? localStorageDateRange.startDate : 'нет',
+        currentEndDate: endDate,
+        newEndDate: localStorageDateRange ? localStorageDateRange.endDate : 'нет'
+      });
+      
+      // Вызываем loadData с новыми параметрами
+      const updatedVehicle = shouldUpdateVehicle ? localStorageVehicle : vehicle;
+      const updatedStartDate = shouldUpdateDateRange ? localStorageDateRange.startDate : startDate;
+      const updatedEndDate = shouldUpdateDateRange ? localStorageDateRange.endDate : endDate;
+      
+      loadData(updatedVehicle, updatedStartDate, updatedEndDate);
+    }
+  }, [localStorageVehicle, localStorageDateRange, vehicle, startDate, endDate, fetchData, title]);
 
   // Эффект для обновления размеров графика при изменении размера окна
   useEffect(() => {
@@ -355,6 +392,28 @@ const BaseChart = ({
         setContainerToFill(container2Id);
         setShowReportChooser(true);
         
+        // Активируем второй контейнер для корректной работы кнопок
+        setTimeout(() => {
+          const container2 = document.getElementById(container2Id) || 
+                           document.querySelector(`[data-container-id="${container2Id}"]`);
+          if (container2) {
+            // Сначала снимаем активность со всех контейнеров
+            document.querySelectorAll('.split-screen-container[data-active="true"]')
+              .forEach(el => {
+                if (el && document.body.contains(el)) { // Проверяем, что элемент всё ещё в DOM
+                  el.setAttribute('data-active', 'false');
+                  el.classList.remove('active-container');
+                }
+              });
+            
+            // Активируем новый контейнер
+            container2.setAttribute('data-active', 'true');
+            container2.classList.add('active-container');
+            
+            console.log(`BaseChart: Активирован новый контейнер ${container2Id} после разделения`);
+          }
+        }, 300);
+        
         // Сбрасываем флаг при закрытии модального окна через некоторое время
         setTimeout(resetModalFlag, 1000);
       }
@@ -426,6 +485,16 @@ const BaseChart = ({
             container.classList.add('active-container');
             
             console.log(`BaseChart: Активирован контейнер ${containerId} для выбора отчета`);
+            
+            // Добавляем отложенное обновление активного состояния через 100мс
+            // чтобы гарантировать, что оно применится после всех DOM-операций
+            setTimeout(() => {
+              if (document.body.contains(container)) {
+                container.setAttribute('data-active', 'true');
+                container.classList.add('active-container');
+                console.log(`BaseChart: Повторно активирован контейнер ${containerId} (отложенное обновление)`);
+              }
+            }, 100);
           }
         }
       }
@@ -755,19 +824,31 @@ const BaseChart = ({
       false
     );
     
-    // Если элементы не найдены, прерываем обработку
-    if (!clickedElements || clickedElements.length === 0) {
-      console.log(`BaseChart: Клик не попал в данные графика`);
-      return;
-    }
-    
-    // Получаем родительский контейнер графика и активируем его
+    // Получаем родительский контейнер графика и активируем его независимо от того, 
+    // попал ли клик в точку данных - это обеспечит работу кнопок
     const container = chartContainerRef.current?.closest('.split-screen-container');
     
     if (container) {
-      // Активируем контейнер - делаем это только для кликнутой точки
+      // Сначала снимаем активность со всех контейнеров
+      document.querySelectorAll('.split-screen-container[data-active="true"]')
+        .forEach(el => {
+          if (el && document.body.contains(el)) { // Проверяем, что элемент всё ещё в DOM
+            el.setAttribute('data-active', 'false');
+            el.classList.remove('active-container');
+          }
+        });
+      
+      // Активируем контейнер - делаем это всегда при клике по области графика
       container.setAttribute('data-active', 'true');
       container.classList.add('active-container');
+      
+      console.log(`BaseChart: Активирован контейнер ${containerId} при клике по графику`);
+    }
+
+    // Если элементы не найдены, прерываем дальнейшую обработку выделения точки
+    if (!clickedElements || clickedElements.length === 0) {
+      console.log(`BaseChart: Клик не попал в данные графика`);
+      return;
     }
 
     // Если пользователь кликнул на точку графика
@@ -1271,14 +1352,7 @@ const BaseChart = ({
             try {
               const dateObj = new Date(dateLabel);
               if (!isNaN(dateObj.getTime())) {
-                return dateObj.toLocaleString('ru-RU', {
-                  timeZone: 'Asia/Almaty',
-                  day: '2-digit',
-                  month: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                });
+                return formatChartTooltipTime(dateObj);
               }
             } catch (e) {
               console.warn('Ошибка при форматировании времени:', e);
@@ -2297,18 +2371,36 @@ const BaseChart = ({
     
   }, [getDataPoints, containerId, syncGroupId]);
 
-  // Функция загрузки данных
-  const loadData = async () => {
-    if (!vehicle || !startDate || !endDate) {
+  // Функция загрузки данных с поддержкой параметров из localStorage
+  const loadData = async (customVehicle, customStartDate, customEndDate) => {
+    // Используем переданные параметры или текущие состояния
+    const vehicleToUse = customVehicle || vehicle || localStorageVehicle;
+    const startDateToUse = customStartDate || startDate || (localStorageDateRange ? localStorageDateRange.startDate : null);
+    const endDateToUse = customEndDate || endDate || (localStorageDateRange ? localStorageDateRange.endDate : null);
+    
+    if (!vehicleToUse || !startDateToUse || !endDateToUse) {
       setError('Не выбран транспорт или период');
       return;
     }
 
+    // Проверяем и исправляем диапазон дат
+    const validatedDates = validateDateRange(startDateToUse, endDateToUse);
+    
     setIsLoading(true);
     setError(null);
 
     try {
-      await fetchData();
+      // Выводим подробную информацию для отладки
+      console.log(`BaseChart: Загрузка данных для графика ${title}:`, {
+        vehicle: vehicleToUse.name,
+        id: vehicleToUse.id,
+        imei: vehicleToUse.imei,
+        startDate: validatedDates.startDate,
+        endDate: validatedDates.endDate
+      });
+      
+      // Вызываем функцию загрузки данных с проверенными параметрами
+      await fetchData(vehicleToUse, validatedDates.startDate, validatedDates.endDate);
     } catch (err) {
       console.error(`Ошибка при загрузке данных для графика ${title}:`, err);
       setError(`Ошибка при загрузке данных: ${err.message || 'Неизвестная ошибка'}`);
@@ -2421,7 +2513,130 @@ const BaseChart = ({
     };
   }, [containerId, applySelectionToChart]);
 
-  // Рендер компонента
+  // Добавляем эффект для отслеживания изменений в localStorage
+  useEffect(() => {
+    // Флаг для отслеживания, был ли уже выполнен первоначальный запрос данных
+    let initialDataFetched = false;
+    
+    // Функция для получения данных из localStorage
+    const getLocalStorageData = () => {
+      try {
+        // Получаем данные о выбранном транспорте
+        const storedVehicle = localStorage.getItem('lastSelectedVehicle');
+        if (storedVehicle) {
+          try {
+            const parsedVehicle = JSON.parse(storedVehicle);
+            
+            // Проверяем, есть ли у нас уже транспортное средство с теми же данными
+            if (!vehicle || vehicle.id !== parsedVehicle.id) {
+              console.log(`BaseChart: Получены новые данные о ТС из localStorage:`, {
+                id: parsedVehicle.id,
+                name: parsedVehicle.name,
+                imei: parsedVehicle.imei
+              });
+              setLocalStorageVehicle(parsedVehicle);
+            }
+          } catch (e) {
+            console.error('BaseChart: Ошибка при разборе данных о транспорте из localStorage:', e);
+          }
+        }
+        
+        // Получаем данные о выбранном диапазоне дат
+        const storedDateRange = localStorage.getItem('lastDateRange');
+        if (storedDateRange) {
+          try {
+            const parsedDateRange = JSON.parse(storedDateRange);
+            
+            // Проверяем, отличается ли новый диапазон от текущего
+            const currentStartTime = startDate ? new Date(startDate).getTime() : 0;
+            const currentEndTime = endDate ? new Date(endDate).getTime() : 0;
+            const newStartTime = new Date(parsedDateRange.startDate).getTime();
+            const newEndTime = new Date(parsedDateRange.endDate).getTime();
+            
+            if (!startDate || !endDate || currentStartTime !== newStartTime || currentEndTime !== newEndTime) {
+              console.log(`BaseChart: Получены новые данные о диапазоне дат из localStorage:`, {
+                startDate: parsedDateRange.startDate,
+                endDate: parsedDateRange.endDate
+              });
+              setLocalStorageDateRange(parsedDateRange);
+            }
+          } catch (e) {
+            console.error('BaseChart: Ошибка при разборе данных о диапазоне дат из localStorage:', e);
+          }
+        }
+        
+        // Устанавливаем флаг, что первоначальные данные получены
+        initialDataFetched = true;
+      } catch (error) {
+        console.error('BaseChart: Ошибка при чтении данных из localStorage:', error);
+      }
+    };
+    
+    // Получаем начальные данные только если не заданы явно
+    if (!vehicle || !startDate || !endDate) {
+      getLocalStorageData();
+    } else {
+      // Если данные уже заданы явно, устанавливаем флаг
+      initialDataFetched = true;
+    }
+    
+    // Создаем обработчик события storage для отслеживания изменений в localStorage
+    const handleStorageChange = (event) => {
+      // Игнорируем события, если первоначальные данные еще не получены
+      if (!initialDataFetched) return;
+      
+      console.log(`BaseChart: Изменение в localStorage: ${event.key}`);
+      
+      if (event.key === 'lastSelectedVehicle' && event.newValue) {
+        try {
+          const newVehicle = JSON.parse(event.newValue);
+          
+          // Проверяем, есть ли у нас уже транспортное средство с теми же данными
+          if (!vehicle || vehicle.id !== newVehicle.id) {
+            console.log(`BaseChart: Обновление ТС из события storage:`, {
+              id: newVehicle.id,
+              name: newVehicle.name,
+              imei: newVehicle.imei
+            });
+            setLocalStorageVehicle(newVehicle);
+          }
+        } catch (e) {
+          console.error('BaseChart: Ошибка при разборе данных о транспорте:', e);
+        }
+      }
+      
+      if (event.key === 'lastDateRange' && event.newValue) {
+        try {
+          const newDateRange = JSON.parse(event.newValue);
+          
+          // Проверяем, отличается ли новый диапазон от текущего
+          const currentStartTime = startDate ? new Date(startDate).getTime() : 0;
+          const currentEndTime = endDate ? new Date(endDate).getTime() : 0;
+          const newStartTime = new Date(newDateRange.startDate).getTime();
+          const newEndTime = new Date(newDateRange.endDate).getTime();
+          
+          if (!startDate || !endDate || currentStartTime !== newStartTime || currentEndTime !== newEndTime) {
+            console.log(`BaseChart: Обновление диапазона дат из события storage:`, {
+              startDate: newDateRange.startDate,
+              endDate: newDateRange.endDate
+            });
+            setLocalStorageDateRange(newDateRange);
+          }
+        } catch (e) {
+          console.error('BaseChart: Ошибка при разборе данных о диапазоне дат:', e);
+        }
+      }
+    };
+    
+    // Добавляем обработчик события storage
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Очистка при размонтировании
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [vehicle, startDate, endDate]);
+
   return (
     <div 
       className={getContainerClasses()} 
@@ -2465,7 +2680,7 @@ const BaseChart = ({
       {/* Используем порталы React для рендеринга модального окна в корне DOM, 
           чтобы избежать проблем с вложенными контейнерами */}
       {showReportChooser ? (
-        <ReportChooser 
+        <ReportChooser
           onSelectReport={handleReportSelect}
           onClose={handleReportChooserClose}
           selectedVehicle={vehicle}

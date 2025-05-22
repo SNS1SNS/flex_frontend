@@ -848,7 +848,7 @@ class ChartSyncManager {
         return;
       }
       
-    // Проверка на наличие шкалы X
+      // Проверка на наличие шкалы X
       if (!chart.scales || !chart.scales.x) {
         console.warn(`ChartSyncManager: У графика ${chartId} отсутствует шкала X`);
         return;
@@ -872,11 +872,24 @@ class ChartSyncManager {
       
       // Безопасное обновление графика
       try {
-        // Используем безопасное обновление с таймаутом
-        if (chart.update && typeof chart.update === 'function') {
+        // Дополнительная проверка перед обновлением
+        if (!chart.isDestroyed && chart.ctx && chart.ctx.canvas && 
+            chart.update && typeof chart.update === 'function') {
+          // Проверяем, что внутренние объекты, необходимые для fullSize, существуют
+          if (!chart.chartArea) {
+            chart.chartArea = {}; // Создаем объект если он не существует
+          }
+          
           // Обновляем график без анимации для быстродействия и безопасности
-      chart.update('none'); 
-      console.log(`ChartSyncManager: Масштаб применен к графику ${chartId}`);
+          chart.update('none'); 
+          console.log(`ChartSyncManager: Масштаб применен к графику ${chartId}`);
+        } else {
+          console.warn(`ChartSyncManager: График ${chartId} не может быть обновлен, т.к. находится в некорректном состоянии`);
+          // Если график в некорректном состоянии, удаляем его из коллекции
+          if (this.charts.has(chartId)) {
+            this.charts.delete(chartId);
+            console.log(`ChartSyncManager: График ${chartId} удален из коллекции из-за некорректного состояния`);
+          }
         }
       } catch (updateError) {
         console.error(`ChartSyncManager: Ошибка при обновлении графика ${chartId}:`, updateError);
@@ -884,12 +897,29 @@ class ChartSyncManager {
         // Если обычное обновление не сработало, пробуем отложенное обновление
         setTimeout(() => {
           try {
-            if (chart && chart.update && !chart.isDestroyed) {
-        chart.update('none');
+            if (chart && chart.update && !chart.isDestroyed && chart.ctx && chart.ctx.canvas) {
+              // Проверяем, что chartArea существует
+              if (!chart.chartArea) {
+                chart.chartArea = {};
+              }
+              
+              chart.update('none');
               console.log(`ChartSyncManager: Масштаб применен к графику ${chartId} с отложенным обновлением`);
+            } else {
+              console.warn(`ChartSyncManager: Невозможно применить отложенное обновление к графику ${chartId}`);
+              // Удаляем из коллекции, если график нерабочий
+              if (this.charts.has(chartId)) {
+                this.charts.delete(chartId);
+                console.log(`ChartSyncManager: График ${chartId} удален из коллекции из-за невозможности обновления`);
+              }
             }
           } catch (delayedError) {
             console.error(`ChartSyncManager: Не удалось обновить график ${chartId} даже с задержкой:`, delayedError);
+            // Удаляем проблемный график из коллекции
+            if (this.charts.has(chartId)) {
+              this.charts.delete(chartId);
+              console.log(`ChartSyncManager: График ${chartId} удален из коллекции после ошибки обновления`);
+            }
           }
         }, 0);
       }
@@ -902,6 +932,11 @@ class ChartSyncManager {
       }, 100);
     } catch (error) {
       console.error(`ChartSyncManager: Ошибка при применении масштаба к графику ${chartId}:`, error);
+      // Удаляем проблемный график из коллекции при общей ошибке
+      if (this.charts.has(chartId)) {
+        this.charts.delete(chartId);
+        console.log(`ChartSyncManager: График ${chartId} удален из коллекции после общей ошибки`);
+      }
     }
   }
 
@@ -1921,7 +1956,8 @@ class ChartSyncManager {
       
       // Только если у графика есть метод resetZoom и он в рабочем состоянии, вызываем его
       let resetAttempted = false;
-      if (chart.resetZoom && typeof chart.resetZoom === 'function' && !chart._active === undefined) {
+      // Исправление: Корректная проверка chart._active
+      if (chart.resetZoom && typeof chart.resetZoom === 'function' && chart._active !== undefined) {
         try {
           console.log(`ChartSyncManager: Пробуем сбросить масштаб через resetZoom для графика ${chartId}`);
           // Оборачиваем в try-catch, так как resetZoom может вызвать ошибку
@@ -1957,8 +1993,18 @@ class ChartSyncManager {
         try {
           if (chart.update && typeof chart.update === 'function') {
             // Используем безопасное обновление без анимации
-            chart.update('none');
-            console.log(`ChartSyncManager: Масштаб успешно сброшен для графика ${chartId} через обновление`);
+            // Проверяем, что график еще активен перед вызовом update
+            if (!chart.isDestroyed && chart.ctx && chart.ctx.canvas) {
+              chart.update('none');
+              console.log(`ChartSyncManager: Масштаб успешно сброшен для графика ${chartId} через обновление`);
+            } else {
+              console.warn(`ChartSyncManager: Контекст графика ${chartId} недоступен, пропускаем обновление`);
+              // Удаляем из коллекции поврежденный график
+              if (this.charts.has(chartId)) {
+                console.warn(`ChartSyncManager: Удаляем поврежденный график ${chartId} из коллекции`);
+                this.charts.delete(chartId);
+              }
+            }
           }
         } catch (updateError) {
           console.error(`ChartSyncManager: Ошибка при обновлении графика ${chartId} после сброса масштаба:`, updateError);

@@ -3,6 +3,7 @@ import BaseChart from './BaseChart';
 import { getAuthToken } from '../../utils/authUtils';
 import { toast } from 'react-toastify';
 import chartSyncActivator from '../../utils/ChartSyncActivator';
+import { formatChartTimeLabel, formatChartTooltipTime, validateDateRange } from '../../utils/DateUtils';
 
 // Активируем синхронизацию графиков при импорте компонента
 if (!chartSyncActivator.initialized) {
@@ -364,72 +365,52 @@ const SpeedChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate 
   }, [error]);
 
   const fetchSpeedData = async () => {
-    if (!vehicle || !vehicle.imei || !startDate || !endDate) {
-      console.warn('Не выбран транспорт или период для загрузки данных о скорости');
-      setError('Не выбран транспорт или не указан период');
+    // Проверяем наличие ТС
+    if (!vehicle || !vehicle.imei) {
+      console.error('Не удалось получить IMEI транспортного средства');
+      setError('Для получения данных о скорости необходимо указать IMEI транспортного средства');
+      setIsLoading(false);
       return;
     }
-
-    // Проверяем даты на "будущность"
-    const now = new Date();
-    const startDateObj = startDate instanceof Date ? startDate : new Date(startDate);
-    const endDateObj = endDate instanceof Date ? endDate : new Date(endDate);
     
-    const debugData = {
-      vehicle: vehicle.imei,
-      vehicleName: vehicle.name || 'Неизвестно',
-      startDate: startDateObj.toISOString(),
-      endDate: endDateObj.toISOString(),
-      now: now.toISOString(),
-      isFutureStart: startDateObj > now,
-      isFutureEnd: endDateObj > now
-    };
-    
-    // Если дата в будущем, показываем предупреждение, но не блокируем запрос
-    if (startDateObj > now || endDateObj > now) {
-      console.warn('Запрос данных о скорости для будущих дат!', debugData);
-      setError(`Внимание: запрос содержит будущие даты, данные могут отсутствовать. 
-        Начало: ${startDateObj.toLocaleDateString()}, 
-        Конец: ${endDateObj.toLocaleDateString()}`);
-    } else {
-      setError(null);
+    // Проверяем даты
+    if (!startDate || !endDate) {
+      console.error('Не указаны даты для запроса данных о скорости');
+      setError('Необходимо указать период для получения данных о скорости');
+      setIsLoading(false);
+      return;
     }
     
-    // Если есть предыдущий запрос, отменяем его
+    // Отменяем предыдущий запрос, если он выполняется
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-
-    // Создаем новый AbortController для текущего запроса
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
     
-    // Сбрасываем ошибки и устанавливаем состояние загрузки
-    setError(null);
+    // Создаем новый контроллер прерывания
+    abortControllerRef.current = new AbortController();
+    
     setIsLoading(true);
-
+    setError(null);
+    
+    // Проверяем и исправляем диапазон дат
+    const { startDate: validStartDate, endDate: validEndDate } = validateDateRange(startDate, endDate);
+    
+    // Форматируем даты для API
+    const formattedStartDate = validStartDate.toISOString();
+    const formattedEndDate = validEndDate.toISOString();
+    
     try {
-      // Преобразование дат в ISO формат для API
-      const startISOString = startDateObj.toISOString();
-      const endISOString = endDateObj.toISOString();
-
-      // Получаем токен авторизации
-      const authToken = getAuthToken();
-      
-      // Базовый URL API - заменяем с учетом текущего окружения
-      // Определяем базовый URL в зависимости от среды запуска
-      const baseUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:8081' 
-        : `${window.location.protocol}//${window.location.host}`;
-      
-      // Формируем параметры запроса
-      const params = new URLSearchParams({
-        startTime: startISOString,
-        endTime: endISOString
+      console.log(`Запрос данных о скорости для ${vehicle.name || vehicle.imei}:`, {
+        imei: vehicle.imei,
+        startDate: formattedStartDate,
+        endDate: formattedEndDate
       });
       
-      // Полный URL для API скорости
-      const apiUrl = `${baseUrl}/api/telemetry/v3/${vehicle.imei}/speed?${params.toString()}`;
+      // Формируем URL для запроса
+      const apiUrl = `/api/telemetry/v3/${vehicle.imei}/speed?startTime=${formattedStartDate}&endTime=${formattedEndDate}`;
+      
+      // Получаем токен авторизации
+      const authToken = getAuthToken();
       
       // Подготавливаем заголовки
       const headers = {
@@ -437,18 +418,16 @@ const SpeedChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate 
         'Accept': 'application/json'
       };
       
-      // Добавляем токен авторизации, если он есть
+      // Если токен найден, добавляем его в заголовки
       if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
       }
-      
-      console.log(`Запрос данных о скорости для ТС ${vehicle.name || vehicle.imei}: ${apiUrl}`);
       
       // Выполняем запрос
       const response = await fetch(apiUrl, { 
         method: 'GET',
         headers: headers,
-        signal: signal
+        signal: abortControllerRef.current.signal
       });
       
       // Проверяем ответ
@@ -760,43 +739,7 @@ const SpeedChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate 
   
   // Форматирование временных меток на оси X
   const formatTimeLabel = (dateTime) => {
-    if (!dateTime || !(dateTime instanceof Date)) return '';
-    
-    // Опции форматирования для казахстанского времени
-    const options = {
-      timeZone: 'Asia/Almaty',
-      day: 'numeric',
-      month: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    };
-    
-    // Если данные за несколько дней, добавляем дату
-    if (startDate && endDate) {
-      const startDateObj = startDate instanceof Date ? startDate : new Date(startDate);
-      const endDateObj = endDate instanceof Date ? endDate : new Date(endDate);
-      
-      const diffInDays = Math.floor((endDateObj.getTime() - startDateObj.getTime()) / (24 * 60 * 60 * 1000));
-      
-      if (diffInDays > 30) {
-        // Для большого диапазона показываем только день и месяц
-        return dateTime.toLocaleString('ru-RU', {
-          timeZone: 'Asia/Almaty',
-          day: 'numeric',
-          month: 'numeric'
-        });
-      } else if (diffInDays > 2) {
-        // Для нескольких дней показываем день, месяц и время
-        return dateTime.toLocaleString('ru-RU', options);
-      }
-    }
-    
-    // Для небольшого интервала показываем только часы и минуты
-    return dateTime.toLocaleString('ru-RU', {
-      timeZone: 'Asia/Almaty',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatChartTimeLabel(dateTime, startDate, endDate);
   };
   
   // Получение максимальной и минимальной скорости для подсветки нарушений
@@ -811,14 +754,7 @@ const SpeedChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate 
             if (tooltipItems.length > 0) {
               const dateTime = tooltipItems[0].xLabel;
               if (dateTime && dateTime instanceof Date) {
-                return dateTime.toLocaleString('ru-RU', {
-                  timeZone: 'Asia/Almaty',
-                  day: 'numeric',
-                  month: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                });
+                return formatChartTooltipTime(dateTime);
               }
             }
             return '';

@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import KalmanFilter from '../../utils/KalmanFilter';
 import chartSyncActivator from '../../utils/ChartSyncActivator';
 import './ChartStyles.css';
+import { formatChartTimeLabel, formatChartTooltipTime, validateDateRange } from '../../utils/DateUtils';
 
 // Активируем синхронизацию графиков при импорте компонента
 if (!chartSyncActivator.initialized) {
@@ -125,6 +126,9 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
     setIsLoading(true);
     setError(null);
     
+    // Проверяем и исправляем диапазон дат
+    const { startDate: validStartDate, endDate: validEndDate } = validateDateRange(startDate, endDate);
+    
     try {
       // Форматируем даты для запроса в формате ISO без миллисекунд
       const formatDateForAPI = (date) => {
@@ -133,8 +137,8 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
         return date.toISOString().split('.')[0] + 'Z';
       };
       
-      const startISO = formatDateForAPI(startDate);
-      const endISO = formatDateForAPI(endDate);
+      const startISO = formatDateForAPI(validStartDate);
+      const endISO = formatDateForAPI(validEndDate);
       
       // Проверяем наличие IMEI
       if (!vehicle.imei) {
@@ -142,9 +146,13 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
       }
       
       // URL для запроса данных о топливе
-      const url = `http://localhost:8081/api/fuel/${vehicle.imei}/liters?startTime=${startISO}&endTime=${endISO}`;
+      const url = `/api/fuel/${vehicle.imei}/liters?startTime=${startISO}&endTime=${endISO}`;
       
-      console.log('FuelChart: Запрос данных топлива:', url);
+      console.log('FuelChart: Запрос данных топлива:', {
+        imei: vehicle.imei,
+        startDate: startISO,
+        endDate: endISO
+      });
       
       const response = await fetch(url, {
         method: 'GET',
@@ -538,44 +546,7 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
   
   // Форматирование метки времени для оси X
   const formatTimeLabel = (dateTime) => {
-    if (!dateTime) return '';
-    
-    const date = new Date(dateTime);
-    
-    // Проверяем валидность даты
-    if (isNaN(date.getTime())) {
-      return 'Неверная дата';
-    }
-    
-    // Определяем диапазон дат
-    const diffDays = startDate && endDate 
-      ? Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) 
-      : 0;
-    
-    if (diffDays > 30) {
-      // Для больших периодов показываем только день и месяц
-      return date.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        day: 'numeric', 
-        month: 'numeric'
-      });
-    } else if (diffDays > 3) {
-      // Для периода более 3 дней - день, месяц и время
-      return date.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        day: 'numeric',
-        month: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } else {
-      // Для коротких периодов показываем только время
-      return date.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
+    return formatChartTimeLabel(dateTime, startDate, endDate);
   };
   
   // Создаем данные для графика с двумя линиями
@@ -620,12 +591,7 @@ const FuelChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate }
             if (tooltipItems.length > 0) {
               const dateTime = tooltipItems[0].xLabel;
               if (dateTime && dateTime instanceof Date) {
-                return dateTime.toLocaleString('ru-RU', {
-                  timeZone: 'Asia/Almaty',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                });
+                return formatChartTooltipTime(dateTime);
               }
             }
             return '';

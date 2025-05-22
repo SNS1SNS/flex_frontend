@@ -346,7 +346,7 @@
 /* Панели в вертикальном разделении */
 .split-container.split-vertical > .split-pane:first-child {
   width: calc(50% - 4px);
-  margin-right: 8px;
+  /* margin-right: 8px; */
 }
 
 .split-container.split-vertical > .split-pane:last-child {

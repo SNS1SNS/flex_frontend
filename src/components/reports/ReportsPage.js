@@ -18,6 +18,7 @@ import fuel from '../../images/fuel.png';
 import track from '../../images/road.png';
 import track2 from '../../images/tracks.png';
 import ChartDebugPanel from './ChartDebugPanel'; 
+import { saveDateRangeToLocalStorage } from '../../utils/DateUtils';
 
 
 const LiveTrack = ({ vehicle, startDate, endDate }) => (
@@ -248,64 +249,53 @@ const ReportsPage = () => {
 
   
   const applyDateRange = () => {
-    
+    if (!tempStartDate || !tempEndDate) {
+      alert('Пожалуйста, выберите дату начала и окончания');
+      return;
+    }
+
+    // Копируем даты, чтобы не изменять оригинальные объекты
     const startDate = new Date(tempStartDate);
     const endDate = new Date(tempEndDate);
     
-    
+    // Устанавливаем время для начальной даты (начало дня)
     startDate.setHours(0, 0, 0, 0);
     
+    // Устанавливаем время для конечной даты (конец дня)
+    endDate.setHours(23, 59, 59, 999);
+
+    setDateRange({ startDate, endDate });
     
-    setDateRange({
-      startDate,
-      endDate
-    });
+    // Используем утилиту для сохранения данных в localStorage
+    const updateTimestamp = saveDateRangeToLocalStorage(startDate, endDate, 'custom');
     
-    
-    window.lastDateUpdateTime = new Date().getTime();
-    
-    
-    try {
-      localStorage.setItem('lastDateRange', JSON.stringify({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        updateTimestamp: window.lastDateUpdateTime
-      }));
-      
-      console.log('Сохранены даты в localStorage (ручной выбор):', {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString()
-      });
-    } catch (error) {
-      console.warn('Ошибка при сохранении дат в localStorage:', error);
-    }
-    
-    
+    // Закрываем модальное окно
     setShowDateModal(false);
     
-    
-    const dateEvent = new CustomEvent('dateRangeChanged', {
+    // Отправляем событие изменения дат
+    const event = new CustomEvent('dateRangeChanged', {
       detail: {
         startDate: formatDate(startDate),
         endDate: formatDate(endDate),
+        periodType: 'custom',
         forceUpdate: true,
-        timestamp: window.lastDateUpdateTime
+        timestamp: updateTimestamp
       }
     });
-    document.dispatchEvent(dateEvent);
+    document.dispatchEvent(event);
     
-    
+    // Обновляем все открытые отчеты
     const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
       detail: { 
         vehicle: selectedVehicle,
         startDate: startDate,
         endDate: endDate,
-        timestamp: window.lastDateUpdateTime
+        timestamp: updateTimestamp
       }
     });
     document.dispatchEvent(forceUpdateEvent);
     
-    
+    // Обновляем вкладки
     if (openTabs.length > 0) {
       setOpenTabs(prevTabs => prevTabs.map(tab => ({
         ...tab,
@@ -313,9 +303,6 @@ const ReportsPage = () => {
         endDate: endDate
       })));
     }
-    
-    
-    fetchStatistics();
   };
 
   
@@ -325,32 +312,18 @@ const ReportsPage = () => {
     
     const { startDate, endDate } = calculateDateRange(new Date(), period);
     
-    
     startDate.setHours(0, 0, 0, 0);
     
     setDateRange({ startDate, endDate });
     
+    // Используем утилиту для сохранения данных в localStorage
+    const updateTimestamp = saveDateRangeToLocalStorage(startDate, endDate, period);
     
-    window.lastDateUpdateTime = new Date().getTime();
-    
-    
-    try {
-      localStorage.setItem('lastDateRange', JSON.stringify({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        periodType: period,
-        updateTimestamp: window.lastDateUpdateTime
-      }));
-      
-      console.log('Сохранены даты в localStorage:', {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        periodType: period
-      });
-    } catch (error) {
-      console.warn('Ошибка при сохранении дат в localStorage:', error);
-    }
-    
+    console.log('Сохранены даты в localStorage:', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      periodType: period
+    });
     
     const event = new CustomEvent('dateRangeChanged', {
       detail: {
@@ -358,22 +331,20 @@ const ReportsPage = () => {
         endDate: formatDate(endDate),
         periodType: period,
         forceUpdate: true,
-        timestamp: window.lastDateUpdateTime
+        timestamp: updateTimestamp
       }
     });
     document.dispatchEvent(event);
-    
     
     const forceUpdateEvent = new CustomEvent('forceVehicleUpdate', {
       detail: { 
         vehicle: selectedVehicle,
         startDate: startDate,
         endDate: endDate,
-        timestamp: window.lastDateUpdateTime
+        timestamp: updateTimestamp
       }
     });
     document.dispatchEvent(forceUpdateEvent);
-    
     
     if (openTabs.length > 0) {
       setOpenTabs(prevTabs => prevTabs.map(tab => ({

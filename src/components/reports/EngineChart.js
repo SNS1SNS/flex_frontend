@@ -3,6 +3,7 @@ import BaseChart from './BaseChart';
 import { toast } from 'react-toastify';
 import tokenService from '../../services/tokenService';
 import chartSyncActivator from '../../utils/ChartSyncActivator';
+import { ensureValidDate, getDateRangeFromLocalStorage, formatChartTimeLabel, formatChartTooltipTime, validateDateRange } from '../../utils/DateUtils';
 
 // Активируем синхронизацию графиков при импорте компонента
 if (!chartSyncActivator.initialized) {
@@ -30,130 +31,92 @@ const EngineChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate
     }
   }, [propsStartDate, propsEndDate]);
 
-  // Функция для форматирования метки времени
+  // Функция для форматирования метки времени с использованием общей утилиты
   const formatTimeLabel = (date) => {
-    if (!date) return '';
-    
-    // Проверяем является ли date объектом Date
-    const dateObj = date instanceof Date ? date : new Date(date);
-    
-    // Проверяем корректность даты
-    if (isNaN(dateObj.getTime())) {
-      console.warn('Некорректная дата:', date);
-      return 'Некорректная дата';
-    }
-    
-    // Форматируем в казахстанское время
-    const diffDays = endDate && startDate ? 
-      Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) : 0;
-    
-    if (diffDays <= 1) {
-      // Для одного дня показываем только время
-      return dateObj.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } else if (diffDays <= 7) {
-      // Для периода до недели - день и время
-      return dateObj.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        day: 'numeric',
-        month: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } else {
-      // Для более длительных периодов - только день и месяц
-      return dateObj.toLocaleString('ru-RU', {
-        timeZone: 'Asia/Almaty',
-        day: 'numeric',
-        month: 'numeric'
-      });
-    }
+    return formatChartTimeLabel(date, startDate, endDate);
   };
 
-  // Обработчик события изменения диапазона дат
+  // Обновляем обработчик события изменения диапазона дат
   const handleDateRangeChanged = (event) => {
-    const { detail } = event;
-    if (!detail) return;
-    
-    const { startDate: newStartDate, endDate: newEndDate, period, source, timestamp } = detail;
-    
-    // Проверяем, что источник события не этот компонент
-    if (source === 'EngineChart') return;
-    
-    console.log('EngineChart: Обработка события изменения диапазона дат:', detail);
-    
-    // Обновляем даты из события
-    if (newStartDate && newEndDate) {
-      const validStartDate = new Date(newStartDate);
-      const validEndDate = new Date(newEndDate);
+    try {
+      const { startDate: newStartDate, endDate: newEndDate, period, timestamp, forceUpdate } = event.detail;
       
-      if (isNaN(validStartDate.getTime()) || isNaN(validEndDate.getTime())) {
-        console.error('EngineChart: Получены некорректные даты:', { newStartDate, newEndDate });
+      console.log('EngineChart: Обработка события изменения диапазона дат:', event.detail);
+      
+      // Сохраняем метку времени последнего обновления
+      window.lastDateUpdateTime = timestamp || new Date().getTime();
+      
+      // Если передан предустановленный период (неделя, месяц и т.д.)
+      if (period) {
+        console.log('EngineChart: Обработка предустановленного периода:', period);
+        
+        // Создаем даты на основе предустановленного периода
+        let validStartDate = new Date();
+        let validEndDate = new Date();
+        
+        switch(period) {
+          case 'day':
+            // Текущий день
+            validStartDate.setHours(0, 0, 0, 0);
+            break;
+          case 'week':
+            // Последние 7 дней
+            validStartDate = new Date(validEndDate);
+            validStartDate.setDate(validEndDate.getDate() - 7);
+            validStartDate.setHours(0, 0, 0, 0);
+            break;
+          case 'month':
+            // Последние 30 дней
+            validStartDate = new Date(validEndDate);
+            validStartDate.setDate(validEndDate.getDate() - 30);
+            break;
+          case 'year':
+            // Последние 365 дней
+            validStartDate = new Date(validEndDate);
+            validStartDate.setDate(validEndDate.getDate() - 365);
+            break;
+          default:
+            // По умолчанию - неделя
+            validStartDate = new Date(validEndDate);
+            validStartDate.setDate(validEndDate.getDate() - 7);
+        }
+        
+        setStartDate(validStartDate);
+        setEndDate(validEndDate);
         return;
       }
       
-      console.log('EngineChart: Обновление дат из события:', {
-        start: validStartDate.toISOString(),
-        end: validEndDate.toISOString()
-      });
-      
-      // Сохраняем метку времени последнего обновления
-      window.lastDateUpdateTime = timestamp || new Date().getTime();
-      
-      setStartDate(validStartDate);
-      setEndDate(validEndDate);
-      
-      return;
-    }
-    
-    // Если передан предустановленный период (неделя, месяц и т.д.)
-    if (period) {
-      console.log('EngineChart: Обработка предустановленного периода:', period);
-      
-      // Создаем даты на основе предустановленного периода
-      let validStartDate = new Date();
-      let validEndDate = new Date();
-      
-      switch(period) {
-        case 'day':
-          // Текущий день
-          validStartDate.setHours(0, 0, 0, 0);
-          break;
-        case 'week':
-          // Последние 7 дней
-          validStartDate = new Date(validEndDate);
-          validStartDate.setDate(validEndDate.getDate() - 7);
-          validStartDate.setHours(0, 0, 0, 0);
-          break;
-        case 'month':
-          // Последние 30 дней
-          validStartDate = new Date(validEndDate);
-          validStartDate.setDate(validEndDate.getDate() - 30);
-          break;
-        case 'year':
-          // Последние 365 дней
-          validStartDate = new Date(validEndDate);
-          validStartDate.setDate(validEndDate.getDate() - 365);
-          break;
-        default:
-          // По умолчанию - неделя
-          validStartDate = new Date(validEndDate);
-          validStartDate.setDate(validEndDate.getDate() - 7);
+      // Проверяем наличие дат
+      if (newStartDate && newEndDate) {
+        // Преобразуем строковые даты в объекты Date используя общую утилиту
+        const validStartDate = ensureValidDate(newStartDate);
+        const validEndDate = ensureValidDate(newEndDate);
+        
+        console.log('EngineChart: Преобразованные даты:', {
+          startDate: validStartDate.toISOString(),
+          endDate: validEndDate.toISOString()
+        });
+        
+        setStartDate(validStartDate);
+        setEndDate(validEndDate);
+      } else if (forceUpdate) {
+        // Получаем даты из localStorage при forceUpdate используя общую утилиту
+        const { startDate: storedStartDate, endDate: storedEndDate } = getDateRangeFromLocalStorage();
+        
+        if (storedStartDate && storedEndDate) {
+          console.log('EngineChart: Даты из localStorage:', {
+            startDate: storedStartDate.toISOString(),
+            endDate: storedEndDate.toISOString()
+          });
+          
+          setStartDate(storedStartDate);
+          setEndDate(storedEndDate);
+        }
+      } else {
+        console.warn('EngineChart: Получены неполные данные в событии dateRangeChanged:', event.detail);
       }
-      
-      // Сохраняем метку времени последнего обновления
-      window.lastDateUpdateTime = timestamp || new Date().getTime();
-      
-      console.log('EngineChart: Обновление дат на основе периода:', {
-        start: validStartDate.toISOString(),
-        end: validEndDate.toISOString()
-      });
-      
-      setStartDate(validStartDate);
-      setEndDate(validEndDate);
+    } catch (error) {
+      console.error('EngineChart: Ошибка при обработке события изменения дат:', error);
     }
   };
 
@@ -209,9 +172,12 @@ const EngineChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate
     setIsLoading(true);
     setError(null);
     
+    // Проверяем и исправляем диапазон дат
+    const { startDate: validStartDate, endDate: validEndDate } = validateDateRange(startDate, endDate);
+    
     // Форматируем даты для API
-    const formattedStartDate = startDate.toISOString();
-    const formattedEndDate = endDate.toISOString();
+    const formattedStartDate = validStartDate.toISOString();
+    const formattedEndDate = validEndDate.toISOString();
     
     try {
       console.log(`Запрос данных о состоянии двигателя для ${vehicle.name || vehicle.imei}:`, {
@@ -454,14 +420,7 @@ const EngineChart = ({ vehicle, startDate: propsStartDate, endDate: propsEndDate
             if (tooltipItems.length > 0) {
               const dateTime = tooltipItems[0].xLabel;
               if (dateTime && dateTime instanceof Date) {
-                return dateTime.toLocaleString('ru-RU', {
-                  timeZone: 'Asia/Almaty',
-                  day: 'numeric',
-                  month: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                });
+                return formatChartTooltipTime(dateTime);
               }
             }
             return '';
